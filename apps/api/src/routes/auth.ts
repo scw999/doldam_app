@@ -27,7 +27,8 @@ auth.post('/phone/request', async (c) => {
   );
   await sendOtp(c.env, phone, code);
 
-  return c.json({ ok: true, ttlSec: OTP_TTL_SEC });
+  const devMode = c.env.ENV === 'development' || !c.env.DANAL_API_KEY;
+  return c.json({ ok: true, ttlSec: OTP_TTL_SEC, ...(devMode && { devCode: code }) });
 });
 
 // ---- 2. OTP 검증 → temp_phone JWT ----

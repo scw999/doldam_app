@@ -28,10 +28,12 @@ export default function LoginScreen() {
     }
     setLoading(true);
     try {
-      await api.post('/auth/phone/request', { phone: clean }, { auth: 'none' });
+      const res = await api.post<{ ok: boolean; devCode?: string }>(
+        '/auth/phone/request', { phone: clean }, { auth: 'none' }
+      );
       setSent(true);
       setTimeout(() => {
-        router.push({ pathname: '/auth/verify', params: { phone: clean } });
+        router.push({ pathname: '/auth/verify', params: { phone: clean, devCode: res.devCode ?? '' } });
       }, 800);
     } catch (e) {
       Alert.alert('발송 실패', (e as Error).message);

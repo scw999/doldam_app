@@ -18,8 +18,8 @@ function fmtSec(s: number) {
 }
 
 export default function VerifyScreen() {
-  const { phone } = useLocalSearchParams<{ phone: string }>();
-  const [code, setCode] = useState('');
+  const { phone, devCode } = useLocalSearchParams<{ phone: string; devCode?: string }>();
+  const [code, setCode] = useState(devCode ?? '');
   const [loading, setLoading] = useState(false);
   const [resending, setResending] = useState(false);
   const [seconds, setSeconds] = useState(TIMER);
@@ -46,8 +46,10 @@ export default function VerifyScreen() {
   async function resend() {
     setResending(true);
     try {
-      await api.post('/auth/phone/request', { phone }, { auth: 'none' });
-      setCode('');
+      const res = await api.post<{ ok: boolean; devCode?: string }>(
+        '/auth/phone/request', { phone }, { auth: 'none' }
+      );
+      setCode(res.devCode ?? '');
       startTimer();
       Alert.alert('재전송 완료', '인증번호를 다시 보냈습니다');
     } catch (e) {

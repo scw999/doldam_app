@@ -3,7 +3,7 @@ import type { Env } from '../types';
 // 다날/NHN SMS SDK는 운영 전환 시 연결.
 // Phase 2 동안은 ENV=development에서 OTP를 로그로 출력.
 export async function sendOtp(env: Env, phone: string, code: string): Promise<void> {
-  if (env.ENV === 'development') {
+  if (env.ENV === 'development' || !env.DANAL_API_KEY) {
     console.log(`[DEV SMS] ${phone} → OTP ${code}`);
     return;
   }
