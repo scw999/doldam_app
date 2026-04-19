@@ -53,7 +53,7 @@ INSERT OR IGNORE INTO comments (id, post_id, user_id, content, created_at) VALUE
   ('cmt-12', 'post-19', 'user-m2', '이 말 저장해놓겠습니다. 요즘 많이 자책하고 있었는데 위로가 돼요.', 1737335000000),
   ('cmt-13', 'post-19', 'user-f5', '정말 그렇죠. 우리 모두 용기 있는 사람들이에요.', 1737338000000),
   ('cmt-14', 'post-20', 'user-f1', '고생하셨어요! 이제 새로운 시작이네요. 치킨 맛있게 드세요!', 1737420000000),
-  ('cmt-15', 'user-m3', 'post-20', '축하드려요! 저도 아직 진행 중인데 희망이 생깁니다.', 1737422000000);
+  ('cmt-15', 'post-20', 'user-m3', '축하드려요! 저도 아직 진행 중인데 희망이 생깁니다.', 1737422000000);
 
 -- ===== 찬반투표 =====
 INSERT OR IGNORE INTO votes (id, user_id, question, description, created_at) VALUES
@@ -64,25 +64,25 @@ INSERT OR IGNORE INTO votes (id, user_id, question, description, created_at) VAL
   ('vote-5', 'user-f4', '이혼 사실, 처음 만나는 사람에게 먼저 밝혀야 할까?', '관계가 어느 정도 됐을 때 말하는 게 맞을까요?', 1736640000000);
 
 -- ===== 투표 참여 =====
-INSERT OR IGNORE INTO vote_choices (vote_id, user_id, choice, gender, created_at) VALUES
-  ('vote-1', 'user-f1', 'yes', 'F', 1735700000000),
-  ('vote-1', 'user-f2', 'no', 'F', 1735710000000),
-  ('vote-1', 'user-m2', 'yes', 'M', 1735720000000),
-  ('vote-1', 'user-m3', 'no', 'M', 1735730000000),
-  ('vote-1', 'user-f3', 'yes', 'F', 1735740000000),
-  ('vote-2', 'user-m1', 'yes', 'M', 1735780000000),
-  ('vote-2', 'user-m2', 'yes', 'M', 1735790000000),
-  ('vote-2', 'user-f2', 'no', 'F', 1735800000000),
-  ('vote-3', 'user-m1', 'yes', 'M', 1736040000000),
-  ('vote-3', 'user-f1', 'yes', 'F', 1736045000000),
-  ('vote-3', 'user-m3', 'no', 'M', 1736050000000),
-  ('vote-4', 'user-f1', 'yes', 'F', 1736215000000),
-  ('vote-4', 'user-f3', 'yes', 'F', 1736220000000),
-  ('vote-4', 'user-m1', 'no', 'M', 1736225000000),
-  ('vote-4', 'user-m4', 'yes', 'M', 1736230000000);
+INSERT OR IGNORE INTO vote_responses (vote_id, user_id, choice, gender, created_at) VALUES
+  ('vote-1', 'user-f1', 'agree', 'F', 1735700000000),
+  ('vote-1', 'user-f2', 'disagree', 'F', 1735710000000),
+  ('vote-1', 'user-m2', 'agree', 'M', 1735720000000),
+  ('vote-1', 'user-m3', 'disagree', 'M', 1735730000000),
+  ('vote-1', 'user-f3', 'agree', 'F', 1735740000000),
+  ('vote-2', 'user-m1', 'agree', 'M', 1735780000000),
+  ('vote-2', 'user-m2', 'agree', 'M', 1735790000000),
+  ('vote-2', 'user-f2', 'disagree', 'F', 1735800000000),
+  ('vote-3', 'user-m1', 'agree', 'M', 1736040000000),
+  ('vote-3', 'user-f1', 'agree', 'F', 1736045000000),
+  ('vote-3', 'user-m3', 'disagree', 'M', 1736050000000),
+  ('vote-4', 'user-f1', 'agree', 'F', 1736215000000),
+  ('vote-4', 'user-f3', 'agree', 'F', 1736220000000),
+  ('vote-4', 'user-m1', 'disagree', 'M', 1736225000000),
+  ('vote-4', 'user-m4', 'agree', 'M', 1736230000000);
 
 -- ===== 포인트 =====
-INSERT OR IGNORE INTO points_ledger (id, user_id, delta, reason, expires_at, created_at) VALUES
+INSERT OR IGNORE INTO points_ledger (id, user_id, amount, reason, expires_at, created_at) VALUES
   ('pts-01', 'user-m1', 100, 'signup_bonus', 1767225600000, 1735689600000),
   ('pts-02', 'user-f1', 100, 'signup_bonus', 1767225600000, 1735689600000),
   ('pts-03', 'user-f2', 100, 'signup_bonus', 1767225600000, 1735689600000),
@@ -126,9 +126,9 @@ INSERT OR IGNORE INTO mission_questions (id, question, category, created_at) VAL
   ('q30', '지금의 나에게 가장 필요한 것은 무엇인가요?', 'self', 1735689600000);
 
 -- ===== 감정 타임라인 =====
-INSERT OR IGNORE INTO moods (id, user_id, mood, note, public, created_at) VALUES
-  ('mood-01', 'user-f1', 'sad', '오늘은 이유 없이 눈물이 났어요', 1, 1737331200000),
-  ('mood-02', 'user-m1', 'okay', '그럭저럭 괜찮은 하루', 1, 1737244800000),
-  ('mood-03', 'user-f2', 'good', '취업 면접 붙었어요!', 1, 1737417600000),
-  ('mood-04', 'user-m2', 'hard', '아이랑 전화하고 나서 마음이 복잡했어요', 0, 1737158400000),
-  ('mood-05', 'user-f3', 'good', '오랜만에 친구들 만났는데 웃었어요', 1, 1737072000000);
+INSERT OR IGNORE INTO moods (id, user_id, mood, note, visibility, created_at) VALUES
+  ('mood-01', 'user-f1', 'sad', '오늘은 이유 없이 눈물이 났어요', 'public', 1737331200000),
+  ('mood-02', 'user-m1', 'okay', '그럭저럭 괜찮은 하루', 'public', 1737244800000),
+  ('mood-03', 'user-f2', 'good', '취업 면접 붙었어요!', 'public', 1737417600000),
+  ('mood-04', 'user-m2', 'hard', '아이랑 전화하고 나서 마음이 복잡했어요', 'private', 1737158400000),
+  ('mood-05', 'user-f3', 'good', '오랜만에 친구들 만났는데 웃었어요', 'public', 1737072000000);
