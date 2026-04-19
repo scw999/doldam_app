@@ -14,20 +14,12 @@ interface Me {
   verified: number; created_at: number;
 }
 
-const BADGES: { e: string; label: string; color: string; unlocked: boolean }[] = [
-  { e: '✓', label: '본인인증', color: '#6BAF7B', unlocked: true },
-  { e: '🌱', label: '첫 글',    color: '#C4956A', unlocked: true },
-  { e: '💬', label: '100댓글',  color: '#5B8FC9', unlocked: true },
-  { e: '🔥', label: '핫글 주인', color: '#E85D4A', unlocked: false },
-  { e: '🏆', label: '7일 연속', color: '#D4728C', unlocked: false },
-];
-
-const MENU: { icon: string; label: string; count?: string; color?: string; onPress?: () => void }[] = [];
-
 export default function MyScreen() {
   const clear = useAuth((s) => s.clear);
   const [me, setMe] = useState<Me | null>(null);
   const [balance, setBalance] = useState(0);
+  const [postCount, setPostCount] = useState<number>(0);
+  const [badgeCount, setBadgeCount] = useState(1);
 
   const load = useCallback(async () => {
     try {
@@ -35,8 +27,12 @@ export default function MyScreen() {
         api.get<Me>('/auth/me'),
         api.get<{ balance: number }>('/points/balance'),
       ]);
-      setMe(meRes); setBalance(pts.balance);
-    } catch {}
+      setMe(meRes);
+      setBalance(pts.balance);
+      if (pts.balance > 0) setBadgeCount(2);
+    } catch (e) {
+      Alert.alert('오류', '정보를 불러올 수 없어요');
+    }
   }, []);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
@@ -48,15 +44,46 @@ export default function MyScreen() {
     ]);
   }
 
+  function deleteAccount() {
+    Alert.alert(
+      '계정 삭제',
+      '계정을 삭제하면 모든 데이터가 영구적으로 삭제됩니다. 정말 삭제하시겠어요?',
+      [
+        { text: '취소', style: 'cancel' },
+        {
+          text: '삭제',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await api.delete('/auth/me');
+              clear();
+            } catch {
+              Alert.alert('오류', '계정 삭제에 실패했어요. 고객센터에 문의해주세요.');
+            }
+          },
+        },
+      ]
+    );
+  }
+
+  const BADGES = [
+    { e: '✓', label: '본인인증', color: '#6BAF7B', unlocked: me?.verified === 1 },
+    { e: '🌱', label: '첫 글',    color: '#C4956A', unlocked: postCount > 0 },
+    { e: '💬', label: '댓글 시작', color: '#5B8FC9', unlocked: balance >= 10 },
+    { e: '🔥', label: '핫글 주인', color: '#E85D4A', unlocked: false },
+    { e: '🏆', label: '7일 연속', color: '#D4728C', unlocked: false },
+  ];
+
+  const unlockedCount = BADGES.filter(b => b.unlocked).length;
+  const daysJoined = me ? Math.floor((Date.now() - me.created_at) / 86400000) : 0;
+
   const menu = [
-    { icon: '📝', label: '내가 쓴 글', onPress: () => {} },
-    { icon: '🔖', label: '스크랩', onPress: () => {} },
-    { icon: '🎨', label: '감정 타임라인', count: '오늘 기록됨', color: colors.green, onPress: () => router.push('/mood') },
+    { icon: '📝', label: '내가 쓴 글', onPress: () => router.push('/my-posts') },
+    { icon: '🎨', label: '감정 타임라인', count: '기록하기', color: colors.green, onPress: () => router.push('/mood') },
     { icon: '📖', label: 'Q&A 미션', count: '진행중', color: colors.primaryDark, onPress: () => router.push('/mission') },
-    { icon: '💎', label: '포인트 내역', onPress: () => {} },
-    { icon: '🔔', label: '알림 설정', onPress: () => {} },
+    { icon: '💎', label: '포인트 내역', count: `${balance}P`, color: colors.primary, onPress: () => router.push('/points') },
+    { icon: '🔔', label: '알림', onPress: () => router.push('/notifications') },
     { icon: '✏️', label: '프로필 편집', onPress: () => router.push('/profile-edit') },
-    { icon: '⚙️', label: '설정', onPress: () => {} },
   ];
 
   return (
@@ -92,7 +119,7 @@ export default function MyScreen() {
                   borderRadius: radius.full,
                 }}>
                   <Text style={{ fontSize: 11, fontWeight: '600', color: colors.primaryDark }}>
-                    가입 {Math.floor((Date.now() - me.created_at) / 86400000)}일차
+                    가입 {daysJoined}일차
                   </Text>
                 </View>
               )}
@@ -101,8 +128,8 @@ export default function MyScreen() {
 
           <View style={[styles.statRow, { borderTopColor: colors.border }]}>
             <Stat label="포인트" value={`${balance}`} unit="P" color={colors.primary} />
-            <Stat label="매칭 온도" value="36.5" unit="°" color={colors.female} />
-            <Stat label="뱃지" value="3" unit=" / 5" color={colors.green} />
+            <Stat label="가입" value={`${daysJoined}`} unit="일차" color={colors.female} />
+            <Stat label="뱃지" value={`${unlockedCount}`} unit={` / ${BADGES.length}`} color={colors.green} />
           </View>
         </Card>
 
@@ -119,10 +146,9 @@ export default function MyScreen() {
                   borderWidth: 1.5,
                   borderColor: b.unlocked ? b.color + '55' : colors.border,
                 }}>
-                  <Text style={{
-                    fontSize: 18, fontWeight: '700',
-                    color: b.unlocked ? b.color : colors.textLight,
-                  }}>{b.unlocked ? b.e : '🔒'}</Text>
+                  <Text style={{ fontSize: 18, fontWeight: '700', color: b.unlocked ? b.color : colors.textLight }}>
+                    {b.unlocked ? b.e : '🔒'}
+                  </Text>
                 </View>
                 <Text style={{ fontSize: 10, color: colors.textSub }}>{b.label}</Text>
               </View>
@@ -131,7 +157,7 @@ export default function MyScreen() {
         </Card>
 
         {/* 메뉴 리스트 */}
-        <Card style={{ overflow: 'hidden' }}>
+        <Card style={{ overflow: 'hidden', marginBottom: 12 }}>
           {menu.map((m, i) => (
             <Pressable
               key={m.label}
@@ -148,11 +174,16 @@ export default function MyScreen() {
           ))}
         </Card>
 
-        <Pressable onPress={logout} style={{ padding: 24, alignItems: 'center' }}>
-          <Text style={{ fontSize: 11, color: colors.textLight, letterSpacing: -0.1 }}>
-            로그아웃 · 계정 삭제
-          </Text>
-        </Pressable>
+        {/* 계정 관리 */}
+        <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 20, paddingVertical: 16 }}>
+          <Pressable onPress={logout}>
+            <Text style={{ fontSize: 13, color: colors.textSub }}>로그아웃</Text>
+          </Pressable>
+          <Text style={{ fontSize: 13, color: colors.border }}>|</Text>
+          <Pressable onPress={deleteAccount}>
+            <Text style={{ fontSize: 13, color: colors.error }}>계정 삭제</Text>
+          </Pressable>
+        </View>
       </ScrollView>
     </View>
   );

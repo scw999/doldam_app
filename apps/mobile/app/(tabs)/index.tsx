@@ -16,13 +16,13 @@ interface Post {
 }
 
 const MOODS = [
-  { e: '🌤️', label: '괜찮아요' },
-  { e: '😔', label: '울적해요' },
-  { e: '😤', label: '답답해요' },
-  { e: '😭', label: '무너져요' },
-  { e: '🔥', label: '열받아요' },
-  { e: '🌱', label: '희망보여요' },
-  { e: '😶', label: '멍해요' },
+  { e: '🌤️', label: '괜찮아요',  key: 'okay' },
+  { e: '😔', label: '울적해요',  key: 'sad' },
+  { e: '😤', label: '답답해요',  key: 'stressed' },
+  { e: '😭', label: '무너져요',  key: 'hard' },
+  { e: '🔥', label: '열받아요',  key: 'angry' },
+  { e: '🌱', label: '희망보여요', key: 'hopeful' },
+  { e: '😶', label: '멍해요',   key: 'blank' },
 ];
 
 const CATEGORY_COLORS: Record<string, { label: string; color: string }> = {
@@ -62,7 +62,7 @@ export default function HomeScreen() {
   async function selectMood(i: number) {
     setMood(i);
     try {
-      await api.post('/moods', { mood: ['good', 'sad', 'angry', 'sad', 'angry', 'hopeful', 'soso'][i], visibility: 'private' });
+      await api.post('/moods', { mood: MOODS[i].key, visibility: 'private' });
       setToast('+3P 기분 기록 완료');
       setTimeout(() => setToast(null), 1800);
     } catch {}

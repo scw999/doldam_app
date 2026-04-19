@@ -44,7 +44,8 @@ export default function BoardScreen() {
       ]);
       setItems(posts.items);
       setBalance(pts.balance);
-    } finally { setLoading(false); }
+    } catch (e) { console.warn('board load', e); }
+    finally { setLoading(false); }
   }, []);
 
   useFocusEffect(useCallback(() => { load(cat); }, [cat, load]));

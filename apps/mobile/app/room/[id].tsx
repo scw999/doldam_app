@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, TextInput, Pressable, Alert, KeyboardAvoidingView, Platform, SafeAreaView } from 'react-native';
+import {
+  View, Text, StyleSheet, FlatList, TextInput, Pressable,
+  Alert, KeyboardAvoidingView, Platform, SafeAreaView,
+} from 'react-native';
 import { useLocalSearchParams, useFocusEffect, router } from 'expo-router';
 import { colors, radius, spacing, typography } from '@/theme';
 import { Avatar, fmtRemaining } from '@/ui/atoms';
@@ -7,13 +10,10 @@ import { useAuth } from '@/store/auth';
 import { api } from '@/api';
 
 const API_BASE = process.env.EXPO_PUBLIC_API_BASE ?? 'http://localhost:8787';
+const RECONNECT_DELAY = 3000;
 
 interface Message {
-  id: string;
-  from: string;
-  nickname: string;
-  text: string;
-  ts: number;
+  id: string; from: string; nickname: string; text: string; ts: number;
 }
 
 interface RoomInfo {
@@ -30,8 +30,11 @@ export default function RoomScreen() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [draft, setDraft] = useState('');
   const [connected, setConnected] = useState(false);
+  const [now, setNow] = useState(Date.now());
   const wsRef = useRef<WebSocket | null>(null);
+  const reconnectRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const listRef = useRef<FlatList<Message>>(null);
+  const mountedRef = useRef(true);
 
   const loadRoom = useCallback(async () => {
     try {
@@ -41,19 +44,38 @@ export default function RoomScreen() {
       ]);
       setRoom(info);
       setMessages(history.items);
-    } catch (e) { console.warn('load room', e); }
+    } catch (e) {
+      Alert.alert('오류', '방 정보를 불러올 수 없어요');
+    }
   }, [id]);
 
   useFocusEffect(useCallback(() => { loadRoom(); }, [loadRoom]));
 
+  // 남은시간 매분 갱신
   useEffect(() => {
-    if (!token || !id) return;
+    const tick = setInterval(() => setNow(Date.now()), 60000);
+    return () => clearInterval(tick);
+  }, []);
+
+  // WebSocket 연결 (자동 재연결 포함)
+  function connect() {
+    if (!token || !id || !mountedRef.current) return;
     const wsUrl = `${API_BASE.replace(/^http/, 'ws')}/rooms/${id}/ws?token=${encodeURIComponent(token)}`;
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
-    ws.onopen = () => setConnected(true);
-    ws.onclose = () => setConnected(false);
-    ws.onerror = (e) => console.warn('ws error', e);
+
+    ws.onopen = () => {
+      if (mountedRef.current) setConnected(true);
+    };
+
+    ws.onclose = () => {
+      if (!mountedRef.current) return;
+      setConnected(false);
+      reconnectRef.current = setTimeout(() => connect(), RECONNECT_DELAY);
+    };
+
+    ws.onerror = () => {};
+
     ws.onmessage = (evt) => {
       try {
         const data = JSON.parse(evt.data);
@@ -64,7 +86,16 @@ export default function RoomScreen() {
         }
       } catch {}
     };
-    return () => ws.close();
+  }
+
+  useEffect(() => {
+    mountedRef.current = true;
+    connect();
+    return () => {
+      mountedRef.current = false;
+      if (reconnectRef.current) clearTimeout(reconnectRef.current);
+      wsRef.current?.close();
+    };
   }, [id, token]);
 
   function send() {
@@ -79,8 +110,12 @@ export default function RoomScreen() {
       const r = await api.post<{ kept: boolean; yes: number; total: number }>(
         `/rooms/${id}/keep-vote`, { keep }
       );
-      if (r.kept) Alert.alert('방 유지', '3일 연장되었어요');
-      else Alert.alert('투표 완료', `유지 ${r.yes} / ${r.total}명`);
+      if (r.kept) {
+        Alert.alert('방 유지', '3일 연장되었어요');
+        loadRoom();
+      } else {
+        Alert.alert('투표 완료', `유지 ${r.yes} / ${r.total}명`);
+      }
     } catch (e) { Alert.alert('실패', (e as Error).message); }
   }
 
@@ -101,13 +136,12 @@ export default function RoomScreen() {
 
   const rem = room ? fmtRemaining(room.expires_at) : { label: '...', urgent: false };
   const isThemed = room?.kind === 'themed';
+  const isExpired = room?.status === 'expired' || rem.label === '0분';
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+
         {/* 헤더 */}
         <View style={styles.header}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 }}>
@@ -118,9 +152,18 @@ export default function RoomScreen() {
               <Text style={[typography.h3, { color: colors.text, fontSize: 15 }]} numberOfLines={1}>
                 {isThemed && '🔥 '}{room?.theme ?? '소그룹'}
               </Text>
-              <Text style={{ fontSize: 11, color: colors.textSub, marginTop: 2 }}>
-                👥 {room?.members?.length ?? 0}명
-              </Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 }}>
+                <Text style={{ fontSize: 11, color: colors.textSub }}>
+                  👥 {room?.members?.length ?? 0}명
+                </Text>
+                <View style={{
+                  width: 6, height: 6, borderRadius: 3,
+                  backgroundColor: connected ? colors.green : colors.textLight,
+                }} />
+                <Text style={{ fontSize: 10, color: connected ? colors.green : colors.textLight }}>
+                  {connected ? '연결됨' : '연결 중...'}
+                </Text>
+              </View>
             </View>
           </View>
 
@@ -135,13 +178,10 @@ export default function RoomScreen() {
               color: rem.urgent ? colors.badge : colors.primaryDark,
             }}>⏱ {rem.label} 남음</Text>
             <View style={{ flex: 1 }} />
-            {rem.label === '0분' || room?.status === 'expired' ? (
+            {isExpired ? (
               <Pressable
                 onPress={revive}
-                style={{
-                  paddingHorizontal: 10, paddingVertical: 4,
-                  borderRadius: radius.full, backgroundColor: colors.error,
-                }}
+                style={{ paddingHorizontal: 10, paddingVertical: 4, borderRadius: radius.full, backgroundColor: colors.error }}
               >
                 <Text style={{ fontSize: 10, fontWeight: '600', color: '#fff' }}>부활 200P</Text>
               </Pressable>
@@ -149,21 +189,13 @@ export default function RoomScreen() {
               <>
                 <Pressable
                   onPress={() => keepVote(true)}
-                  style={{
-                    paddingHorizontal: 10, paddingVertical: 4,
-                    borderRadius: radius.full, backgroundColor: colors.green,
-                  }}
+                  style={{ paddingHorizontal: 10, paddingVertical: 4, borderRadius: radius.full, backgroundColor: colors.green }}
                 >
                   <Text style={{ fontSize: 10, fontWeight: '600', color: '#fff' }}>유지</Text>
                 </Pressable>
                 <Pressable
                   onPress={() => keepVote(false)}
-                  style={{
-                    paddingHorizontal: 10, paddingVertical: 4,
-                    borderRadius: radius.full,
-                    borderWidth: 1, borderColor: colors.border,
-                    backgroundColor: colors.card,
-                  }}
+                  style={{ paddingHorizontal: 10, paddingVertical: 4, borderRadius: radius.full, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card }}
                 >
                   <Text style={{ fontSize: 10, fontWeight: '600', color: colors.textSub }}>폭파</Text>
                 </Pressable>
@@ -179,24 +211,24 @@ export default function RoomScreen() {
           data={messages}
           keyExtractor={(m) => m.id}
           ListHeaderComponent={
-            <View style={{
-              padding: 12, backgroundColor: colors.accent + '80',
-              borderRadius: 10, marginBottom: 14,
-            }}>
-              <Text style={{
-                fontSize: 11, color: colors.primaryDark, textAlign: 'center',
-                fontWeight: '500',
-              }}>🔒 본인인증된 돌싱만 입장 가능한 방이에요</Text>
+            <View style={{ padding: 12, backgroundColor: colors.accent + '80', borderRadius: 10, marginBottom: 14 }}>
+              <Text style={{ fontSize: 11, color: colors.primaryDark, textAlign: 'center', fontWeight: '500' }}>
+                🔒 본인인증된 돌싱만 입장 가능한 방이에요
+              </Text>
             </View>
+          }
+          ListEmptyComponent={
+            <Text style={{ textAlign: 'center', color: colors.textSub, marginTop: 40, fontSize: 13 }}>
+              첫 메시지를 보내보세요
+            </Text>
           }
           onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: false })}
           renderItem={({ item: m }) => {
             if (m.from === 'system') {
               return (
-                <Text style={{
-                  fontSize: 11, color: colors.textSub, textAlign: 'center',
-                  marginVertical: 6,
-                }}>{m.text}</Text>
+                <Text style={{ fontSize: 11, color: colors.textSub, textAlign: 'center', marginVertical: 6 }}>
+                  {m.text}
+                </Text>
               );
             }
             return <Bubble msg={m} mine={m.from === myUserId} />;
@@ -211,21 +243,21 @@ export default function RoomScreen() {
             onChangeText={setDraft}
             placeholder={connected ? '메시지 보내기' : '연결 중...'}
             placeholderTextColor={colors.textLight}
-            editable={connected}
+            editable={connected && !isExpired}
+            onSubmitEditing={send}
+            returnKeyType="send"
+            blurOnSubmit={false}
           />
           <Pressable
             onPress={send}
-            disabled={!connected || !draft.trim()}
+            disabled={!connected || !draft.trim() || isExpired}
             style={{
               width: 40, height: 40, borderRadius: 20,
-              backgroundColor: draft.trim() ? colors.primary : colors.tag,
+              backgroundColor: draft.trim() && connected ? colors.primary : colors.tag,
               alignItems: 'center', justifyContent: 'center',
             }}
           >
-            <Text style={{
-              fontSize: 16, fontWeight: '700',
-              color: draft.trim() ? '#fff' : colors.textLight,
-            }}>↑</Text>
+            <Text style={{ fontSize: 16, fontWeight: '700', color: draft.trim() ? '#fff' : colors.textLight }}>↑</Text>
           </Pressable>
         </View>
       </KeyboardAvoidingView>
@@ -235,10 +267,7 @@ export default function RoomScreen() {
 
 function Bubble({ msg, mine }: { msg: Message; mine: boolean }) {
   return (
-    <View style={{
-      flexDirection: mine ? 'row-reverse' : 'row',
-      gap: 8, marginBottom: 12, alignItems: 'flex-end',
-    }}>
+    <View style={{ flexDirection: mine ? 'row-reverse' : 'row', gap: 8, marginBottom: 12, alignItems: 'flex-end' }}>
       {!mine && <Avatar size={28} />}
       <View style={{ maxWidth: '74%' }}>
         {!mine && (
@@ -246,29 +275,20 @@ function Bubble({ msg, mine }: { msg: Message; mine: boolean }) {
             {msg.nickname}
           </Text>
         )}
-        <View style={{
-          flexDirection: mine ? 'row-reverse' : 'row',
-          alignItems: 'flex-end', gap: 6,
-        }}>
+        <View style={{ flexDirection: mine ? 'row-reverse' : 'row', alignItems: 'flex-end', gap: 6 }}>
           <View style={{
             padding: 12, paddingHorizontal: 13,
             backgroundColor: mine ? colors.primary : colors.card,
             borderRadius: 16,
             borderBottomRightRadius: mine ? 4 : 16,
             borderBottomLeftRadius: mine ? 16 : 4,
-            shadowColor: '#2C2420', shadowOpacity: mine ? 0 : 0.04,
-            shadowRadius: 2, shadowOffset: { width: 0, height: 1 },
             elevation: mine ? 0 : 1,
           }}>
-            <Text style={{
-              fontSize: 13.5, lineHeight: 20,
-              color: mine ? '#fff' : colors.text,
-              letterSpacing: -0.1,
-            }}>{msg.text}</Text>
+            <Text style={{ fontSize: 13.5, lineHeight: 20, color: mine ? '#fff' : colors.text, letterSpacing: -0.1 }}>
+              {msg.text}
+            </Text>
           </View>
-          <Text style={{ fontSize: 10, color: colors.textLight }}>
-            {fmtHhmm(msg.ts)}
-          </Text>
+          <Text style={{ fontSize: 10, color: colors.textLight }}>{fmtHhmm(msg.ts)}</Text>
         </View>
       </View>
     </View>
@@ -280,8 +300,7 @@ function fmtHhmm(ts: number): string {
   const h = d.getHours();
   const m = d.getMinutes();
   const ap = h < 12 ? '오전' : '오후';
-  const hh = h % 12 || 12;
-  return `${ap} ${hh}:${String(m).padStart(2, '0')}`;
+  return `${ap} ${h % 12 || 12}:${String(m).padStart(2, '0')}`;
 }
 
 const styles = StyleSheet.create({
@@ -298,9 +317,7 @@ const styles = StyleSheet.create({
   },
   input: {
     flex: 1, paddingHorizontal: 14, paddingVertical: 11,
-    borderRadius: radius.full,
-    borderWidth: 1, borderColor: colors.border,
-    backgroundColor: colors.bg,
-    fontSize: 13, color: colors.text,
+    borderRadius: radius.full, borderWidth: 1, borderColor: colors.border,
+    backgroundColor: colors.bg, fontSize: 13, color: colors.text,
   },
 });

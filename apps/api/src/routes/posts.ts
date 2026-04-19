@@ -31,6 +31,19 @@ posts.get('/', async (c) => {
   return c.json({ items: results, nextCursor });
 });
 
+// ---- 내 글 목록 ----
+posts.get('/mine', requireAuth, async (c) => {
+  const user = c.get('user');
+  const { results } = await c.env.DOLDAM_DB
+    .prepare(
+      `SELECT id, title, content, category, like_count, comment_count, created_at
+       FROM posts WHERE user_id = ? AND deleted_at IS NULL
+       ORDER BY created_at DESC LIMIT 50`
+    )
+    .bind(user.id).all();
+  return c.json({ items: results });
+});
+
 // ---- 생성 ----
 posts.post('/', requireAuth, moderate, async (c) => {
   const user = c.get('user');

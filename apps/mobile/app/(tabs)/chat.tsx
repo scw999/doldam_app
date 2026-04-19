@@ -40,6 +40,8 @@ export default function ChatScreen() {
     setMatching(true);
     try {
       await api.post('/rooms/match', {});
+      await load();
+      setTab('my');
       Alert.alert('매칭 대기', '6명이 모이면 방이 열려요');
     } catch (e) { Alert.alert('실패', (e as Error).message); }
     finally { setMatching(false); }
