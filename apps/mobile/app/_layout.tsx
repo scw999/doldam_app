@@ -1,33 +1,10 @@
 import { useEffect } from 'react';
-import { Platform } from 'react-native';
 import { Stack, router, useSegments, useRootNavigationState } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useFonts, NotoSerifKR_600SemiBold, NotoSerifKR_700Bold } from '@expo-google-fonts/noto-serif-kr';
-import * as Notifications from 'expo-notifications';
 import { useAuth } from '@/store/auth';
-import { api } from '@/api';
 import { colors } from '@/theme';
-
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: false,
-  }),
-});
-
-async function registerPushToken() {
-  if (Platform.OS === 'web') return;
-  const { status } = await Notifications.requestPermissionsAsync();
-  if (status !== 'granted') return;
-  const tokenData = await Notifications.getExpoPushTokenAsync().catch(() => null);
-  if (!tokenData) return;
-  await api.post('/notifications/token', {
-    token: tokenData.data,
-    platform: Platform.OS as 'ios' | 'android',
-  }).catch(() => {});
-}
 
 function AuthGate() {
   const { token, hydrated } = useAuth();
@@ -41,10 +18,6 @@ function AuthGate() {
     if (!token && !inAuth) router.replace('/auth/login');
     else if (token && inAuth) router.replace('/(tabs)');
   }, [token, hydrated, segments, navState?.key]);
-
-  useEffect(() => {
-    if (token) registerPushToken();
-  }, [token]);
 
   return null;
 }
