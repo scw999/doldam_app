@@ -89,7 +89,7 @@ export default function CertificateScreen() {
       )}
 
       {status === 'verified' && (
-        <Text style={[styles.stateText, { color: colors.success }]}>검증 완료! 다음 단계로 이동합니다...</Text>
+        <Text style={[styles.stateText, { color: colors.green }]}>검증 완료! 다음 단계로 이동합니다...</Text>
       )}
 
       {status === 'rejected' && (
@@ -106,7 +106,7 @@ export default function CertificateScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background, padding: spacing.md },
+  container: { flex: 1, backgroundColor: colors.bg, padding: spacing.md },
   title: { ...typography.h2, color: colors.text, marginTop: spacing.md },
   sub: { ...typography.body, color: colors.textSub, marginTop: spacing.sm, lineHeight: 22, marginBottom: spacing.lg },
   cta: { backgroundColor: colors.primary, padding: spacing.md, borderRadius: radius.md, alignItems: 'center' },

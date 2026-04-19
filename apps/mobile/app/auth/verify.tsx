@@ -136,7 +136,7 @@ export default function VerifyScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background, padding: spacing.lg },
+  container: { flex: 1, backgroundColor: colors.bg, padding: spacing.lg },
   title: { ...typography.h2, color: colors.text, marginTop: spacing.lg },
   sub: { ...typography.body, color: colors.textSub, marginTop: spacing.xs, marginBottom: spacing.lg },
   input: {
