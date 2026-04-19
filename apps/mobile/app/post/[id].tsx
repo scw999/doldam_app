@@ -111,13 +111,36 @@ export default function PostDetail() {
     ]);
   }
 
-  function openMenu() {
-    if (!post || post.user_id !== myUserId) return;
-    Alert.alert('게시글 관리', '', [
-      { text: '수정', onPress: openEdit },
-      { text: '삭제', style: 'destructive', onPress: confirmDelete },
+  function reportPost() {
+    Alert.alert('신고 사유 선택', '', [
+      { text: '개인정보 포함', onPress: () => submitReport('post', id, '개인정보 포함') },
+      { text: '욕설/혐오 발언', onPress: () => submitReport('post', id, '욕설/혐오 발언') },
+      { text: '스팸/홍보', onPress: () => submitReport('post', id, '스팸/홍보') },
       { text: '취소', style: 'cancel' },
     ]);
+  }
+
+  async function submitReport(targetType: string, targetId: string, reason: string) {
+    try {
+      await api.post('/reports', { targetType, targetId, reason });
+      Alert.alert('신고 완료', '검토 후 조치하겠습니다');
+    } catch { Alert.alert('오류', '신고에 실패했어요'); }
+  }
+
+  function openMenu() {
+    if (!post) return;
+    if (post.user_id === myUserId) {
+      Alert.alert('게시글 관리', '', [
+        { text: '수정', onPress: openEdit },
+        { text: '삭제', style: 'destructive', onPress: confirmDelete },
+        { text: '취소', style: 'cancel' },
+      ]);
+    } else {
+      Alert.alert('게시글', '', [
+        { text: '신고하기', style: 'destructive', onPress: reportPost },
+        { text: '취소', style: 'cancel' },
+      ]);
+    }
   }
 
   if (!post) return <ActivityIndicator style={{ marginTop: 40 }} />;
@@ -133,11 +156,9 @@ export default function PostDetail() {
         </Pressable>
         <Tag label={cat.label} color={cat.color} />
         <View style={{ flex: 1 }} />
-        {isMine && (
-          <Pressable onPress={openMenu} style={{ padding: 8 }}>
-            <Text style={{ fontSize: 20, color: colors.textSub }}>⋯</Text>
-          </Pressable>
-        )}
+        <Pressable onPress={openMenu} style={{ padding: 8 }}>
+          <Text style={{ fontSize: 20, color: colors.textSub }}>⋯</Text>
+        </Pressable>
       </View>
 
       <ScrollView style={{ flex: 1 }}>
@@ -199,13 +220,25 @@ export default function PostDetail() {
           {comments.map((c) => {
             const mine = c.user_id === myUserId;
             return (
-              <View key={c.id} style={{
-                padding: 14,
-                backgroundColor: mine ? colors.accent + '66' : colors.card,
-                borderWidth: 1,
-                borderColor: mine ? colors.primary + '33' : colors.border,
-                borderRadius: 14,
-              }}>
+              <Pressable
+                key={c.id}
+                onLongPress={() => {
+                  if (!mine) {
+                    Alert.alert('댓글 신고', '', [
+                      { text: '개인정보 포함', onPress: () => submitReport('comment', c.id, '개인정보 포함') },
+                      { text: '욕설/혐오', onPress: () => submitReport('comment', c.id, '욕설/혐오 발언') },
+                      { text: '취소', style: 'cancel' },
+                    ]);
+                  }
+                }}
+                style={{
+                  padding: 14,
+                  backgroundColor: mine ? colors.accent + '66' : colors.card,
+                  borderWidth: 1,
+                  borderColor: mine ? colors.primary + '33' : colors.border,
+                  borderRadius: 14,
+                }}
+              >
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 }}>
                   <Avatar gender={c.gender} size={24} />
                   <Text style={{ fontSize: 11.5, fontWeight: '600', color: colors.text }}>
@@ -217,7 +250,7 @@ export default function PostDetail() {
                   <Text style={{ fontSize: 10, color: colors.textLight }}>{timeAgo(c.created_at)}</Text>
                 </View>
                 <Text style={{ fontSize: 13.5, color: colors.text, lineHeight: 21 }}>{c.content}</Text>
-              </View>
+              </Pressable>
             );
           })}
         </View>

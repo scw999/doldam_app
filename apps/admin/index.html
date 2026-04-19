@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>돌담 관리자</title>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:system-ui,sans-serif;background:#FAF6F1;color:#2C2420;font-size:14px}
+    header{background:#A07850;color:#fff;padding:14px 20px;display:flex;align-items:center;gap:12px}
+    header h1{font-size:18px;font-weight:700}
+    #login{max-width:360px;margin:60px auto;background:#fff;border-radius:12px;padding:32px;border:1px solid #EDE4DA}
+    #login h2{font-size:16px;font-weight:700;margin-bottom:20px;color:#A07850}
+    input,select{width:100%;padding:10px 12px;border:1px solid #EDE4DA;border-radius:8px;font-size:14px;color:#2C2420;background:#FAF6F1;margin-bottom:10px}
+    button{background:#C4956A;color:#fff;border:none;padding:10px 20px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer}
+    button:hover{background:#A07850}
+    button.danger{background:#E07B6B}
+    button.ghost{background:transparent;color:#8C7B6B;border:1px solid #EDE4DA}
+    .container{max-width:900px;margin:0 auto;padding:20px}
+    .tabs{display:flex;gap:0;border-bottom:1px solid #EDE4DA;margin-bottom:20px}
+    .tab{padding:10px 20px;cursor:pointer;font-size:13px;font-weight:500;color:#8C7B6B;border-bottom:2px solid transparent;margin-bottom:-1px}
+    .tab.active{color:#2C2420;border-bottom-color:#C4956A;font-weight:700}
+    .section{display:none}.section.active{display:block}
+    .card{background:#fff;border:1px solid #EDE4DA;border-radius:12px;padding:16px;margin-bottom:10px}
+    .badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:600}
+    .badge-pending{background:#FFF3CD;color:#856404}
+    .badge-resolved{background:#D1FAD7;color:#155724}
+    .badge-dismissed{background:#E2E3E5;color:#6c757d}
+    .row{display:flex;gap:10px;align-items:flex-start;flex-wrap:wrap}
+    .meta{font-size:11px;color:#8C7B6B;margin-top:4px}
+    .stat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;margin-bottom:20px}
+    .stat-card{background:#fff;border:1px solid #EDE4DA;border-radius:12px;padding:16px;text-align:center}
+    .stat-card .num{font-size:28px;font-weight:700;color:#C4956A;letter-spacing:-1px}
+    .stat-card .lbl{font-size:11px;color:#8C7B6B;margin-top:4px}
+    #toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#2C2420;color:#fff;padding:10px 20px;border-radius:999px;font-size:13px;display:none}
+    .empty{text-align:center;color:#8C7B6B;padding:40px;font-size:13px}
+    .filter-row{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap}
+    .filter-row select,.filter-row input{flex:1;min-width:120px;margin-bottom:0}
+    .action-row{margin-top:10px;display:flex;gap:8px}
+  </style>
+</head>
+<body>
+
+<div id="loginScreen">
+  <div id="login">
+    <h2>돌담 관리자</h2>
+    <input id="apiBase" placeholder="API URL" value="https://doldam-api.scw999.workers.dev" />
+    <input id="tokenInput" type="password" placeholder="관리자 JWT 토큰" />
+    <button id="loginBtn">로그인</button>
+    <div id="loginErr" style="color:#E07B6B;font-size:12px;margin-top:8px"></div>
+  </div>
+</div>
+
+<div id="app" style="display:none">
+  <header>
+    <h1>돌담 관리자</h1>
+    <span id="headerInfo" style="font-size:12px;opacity:.8"></span>
+    <div style="flex:1"></div>
+    <button id="logoutBtn" style="background:transparent;color:#fff;border:1px solid rgba(255,255,255,.3)">로그아웃</button>
+  </header>
+
+  <div class="container">
+    <div class="tabs">
+      <div class="tab active" data-tab="overview">개요</div>
+      <div class="tab" data-tab="reports">신고 <span id="pendingBadge"></span></div>
+      <div class="tab" data-tab="users">유저</div>
+    </div>
+
+    <div id="tab-overview" class="section active">
+      <div class="stat-grid" id="statsGrid">
+        <div class="stat-card"><div class="num">...</div><div class="lbl">로딩 중</div></div>
+      </div>
+      <div class="card">
+        <p style="font-size:13px;font-weight:700;margin-bottom:8px">빠른 도움말</p>
+        <ul style="font-size:12px;color:#8C7B6B;line-height:24px;padding-left:16px">
+          <li>신고 탭: 대기 중인 신고 처리 (resolved / dismissed)</li>
+          <li>유저 탭: 닉네임으로 게시글 검색</li>
+          <li>AI 필터: CLAUDE_API_KEY를 Cloudflare Secret에 등록해야 production에서 작동</li>
+          <li>방 만료: 매시 cron trigger에서 자동 처리됨</li>
+        </ul>
+      </div>
+    </div>
+
+    <div id="tab-reports" class="section">
+      <div class="filter-row">
+        <select id="reportStatus">
+          <option value="pending">대기 중</option>
+          <option value="resolved">처리 완료</option>
+          <option value="dismissed">기각됨</option>
+        </select>
+        <button id="refreshReports">새로고침</button>
+      </div>
+      <div id="reportsList"><div class="empty">로딩 중...</div></div>
+    </div>
+
+    <div id="tab-users" class="section">
+      <div class="filter-row">
+        <input id="userSearch" placeholder="닉네임으로 검색..." />
+      </div>
+      <div id="usersList"><div class="empty">검색어를 입력하세요</div></div>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+'use strict';
+let API = '', TOKEN = '';
+
+function esc(s) {
+  return String(s ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = String(msg);
+  el.style.display = 'block';
+  setTimeout(() => { el.style.display = 'none'; }, 2000);
+}
+
+async function apiFetch(path, opts) {
+  opts = opts || {};
+  const res = await fetch(API + path, Object.assign({}, opts, {
+    headers: Object.assign(
+      { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + TOKEN },
+      opts.headers || {}
+    ),
+  }));
+  if (!res.ok) throw new Error(String(res.status));
+  return res.json();
+}
+
+document.getElementById('loginBtn').addEventListener('click', async function() {
+  API = document.getElementById('apiBase').value.replace(/\/$/, '');
+  TOKEN = document.getElementById('tokenInput').value.trim();
+  try {
+    await apiFetch('/auth/me');
+    document.getElementById('loginScreen').style.display = 'none';
+    document.getElementById('app').style.display = 'block';
+    document.getElementById('headerInfo').textContent = API;
+    loadOverview();
+    loadReports();
+  } catch(e) {
+    document.getElementById('loginErr').textContent = '로그인 실패: ' + esc(e.message);
+  }
+});
+
+document.getElementById('logoutBtn').addEventListener('click', function() {
+  TOKEN = '';
+  document.getElementById('loginScreen').style.display = '';
+  document.getElementById('app').style.display = 'none';
+});
+
+document.querySelectorAll('.tab').forEach(function(tab) {
+  tab.addEventListener('click', function() {
+    const name = tab.dataset.tab;
+    document.querySelectorAll('.tab').forEach(function(t) { t.classList.remove('active'); });
+    tab.classList.add('active');
+    document.querySelectorAll('.section').forEach(function(s) { s.classList.remove('active'); });
+    document.getElementById('tab-' + name).classList.add('active');
+    if (name === 'reports') loadReports();
+  });
+});
+
+document.getElementById('refreshReports').addEventListener('click', loadReports);
+document.getElementById('reportStatus').addEventListener('change', loadReports);
+
+async function loadOverview() {
+  try {
+    const health = await apiFetch('/health').catch(function() { return null; });
+    const grid = document.getElementById('statsGrid');
+    const cells = [
+      { num: health ? '✓' : '✗', lbl: 'API 상태' },
+      { num: 'Dev', lbl: '환경' },
+      { num: '✓', lbl: 'D1 연결' },
+    ];
+    grid.textContent = '';
+    cells.forEach(function(c) {
+      const div = document.createElement('div');
+      div.className = 'stat-card';
+      const numEl = document.createElement('div');
+      numEl.className = 'num';
+      numEl.textContent = c.num;
+      const lblEl = document.createElement('div');
+      lblEl.className = 'lbl';
+      lblEl.textContent = c.lbl;
+      div.appendChild(numEl);
+      div.appendChild(lblEl);
+      grid.appendChild(div);
+    });
+  } catch(e) { /* ignore */ }
+}
+
+async function loadReports() {
+  const status = document.getElementById('reportStatus').value;
+  const el = document.getElementById('reportsList');
+  el.textContent = '';
+  const loading = document.createElement('div');
+  loading.className = 'empty';
+  loading.textContent = '로딩 중...';
+  el.appendChild(loading);
+
+  try {
+    const data = await apiFetch('/admin/reports?status=' + encodeURIComponent(status));
+    const arr = Array.isArray(data) ? data : (data.results || []);
+    el.textContent = '';
+
+    if (status === 'pending') {
+      const badge = document.getElementById('pendingBadge');
+      badge.textContent = arr.length > 0 ? '(' + arr.length + ')' : '';
+    }
+
+    if (!arr.length) {
+      const empty = document.createElement('div');
+      empty.className = 'empty';
+      empty.textContent = '신고 없음';
+      el.appendChild(empty);
+      return;
+    }
+
+    arr.forEach(function(r) {
+      const card = document.createElement('div');
+      card.className = 'card';
+
+      const row = document.createElement('div');
+      row.className = 'row';
+
+      const badge = document.createElement('span');
+      badge.className = 'badge badge-' + esc(r.status);
+      badge.textContent = r.status;
+
+      const type = document.createElement('b');
+      type.style.fontSize = '13px';
+      type.textContent = '[' + (r.target_type || '') + ']';
+
+      const reporter = document.createElement('span');
+      reporter.className = 'meta';
+      reporter.textContent = (r.reporter_nickname || '익명') + ' 신고';
+
+      row.appendChild(badge);
+      row.appendChild(type);
+      row.appendChild(reporter);
+      card.appendChild(row);
+
+      const reason = document.createElement('div');
+      reason.style.cssText = 'margin:8px 0;font-size:13px';
+      reason.textContent = r.reason || '';
+      card.appendChild(reason);
+
+      const meta = document.createElement('div');
+      meta.className = 'meta';
+      meta.style.marginTop = '4px';
+      meta.textContent = 'ID: ' + (r.target_id || '') + ' · ' + new Date(r.created_at).toLocaleString('ko-KR');
+      card.appendChild(meta);
+
+      if (r.status === 'pending') {
+        const actions = document.createElement('div');
+        actions.className = 'action-row';
+
+        const resolveBtn = document.createElement('button');
+        resolveBtn.textContent = '처리 완료';
+        resolveBtn.addEventListener('click', function() { resolveReport(r.id, 'resolved'); });
+
+        const dismissBtn = document.createElement('button');
+        dismissBtn.className = 'ghost';
+        dismissBtn.textContent = '기각';
+        dismissBtn.addEventListener('click', function() { resolveReport(r.id, 'dismissed'); });
+
+        actions.appendChild(resolveBtn);
+        actions.appendChild(dismissBtn);
+        card.appendChild(actions);
+      }
+
+      el.appendChild(card);
+    });
+  } catch(e) {
+    el.textContent = '';
+    const err = document.createElement('div');
+    err.className = 'empty';
+    err.textContent = '오류: ' + e.message;
+    el.appendChild(err);
+  }
+}
+
+async function resolveReport(id, status) {
+  try {
+    await apiFetch('/admin/reports/' + encodeURIComponent(id), {
+      method: 'PATCH',
+      body: JSON.stringify({ status: status }),
+    });
+    toast('처리 완료');
+    loadReports();
+  } catch(e) { toast('실패: ' + e.message); }
+}
+
+let searchTimer;
+document.getElementById('userSearch').addEventListener('input', function() {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(async function() {
+    const q = document.getElementById('userSearch').value.trim();
+    const el = document.getElementById('usersList');
+    if (!q) {
+      el.textContent = '';
+      const empty = document.createElement('div');
+      empty.className = 'empty';
+      empty.textContent = '검색어를 입력하세요';
+      el.appendChild(empty);
+      return;
+    }
+    el.textContent = '';
+    const loading = document.createElement('div');
+    loading.className = 'empty';
+    loading.textContent = '검색 중...';
+    el.appendChild(loading);
+    try {
+      const res = await apiFetch('/posts?category=all&limit=50');
+      const seen = new Set();
+      const users = (res.items || []).filter(function(p) {
+        if (!p.nickname || !p.nickname.includes(q)) return false;
+        if (seen.has(p.nickname)) return false;
+        seen.add(p.nickname);
+        return true;
+      });
+      el.textContent = '';
+      if (!users.length) {
+        const empty = document.createElement('div');
+        empty.className = 'empty';
+        empty.textContent = '결과 없음';
+        el.appendChild(empty);
+        return;
+      }
+      users.forEach(function(u) {
+        const card = document.createElement('div');
+        card.className = 'card';
+
+        const row = document.createElement('div');
+        row.className = 'row';
+
+        const name = document.createElement('b');
+        name.textContent = u.nickname || '';
+
+        const meta = document.createElement('span');
+        meta.className = 'meta';
+        meta.textContent = (u.gender === 'M' ? '남' : '여') + ' · ' + (u.age_range || '');
+
+        row.appendChild(name);
+        row.appendChild(meta);
+        card.appendChild(row);
+
+        const postMeta = document.createElement('div');
+        postMeta.className = 'meta';
+        postMeta.style.marginTop = '4px';
+        postMeta.textContent = '최근 게시글: ' + (u.title || '');
+        card.appendChild(postMeta);
+
+        el.appendChild(card);
+      });
+    } catch(e) {
+      el.textContent = '';
+      const err = document.createElement('div');
+      err.className = 'empty';
+      err.textContent = '오류: ' + e.message;
+      el.appendChild(err);
+    }
+  }, 400);
+});
+</script>
+</body>
+</html>

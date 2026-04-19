@@ -1,13 +1,20 @@
 import { useCallback, useState } from 'react';
-import { View, Text, FlatList, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, FlatList, ActivityIndicator, Alert, Pressable, ScrollView } from 'react-native';
 import { useFocusEffect } from 'expo-router';
-import { colors, spacing } from '@/theme';
+import { colors, spacing, radius, typography } from '@/theme';
 import { Card } from '@/ui/atoms';
 import { api } from '@/api';
 
 interface Ledger {
   id: string; amount: number; reason: string; created_at: number; expires_at: number;
 }
+
+const PRODUCTS = [
+  { id: 'doldam.points.500',  points: 500,  price: '1,200원', badge: '' },
+  { id: 'doldam.points.1200', points: 1200, price: '2,900원', badge: '인기' },
+  { id: 'doldam.points.3000', points: 3000, price: '6,900원', badge: '' },
+  { id: 'doldam.points.8000', points: 8000, price: '18,000원', badge: '베스트' },
+];
 
 const REASON_LABEL: Record<string, string> = {
   signup_bonus:   '가입 보너스',
@@ -57,6 +64,20 @@ export default function PointsScreen() {
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
+  function onBuy(p: typeof PRODUCTS[0]) {
+    Alert.alert(
+      `${p.points.toLocaleString()}P 충전`,
+      `${p.price}로 ${p.points.toLocaleString()}P를 충전할까요?\n(앱 스토어 결제 페이지로 이동)`,
+      [
+        { text: '취소', style: 'cancel' },
+        {
+          text: '충전하기',
+          onPress: () => Alert.alert('준비 중', '스토어 출시 후 이용 가능합니다'),
+        },
+      ]
+    );
+  }
+
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
       {/* 잔액 헤더 */}
@@ -73,8 +94,50 @@ export default function PointsScreen() {
         </Text>
       </View>
 
+      {/* 포인트 구매 */}
+      <View style={{ paddingHorizontal: 20, marginBottom: 12 }}>
+        <Text style={[typography.h3, { color: colors.text, marginBottom: 10 }]}>포인트 충전</Text>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+          {PRODUCTS.map((p) => (
+            <Pressable
+              key={p.id}
+              onPress={() => onBuy(p)}
+              style={{
+                flex: 1, minWidth: '44%',
+                backgroundColor: colors.card,
+                borderWidth: 1.5,
+                borderColor: p.badge ? colors.primary : colors.border,
+                borderRadius: radius.lg,
+                padding: 14,
+                alignItems: 'center', gap: 4,
+              }}
+            >
+              {p.badge ? (
+                <View style={{
+                  position: 'absolute', top: -1, right: -1,
+                  backgroundColor: colors.primary,
+                  paddingHorizontal: 7, paddingVertical: 2,
+                  borderTopRightRadius: radius.lg, borderBottomLeftRadius: radius.lg,
+                }}>
+                  <Text style={{ fontSize: 10, fontWeight: '700', color: '#fff' }}>{p.badge}</Text>
+                </View>
+              ) : null}
+              <Text style={{ fontSize: 18, fontWeight: '700', color: colors.primary, letterSpacing: -0.5 }}>
+                {p.points.toLocaleString()}P
+              </Text>
+              <Text style={{ fontSize: 13, color: colors.textSub, fontWeight: '500' }}>{p.price}</Text>
+            </Pressable>
+          ))}
+        </View>
+        <Text style={{ fontSize: 11, color: colors.textLight, marginTop: 8, textAlign: 'center' }}>
+          포인트는 충전 후 30일 내 사용하세요
+        </Text>
+      </View>
+
+      <Text style={[typography.h3, { color: colors.text, paddingHorizontal: 20, marginBottom: 6 }]}>내역</Text>
+
       <FlatList
-        contentContainerStyle={{ paddingHorizontal: 20, gap: 8, paddingBottom: 40 }}
+        contentContainerStyle={{ paddingHorizontal: 20, gap: 8, paddingBottom: 40, paddingTop: 4 }}
         data={items}
         keyExtractor={(i) => i.id}
         ListEmptyComponent={
