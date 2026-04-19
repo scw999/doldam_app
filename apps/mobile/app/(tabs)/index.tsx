@@ -16,13 +16,13 @@ interface Post {
 }
 
 const MOODS = [
-  { e: '🌤️', label: '괜찮아요',  key: 'okay' },
+  { e: '🌤️', label: '괜찮아요',  key: 'good' },
   { e: '😔', label: '울적해요',  key: 'sad' },
-  { e: '😤', label: '답답해요',  key: 'stressed' },
-  { e: '😭', label: '무너져요',  key: 'hard' },
+  { e: '😤', label: '답답해요',  key: 'anxious' },
+  { e: '😭', label: '무너져요',  key: 'lonely' },
   { e: '🔥', label: '열받아요',  key: 'angry' },
   { e: '🌱', label: '희망보여요', key: 'hopeful' },
-  { e: '😶', label: '멍해요',   key: 'blank' },
+  { e: '😶', label: '멍해요',   key: 'soso' },
 ];
 
 const CATEGORY_COLORS: Record<string, { label: string; color: string }> = {
@@ -50,7 +50,7 @@ export default function HomeScreen() {
         api.get<Me>('/auth/me'),
         api.get<{ balance: number }>('/points/balance'),
         api.get<{ items: Vote[] }>('/votes?limit=3'),
-        api.get<{ items: Post[] }>('/posts?limit=2'),
+        api.get<{ items: Post[] }>('/posts?category=all&limit=3'),
       ]);
       setMe(meRes); setBalance(pts.balance);
       setTopVotes(votes.items); setPosts(board.items);

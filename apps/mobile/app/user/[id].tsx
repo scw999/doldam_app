@@ -90,7 +90,7 @@ export default function UserProfile() {
 }
 
 const styles = StyleSheet.create({
-  container: { padding: spacing.md, backgroundColor: colors.background, flexGrow: 1 },
+  container: { padding: spacing.md, backgroundColor: colors.bg, flexGrow: 1 },
   hero: { alignItems: 'center', padding: spacing.lg },
   nick: { ...typography.h1, color: colors.primary, marginBottom: spacing.xs },
   meta: { ...typography.body, color: colors.textSub },

@@ -6,7 +6,6 @@ import { colors, radius, spacing, typography } from '@/theme';
 import { Pill } from '@/ui/atoms';
 import { api } from '@/api';
 
-const API_BASE = process.env.EXPO_PUBLIC_API_BASE ?? 'http://localhost:8787';
 
 interface VoteDetail {
   id: string;
@@ -46,15 +45,15 @@ export default function VoteDetailScreen() {
     finally { setSubmitting(false); }
   }
 
-  async function share() {
-    await Share.share({
-      message: `${vote?.question}\n\n돌담에서 투표하기: ${API_BASE}/votes/${id}/card.svg`,
-    });
-  }
-
   if (!vote) return <ActivityIndicator style={{ marginTop: 40 }} />;
 
   const pct = vote.total ? Math.round((vote.agree / vote.total) * 100) : 0;
+
+  async function share() {
+    await Share.share({
+      message: `[돌싱 딜레마] ${vote!.question}\n\n찬성 ${pct}% vs 반대 ${100 - pct}%\n(${vote!.total.toLocaleString()}명 참여)\n\n돌담 앱에서 투표해보세요`,
+    });
+  }
   const isHot = vote.total >= 500;
   const mPct = byGender.M && byGender.M.total ? Math.round((byGender.M.agree / byGender.M.total) * 100) : 0;
   const fPct = byGender.F && byGender.F.total ? Math.round((byGender.F.agree / byGender.F.total) * 100) : 0;

@@ -103,7 +103,7 @@ export default function MoodScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { padding: spacing.md, backgroundColor: colors.background, flexGrow: 1 },
+  container: { padding: spacing.md, backgroundColor: colors.bg, flexGrow: 1 },
   title: { ...typography.h2, color: colors.text, marginTop: spacing.md, marginBottom: spacing.md },
   moodGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   moodChip: {

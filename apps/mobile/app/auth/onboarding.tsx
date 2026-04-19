@@ -84,7 +84,7 @@ function Chip({ label, selected, onPress }: { label: string; selected: boolean; 
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background, padding: spacing.md },
+  container: { flex: 1, backgroundColor: colors.bg, padding: spacing.md },
   title: { ...typography.h2, color: colors.text, marginTop: spacing.md },
   sub: { ...typography.body, color: colors.textSub, marginTop: spacing.xs, marginBottom: spacing.lg },
   label: { ...typography.h3, color: colors.text, marginTop: spacing.md, marginBottom: spacing.sm },

@@ -86,7 +86,7 @@ export default function MissionScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { padding: spacing.md, backgroundColor: colors.background, flexGrow: 1 },
+  container: { padding: spacing.md, backgroundColor: colors.bg, flexGrow: 1 },
   title: { ...typography.h2, color: colors.text, marginTop: spacing.md },
   sub: { ...typography.body, color: colors.textSub, marginBottom: spacing.md },
   progress: {
@@ -103,7 +103,7 @@ const styles = StyleSheet.create({
   q: { ...typography.h3, color: colors.text, marginBottom: spacing.sm },
   input: {
     ...typography.body, color: colors.text,
-    backgroundColor: colors.background,
+    backgroundColor: colors.bg,
     borderWidth: 1, borderColor: colors.border, borderRadius: radius.md,
     padding: spacing.md, minHeight: 80, textAlignVertical: 'top',
   },
@@ -114,5 +114,5 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
   },
   sendText: { color: '#fff', ...typography.body },
-  answered: { ...typography.body, color: colors.success, backgroundColor: colors.background, padding: spacing.sm, borderRadius: radius.sm },
+  answered: { ...typography.body, color: colors.green, backgroundColor: colors.bg, padding: spacing.sm, borderRadius: radius.sm },
 });

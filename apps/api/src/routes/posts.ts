@@ -11,21 +11,33 @@ const posts = new Hono<{ Bindings: Env; Variables: Vars }>();
 
 // ---- 목록 (커서 페이지네이션) ----
 posts.get('/', async (c) => {
-  const category = (c.req.query('category') ?? 'free') as Category;
-  if (!CATEGORIES.includes(category)) return c.json({ error: 'invalid_category' }, 400);
+  const categoryParam = c.req.query('category') ?? 'free';
+  const all = categoryParam === 'all';
+  if (!all && !CATEGORIES.includes(categoryParam as Category)) return c.json({ error: 'invalid_category' }, 400);
   const limit = Math.min(Number(c.req.query('limit') ?? 20), 50);
   const cursor = Number(c.req.query('cursor') ?? Date.now());
 
-  const { results } = await c.env.DOLDAM_DB
-    .prepare(
-      `SELECT p.id, p.title, p.content, p.category, p.view_count, p.like_count,
-              p.comment_count, p.created_at, u.nickname, u.gender, u.age_range
-       FROM posts p JOIN users u ON u.id = p.user_id
-       WHERE p.category = ? AND p.deleted_at IS NULL AND p.created_at < ?
-       ORDER BY p.created_at DESC LIMIT ?`
-    )
-    .bind(category, cursor, limit)
-    .all<{ created_at: number }>();
+  const { results } = all
+    ? await c.env.DOLDAM_DB
+        .prepare(
+          `SELECT p.id, p.title, p.content, p.category, p.view_count, p.like_count,
+                  p.comment_count, p.created_at, u.nickname, u.gender, u.age_range
+           FROM posts p JOIN users u ON u.id = p.user_id
+           WHERE p.deleted_at IS NULL AND p.created_at < ?
+           ORDER BY p.created_at DESC LIMIT ?`
+        )
+        .bind(cursor, limit)
+        .all<{ created_at: number }>()
+    : await c.env.DOLDAM_DB
+        .prepare(
+          `SELECT p.id, p.title, p.content, p.category, p.view_count, p.like_count,
+                  p.comment_count, p.created_at, u.nickname, u.gender, u.age_range
+           FROM posts p JOIN users u ON u.id = p.user_id
+           WHERE p.category = ? AND p.deleted_at IS NULL AND p.created_at < ?
+           ORDER BY p.created_at DESC LIMIT ?`
+        )
+        .bind(categoryParam, cursor, limit)
+        .all<{ created_at: number }>();
 
   const nextCursor = results.length === limit ? results[results.length - 1].created_at : null;
   return c.json({ items: results, nextCursor });

@@ -23,13 +23,14 @@ export default function MyScreen() {
 
   const load = useCallback(async () => {
     try {
-      const [meRes, pts] = await Promise.all([
+      const [meRes, pts, myPosts] = await Promise.all([
         api.get<Me>('/auth/me'),
         api.get<{ balance: number }>('/points/balance'),
+        api.get<{ items: unknown[] }>('/posts/mine').catch(() => ({ items: [] })),
       ]);
       setMe(meRes);
       setBalance(pts.balance);
-      if (pts.balance > 0) setBadgeCount(2);
+      setPostCount(myPosts.items.length);
     } catch (e) {
       Alert.alert('오류', '정보를 불러올 수 없어요');
     }
@@ -69,7 +70,7 @@ export default function MyScreen() {
   const BADGES = [
     { e: '✓', label: '본인인증', color: '#6BAF7B', unlocked: me?.verified === 1 },
     { e: '🌱', label: '첫 글',    color: '#C4956A', unlocked: postCount > 0 },
-    { e: '💬', label: '댓글 시작', color: '#5B8FC9', unlocked: balance >= 10 },
+    { e: '💬', label: '댓글 시작', color: '#5B8FC9', unlocked: balance >= 3 },
     { e: '🔥', label: '핫글 주인', color: '#E85D4A', unlocked: false },
     { e: '🏆', label: '7일 연속', color: '#D4728C', unlocked: false },
   ];

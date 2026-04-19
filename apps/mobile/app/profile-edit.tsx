@@ -1,15 +1,34 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TextInput, Pressable, Alert, ActivityIndicator, ScrollView } from 'react-native';
 import { router } from 'expo-router';
 import { colors, spacing, typography, radius } from '@/theme';
 import { api } from '@/api';
+import { useAuth } from '@/store/auth';
 
 export default function ProfileEdit() {
+  const userId = useAuth((s) => s.userId);
   const [job, setJob] = useState('');
   const [hasKids, setHasKids] = useState<boolean | null>(null);
   const [intro, setIntro] = useState('');
   const [interests, setInterests] = useState('');
   const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!userId) return;
+    api.get<{
+      job: string | null; has_kids: number | null;
+      intro: string | null; interests: string | null;
+    }>(`/profiles/${userId}`)
+      .then((p) => {
+        if (p.job) setJob(p.job);
+        if (p.has_kids !== null) setHasKids(p.has_kids === 1);
+        if (p.intro) setIntro(p.intro);
+        if (p.interests) setInterests(p.interests);
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [userId]);
 
   async function save() {
     setSaving(true);
@@ -21,6 +40,8 @@ export default function ProfileEdit() {
       Alert.alert('실패', (e as Error).message);
     } finally { setSaving(false); }
   }
+
+  if (loading) return <ActivityIndicator style={{ marginTop: 60 }} />;
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
@@ -55,7 +76,7 @@ export default function ProfileEdit() {
 }
 
 const styles = StyleSheet.create({
-  container: { padding: spacing.md, backgroundColor: colors.background, flexGrow: 1 },
+  container: { padding: spacing.md, backgroundColor: colors.bg, flexGrow: 1 },
   label: { ...typography.caption, color: colors.textSub, marginTop: spacing.md, marginBottom: spacing.xs },
   input: {
     ...typography.body, color: colors.text,
