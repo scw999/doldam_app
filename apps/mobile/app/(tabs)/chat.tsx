@@ -63,7 +63,7 @@ export default function ChatScreen() {
           { id: 'my', label: '내 방', count: mine.length },
           { id: 'theme', label: '🔥 테마방', count: themed.length },
           { id: 'match', label: '매칭' },
-        ] as const).map((t) => (
+        ] as { id: 'my' | 'theme' | 'match'; label: string; count?: number }[]).map((t) => (
           <Pressable
             key={t.id}
             onPress={() => setTab(t.id)}

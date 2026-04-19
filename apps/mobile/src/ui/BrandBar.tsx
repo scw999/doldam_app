@@ -56,7 +56,7 @@ export function BrandBar({ points, hasNewNotification = false }: Props) {
 
         {/* 알림 */}
         <Pressable
-          onPress={() => router.push('/notifications')}
+          onPress={() => router.push('/notifications' as any)}
           style={{
             width: 36, height: 36, borderRadius: 18,
             backgroundColor: colors.card, alignItems: 'center', justifyContent: 'center',

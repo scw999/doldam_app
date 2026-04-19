@@ -110,5 +110,5 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md, paddingVertical: spacing.xs,
     borderRadius: radius.full,
   },
-  lockText: { color: '#fff', ...typography.caption },
+  lockText: { ...typography.caption, color: '#fff' },
 });

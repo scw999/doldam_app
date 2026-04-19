@@ -79,12 +79,12 @@ export default function MyScreen() {
   const daysJoined = me ? Math.floor((Date.now() - me.created_at) / 86400000) : 0;
 
   const menu = [
-    { icon: '📝', label: '내가 쓴 글', onPress: () => router.push('/my-posts') },
-    { icon: '🎨', label: '감정 타임라인', count: '기록하기', color: colors.green, onPress: () => router.push('/mood') },
-    { icon: '📖', label: 'Q&A 미션', count: '진행중', color: colors.primaryDark, onPress: () => router.push('/mission') },
-    { icon: '💎', label: '포인트 내역', count: `${balance}P`, color: colors.primary, onPress: () => router.push('/points') },
-    { icon: '🔔', label: '알림', onPress: () => router.push('/notifications') },
-    { icon: '✏️', label: '프로필 편집', onPress: () => router.push('/profile-edit') },
+    { icon: '📝', label: '내가 쓴 글', onPress: () => router.push('/my-posts' as any) },
+    { icon: '🎨', label: '감정 타임라인', count: '기록하기', color: colors.green, onPress: () => router.push('/mood' as any) },
+    { icon: '📖', label: 'Q&A 미션', count: '진행중', color: colors.primaryDark, onPress: () => router.push('/mission' as any) },
+    { icon: '💎', label: '포인트 내역', count: `${balance}P`, color: colors.primary, onPress: () => router.push('/points' as any) },
+    { icon: '🔔', label: '알림', onPress: () => router.push('/notifications' as any) },
+    { icon: '✏️', label: '프로필 편집', onPress: () => router.push('/profile-edit' as any) },
   ];
 
   return (

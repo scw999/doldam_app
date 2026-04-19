@@ -16,7 +16,7 @@ export default function CertificateScreen() {
 
   async function pickAndUpload() {
     const res = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaType.Images,
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
       quality: 0.9,
     });
     if (res.canceled) return;

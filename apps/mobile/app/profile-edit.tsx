@@ -33,7 +33,7 @@ export default function ProfileEdit() {
   async function save() {
     setSaving(true);
     try {
-      await api.put('/profiles/me', { job, hasKids, intro, interests });
+      await api.patch('/profiles/me', { job, hasKids, intro, interests });
       Alert.alert('저장 완료');
       router.back();
     } catch (e) {

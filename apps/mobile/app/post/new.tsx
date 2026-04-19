@@ -58,7 +58,7 @@ export default function NewPost() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background, padding: spacing.md },
+  container: { flex: 1, backgroundColor: colors.bg, padding: spacing.md },
   label: { ...typography.caption, color: colors.textSub, marginTop: spacing.sm, marginBottom: spacing.xs },
   input: {
     ...typography.body, color: colors.text,
