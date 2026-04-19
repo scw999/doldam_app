@@ -1,11 +1,11 @@
 import { Hono } from 'hono';
 import type { Env, AuthedUser } from '../types';
-import { requireAuth } from '../middleware/auth';
+import { requireAdmin } from '../middleware/auth';
 
 type Vars = { user: AuthedUser };
 const admin = new Hono<{ Bindings: Env; Variables: Vars }>();
 
-admin.get('/reports', requireAuth, async (c) => {
+admin.get('/reports', requireAdmin, async (c) => {
   const { status = 'pending', limit = '50', offset = '0' } = c.req.query();
   const rows = await c.env.DOLDAM_DB
     .prepare(
@@ -21,7 +21,7 @@ admin.get('/reports', requireAuth, async (c) => {
   return c.json(rows.results);
 });
 
-admin.patch('/reports/:id', requireAuth, async (c) => {
+admin.patch('/reports/:id', requireAdmin, async (c) => {
   const { id } = c.req.param();
   const { status } = await c.req.json<{ status: 'resolved' | 'dismissed' }>();
   if (!['resolved', 'dismissed'].includes(status)) {
@@ -35,7 +35,7 @@ admin.patch('/reports/:id', requireAuth, async (c) => {
 });
 
 // ---- 증명서 수동 검증 ----
-admin.get('/certificates', requireAuth, async (c) => {
+admin.get('/certificates', requireAdmin, async (c) => {
   const list = await c.env.DOLDAM_KV.list({ prefix: 'cert:' });
   const results = await Promise.all(
     list.keys.map(async (k) => {
@@ -49,7 +49,7 @@ admin.get('/certificates', requireAuth, async (c) => {
   return c.json(results.filter((r) => r && r.status === statusFilter));
 });
 
-admin.post('/certificates/:phoneHash/approve', requireAuth, async (c) => {
+admin.post('/certificates/:phoneHash/approve', requireAdmin, async (c) => {
   const { phoneHash } = c.req.param();
   const raw = await c.env.DOLDAM_KV.get(`cert:${phoneHash}`);
   if (!raw) return c.json({ error: 'not_found' }, 404);
@@ -62,7 +62,7 @@ admin.post('/certificates/:phoneHash/approve', requireAuth, async (c) => {
   return c.json({ ok: true });
 });
 
-admin.post('/certificates/:phoneHash/reject', requireAuth, async (c) => {
+admin.post('/certificates/:phoneHash/reject', requireAdmin, async (c) => {
   const { phoneHash } = c.req.param();
   const { reason = '검증 실패' } = await c.req.json<{ reason?: string }>().catch(() => ({}));
   const raw = await c.env.DOLDAM_KV.get(`cert:${phoneHash}`);

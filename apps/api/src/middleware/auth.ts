@@ -27,6 +27,14 @@ export const requireAuth: MiddlewareHandler<{ Bindings: Env; Variables: Vars }> 
   await next();
 };
 
+export const requireAdmin: MiddlewareHandler<{ Bindings: Env }> = async (c, next) => {
+  const token = c.req.header('Authorization')?.replace(/^Bearer\s+/i, '');
+  if (!token || !c.env.ADMIN_TOKEN || token !== c.env.ADMIN_TOKEN) {
+    return c.json({ error: 'unauthorized' }, 401);
+  }
+  await next();
+};
+
 // 전화번호 인증을 끝낸 상태(아직 회원가입 전) — 증명서 업로드/회원가입에 사용
 export const requireTempPhone: MiddlewareHandler<{ Bindings: Env; Variables: { jwt: JwtPayload } }> = async (c, next) => {
   const jwt = await extractJwt(c);

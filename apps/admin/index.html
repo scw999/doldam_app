@@ -45,7 +45,7 @@
   <div id="login">
     <h2>돌담 관리자</h2>
     <input id="apiBase" placeholder="API URL" value="https://doldam-api.scw999.workers.dev" />
-    <input id="tokenInput" type="password" placeholder="관리자 JWT 토큰" />
+    <input id="tokenInput" type="password" placeholder="ADMIN_TOKEN (Cloudflare Secret)" />
     <button id="loginBtn">로그인</button>
     <div id="loginErr" style="color:#E07B6B;font-size:12px;margin-top:8px"></div>
   </div>
@@ -153,7 +153,7 @@ document.getElementById('loginBtn').addEventListener('click', async function() {
   API = document.getElementById('apiBase').value.replace(/\/$/, '');
   TOKEN = document.getElementById('tokenInput').value.trim();
   try {
-    await apiFetch('/auth/me');
+    await apiFetch('/admin/reports?limit=1&offset=0');
     document.getElementById('loginScreen').style.display = 'none';
     document.getElementById('app').style.display = 'block';
     document.getElementById('headerInfo').textContent = API;
