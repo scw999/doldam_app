@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>돌담 — 하이파이 프로토타입</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    background: #E8E0D5;
+    min-height: 100vh;
+    color: #2C2420;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  @keyframes toastIn {
+    from { transform: translateX(-50%) translateY(10px); opacity: 0; }
+    to { transform: translateX(-50%) translateY(0); opacity: 1; }
+  }
+  @keyframes slideUp {
+    from { transform: translateY(20px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+  }
+  button { font-family: inherit; }
+  input { font-family: inherit; }
+  ::-webkit-scrollbar { display: none; }
+  .stage {
+    min-height: 100vh;
+    display: flex; align-items: flex-start; justify-content: center;
+    padding: 32px 16px 48px;
+    background: radial-gradient(ellipse at top, #F2EBDF 0%, #E8E0D5 60%, #D9CFBF 100%);
+  }
+</style>
+</head>
+<body>
+<div class="stage">
+  <div id="root"></div>
+</div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script type="text/babel" src="frames/ios-frame.jsx"></script>
+<script type="text/babel" src="src/tokens.jsx"></script>
+<script type="text/babel" src="src/mockdata.jsx"></script>
+<script type="text/babel" src="src/atoms.jsx"></script>
+<script type="text/babel" src="src/shell.jsx"></script>
+<script type="text/babel" src="src/screens/home.jsx"></script>
+<script type="text/babel" src="src/screens/board.jsx"></script>
+<script type="text/babel" src="src/screens/vote.jsx"></script>
+<script type="text/babel" src="src/screens/chat.jsx"></script>
+<script type="text/babel" src="src/screens/my.jsx"></script>
+<script type="text/babel" src="src/screens/post-detail.jsx"></script>
+
+<script type="text/babel" data-presets="react">
+const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+  "aesthetic": "editorial",
+  "primaryColor": "#C4956A",
+  "cardRadius": 9,
+  "density": "compact",
+  "stripe": false
+}/*EDITMODE-END*/;
+
+function App() {
+  const [tab, setTab] = React.useState(() => localStorage.getItem('doldam_tab') || 'home');
+  const [postId, setPostId] = React.useState(null);
+  const [voteId, setVoteId] = React.useState(null);
+  const [roomId, setRoomId] = React.useState(null);
+  const [tweaks, setTweaks] = React.useState(TWEAK_DEFAULTS);
+  const [tweaksOpen, setTweaksOpen] = React.useState(false);
+
+  React.useEffect(() => { localStorage.setItem('doldam_tab', tab); }, [tab]);
+
+  // 뷰별 aesthetic 병합
+  const ae = React.useMemo(() => {
+    const base = AESTHETICS[tweaks.aesthetic] || AESTHETICS.warm;
+    return {
+      ...base,
+      cardRadius: tweaks.cardRadius,
+      accentStripe: tweaks.stripe,
+    };
+  }, [tweaks]);
+
+  // primary 색 동적 오버라이드
+  React.useEffect(() => {
+    if (tweaks.primaryColor && tweaks.primaryColor !== '#C4956A') {
+      COLORS.primary = tweaks.primaryColor;
+      COLORS.tabActive = tweaks.primaryColor;
+    } else {
+      COLORS.primary = '#C4956A';
+      COLORS.tabActive = '#C4956A';
+    }
+  }, [tweaks.primaryColor]);
+
+  // Tweaks host integration
+  React.useEffect(() => {
+    const handler = (e) => {
+      if (!e.data || typeof e.data !== 'object') return;
+      if (e.data.type === '__activate_edit_mode') setTweaksOpen(true);
+      if (e.data.type === '__deactivate_edit_mode') setTweaksOpen(false);
+    };
+    window.addEventListener('message', handler);
+    window.parent.postMessage({ type: '__edit_mode_available' }, '*');
+    return () => window.removeEventListener('message', handler);
+  }, []);
+
+  const updateTweaks = (patch) => {
+    setTweaks(prev => ({ ...prev, ...patch }));
+    window.parent.postMessage({
+      type: '__edit_mode_set_keys', edits: patch,
+    }, '*');
+  };
+
+  const screen = (() => {
+    const p = { ae };
+    if (tab === 'home') return <HomeScreen {...p}
+      onOpenPost={setPostId} onOpenVote={setVoteId} onGoTab={setTab} />;
+    if (tab === 'board') return <BoardScreen {...p} onOpenPost={setPostId}
+      onCompose={() => alert('→ 글쓰기')} />;
+    if (tab === 'vote') return <VoteScreen {...p} onOpenVote={setVoteId} />;
+    if (tab === 'chat') return <ChatScreen {...p} onOpenRoom={setRoomId} />;
+    if (tab === 'my') return <MyScreen {...p} />;
+  })();
+
+  const activeVote = voteId ? VOTES.find(v => v.id === voteId) : null;
+
+  return (
+    <React.Fragment>
+      {/* Device frame: 390×844 iPhone ratio */}
+      <div style={{
+        width: 390, height: 844, borderRadius: 48, overflow: 'hidden',
+        position: 'relative', background: ae.bg,
+        boxShadow: '0 40px 80px rgba(50,40,30,0.22), 0 0 0 8px #1a1614, 0 0 0 9px #2a2420',
+        fontFamily: "'Pretendard', -apple-system, system-ui, sans-serif",
+      }}
+        data-screen-label={`00 ${tab}`}>
+
+        {/* dynamic island */}
+        <div style={{
+          position: 'absolute', top: 11, left: '50%', transform: 'translateX(-50%)',
+          width: 120, height: 35, borderRadius: 22, background: '#000', zIndex: 50,
+        }} />
+
+        {/* iOS status bar */}
+        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 45 }}>
+          <IOSStatusBar time="9:41" />
+        </div>
+
+        {/* content stack */}
+        <div style={{
+          height: '100%', display: 'flex', flexDirection: 'column',
+          background: ae.bg,
+        }}>
+          <BrandBar ae={ae} points={187} />
+          <div style={{ flex: 1, overflowY: 'auto', position: 'relative' }}>
+            {screen}
+          </div>
+          <TabBar active={tab} onChange={(t) => {
+            setTab(t); setPostId(null); setVoteId(null); setRoomId(null);
+          }} />
+        </div>
+
+        {/* Home indicator */}
+        <div style={{
+          position: 'absolute', bottom: 8, left: '50%', transform: 'translateX(-50%)',
+          width: 134, height: 5, borderRadius: 100,
+          background: 'rgba(0,0,0,0.25)', zIndex: 60, pointerEvents: 'none',
+        }} />
+
+        {/* Modals inside device frame */}
+        {postId && <PostDetail postId={postId} ae={ae} onClose={() => setPostId(null)} />}
+        {activeVote && <VoteDetail vote={activeVote} ae={ae} onClose={() => setVoteId(null)} />}
+        {roomId && <RoomDetail roomId={roomId} ae={ae} onClose={() => setRoomId(null)} />}
+      </div>
+
+      {/* Caption */}
+      <div style={{
+        position: 'fixed', left: 20, bottom: 14, fontSize: 11,
+        color: '#8C7B6B', letterSpacing: '-0.01em',
+        fontFamily: 'Pretendard, sans-serif',
+      }}>
+        돌담 · 하이파이 프로토타입 · {AESTHETICS[tweaks.aesthetic]?.label}
+      </div>
+
+      <TweaksPanel open={tweaksOpen} state={tweaks} setState={updateTweaks}
+        onClose={() => setTweaksOpen(false)} />
+    </React.Fragment>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>

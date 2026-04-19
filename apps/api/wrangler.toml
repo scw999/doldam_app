@@ -1,0 +1,55 @@
+name = "doldam-api"
+main = "src/index.ts"
+compatibility_date = "2025-01-20"
+compatibility_flags = ["nodejs_compat"]
+
+# ---- D1 ----
+[[d1_databases]]
+binding = "DOLDAM_DB"
+database_name = "doldam-db"
+database_id = "744b6bcd-c6c6-4e19-a055-803ffd18c424"
+migrations_dir = "migrations"
+
+# ---- KV ----
+[[kv_namespaces]]
+binding = "DOLDAM_KV"
+id = "c018661061d54bdea31f626f02d2e811"
+
+# ---- R2 ----
+[[r2_buckets]]
+binding = "DOLDAM_R2"
+bucket_name = "doldam-certificates"
+
+# ---- Queues (producer) ----
+[[queues.producers]]
+binding = "DOLDAM_QUEUE"
+queue = "doldam-tasks"
+
+# ---- Queues (consumer) ----
+[[queues.consumers]]
+queue = "doldam-tasks"
+max_batch_size = 10
+max_batch_timeout = 30
+
+# ---- Durable Objects ----
+[[durable_objects.bindings]]
+name = "CHAT_ROOM"
+class_name = "ChatRoom"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["ChatRoom"]
+
+# ---- Cron Triggers ----
+[triggers]
+crons = ["0 * * * *"]  # 매시간 — 만료 포인트/방 정리
+
+# ---- Vars ----
+[vars]
+ENV = "development"  # TODO: 출시 전 "production" + 다날 API 연결 필요
+
+# Secrets (wrangler secret put 으로 주입):
+# - JWT_SECRET
+# - CLAUDE_API_KEY
+# - GOOGLE_VISION_KEY
+# - DANAL_API_KEY

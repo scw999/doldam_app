@@ -1,0 +1,337 @@
+import { useCallback, useState } from 'react';
+import {
+  View, Text, StyleSheet, ScrollView, TextInput, Pressable,
+  Alert, ActivityIndicator, SafeAreaView, Modal,
+} from 'react-native';
+import { useLocalSearchParams, useFocusEffect, router } from 'expo-router';
+import { colors, radius, spacing, typography } from '@/theme';
+import { Avatar, Tag, GenderDot } from '@/ui/atoms';
+import { useAuth } from '@/store/auth';
+import { api } from '@/api';
+
+interface Post {
+  id: string; title: string; content: string; category: string;
+  user_id: string; nickname: string; gender: 'M' | 'F'; age_range: string;
+  like_count: number; comment_count: number; created_at: number;
+}
+
+interface Comment {
+  id: string; content: string;
+  nickname: string; gender: 'M' | 'F'; created_at: number;
+  user_id?: string;
+}
+
+const CATEGORY_COLORS: Record<string, { label: string; color: string }> = {
+  free: { label: '자유톡', color: '#6BAF7B' },
+  heart: { label: '속마음', color: '#D4728C' },
+  kids: { label: '양육일기', color: '#5B8FC9' },
+  dating: { label: '연애/관계', color: '#C4956A' },
+  legal: { label: '법률/돈', color: '#8C7B6B' },
+  men_only: { label: '남성방', color: '#5B8FC9' },
+  women_only: { label: '여성방', color: '#D4728C' },
+};
+
+const REACTIONS = [
+  { emoji: '💛', label: '공감돼요' },
+  { emoji: '🫂', label: '안아줄게요' },
+  { emoji: '💪', label: '힘내요' },
+  { emoji: '😂', label: '웃겨요' },
+];
+
+export default function PostDetail() {
+  const { id } = useLocalSearchParams<{ id: string }>();
+  const myUserId = useAuth((s) => s.userId);
+  const [post, setPost] = useState<Post | null>(null);
+  const [comments, setComments] = useState<Comment[]>([]);
+  const [myReact, setMyReact] = useState<number | null>(null);
+  const [draft, setDraft] = useState('');
+  const [sending, setSending] = useState(false);
+
+  const [editVisible, setEditVisible] = useState(false);
+  const [editTitle, setEditTitle] = useState('');
+  const [editContent, setEditContent] = useState('');
+  const [editSaving, setEditSaving] = useState(false);
+
+  const load = useCallback(async () => {
+    const [p, c] = await Promise.all([
+      api.get<Post>(`/posts/${id}`),
+      api.get<{ items: Comment[] }>(`/posts/${id}/comments`),
+    ]);
+    setPost(p); setComments(c.items);
+  }, [id]);
+
+  useFocusEffect(useCallback(() => { load(); }, [load]));
+
+  async function toggleLike(i: number) {
+    if (myReact === i) { setMyReact(null); return; }
+    setMyReact(i);
+    try { await api.post(`/posts/${id}/like`, {}); } catch {}
+  }
+
+  async function submitComment() {
+    if (!draft.trim()) return;
+    setSending(true);
+    try {
+      await api.post(`/posts/${id}/comments`, { content: draft });
+      setDraft('');
+      load();
+    } catch (e) { Alert.alert('댓글 실패', (e as Error).message); }
+    finally { setSending(false); }
+  }
+
+  function openEdit() {
+    if (!post) return;
+    setEditTitle(post.title);
+    setEditContent(post.content);
+    setEditVisible(true);
+  }
+
+  async function saveEdit() {
+    if (!editTitle.trim() || !editContent.trim()) return;
+    setEditSaving(true);
+    try {
+      await api.patch(`/posts/${id}`, { title: editTitle.trim(), content: editContent.trim() });
+      setEditVisible(false);
+      load();
+    } catch (e) { Alert.alert('수정 실패', (e as Error).message); }
+    finally { setEditSaving(false); }
+  }
+
+  function confirmDelete() {
+    Alert.alert('게시글 삭제', '삭제하면 복구할 수 없어요. 삭제할까요?', [
+      { text: '취소', style: 'cancel' },
+      {
+        text: '삭제', style: 'destructive', onPress: async () => {
+          try {
+            await api.delete(`/posts/${id}`);
+            router.back();
+          } catch (e) { Alert.alert('삭제 실패', (e as Error).message); }
+        },
+      },
+    ]);
+  }
+
+  function openMenu() {
+    if (!post || post.user_id !== myUserId) return;
+    Alert.alert('게시글 관리', '', [
+      { text: '수정', onPress: openEdit },
+      { text: '삭제', style: 'destructive', onPress: confirmDelete },
+      { text: '취소', style: 'cancel' },
+    ]);
+  }
+
+  if (!post) return <ActivityIndicator style={{ marginTop: 40 }} />;
+  const cat = CATEGORY_COLORS[post.category] ?? { label: post.category, color: colors.textSub };
+  const isMine = post.user_id === myUserId;
+
+  return (
+    <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
+      {/* 헤더 */}
+      <View style={styles.header}>
+        <Pressable onPress={() => router.back()} style={{ padding: 4 }}>
+          <Text style={{ fontSize: 22, color: colors.text }}>←</Text>
+        </Pressable>
+        <Tag label={cat.label} color={cat.color} />
+        <View style={{ flex: 1 }} />
+        {isMine && (
+          <Pressable onPress={openMenu} style={{ padding: 8 }}>
+            <Text style={{ fontSize: 20, color: colors.textSub }}>⋯</Text>
+          </Pressable>
+        )}
+      </View>
+
+      <ScrollView style={{ flex: 1 }}>
+        {/* 본문 */}
+        <View style={{ padding: 20, backgroundColor: colors.card }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+            <Avatar gender={post.gender} size={36} />
+            <View style={{ flex: 1 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                <Text style={{ fontSize: 13, fontWeight: '600', color: colors.text }}>{post.nickname}</Text>
+                <GenderDot gender={post.gender} />
+              </View>
+              <Text style={{ fontSize: 11, color: colors.textSub, marginTop: 2 }}>
+                {post.age_range} · {timeAgo(post.created_at)}
+              </Text>
+            </View>
+          </View>
+
+          <Text style={[typography.h1, { color: colors.text, marginBottom: 12, lineHeight: 30 }]}>
+            {post.title}
+          </Text>
+
+          <Text style={{ fontSize: 15, color: colors.text, lineHeight: 26, letterSpacing: -0.1, marginBottom: 20 }}>
+            {post.content}
+          </Text>
+
+          {/* 반응 픽커 */}
+          <View style={styles.reactPicker}>
+            {REACTIONS.map((r, i) => {
+              const active = myReact === i;
+              const count = (i === 0 ? post.like_count : 0) + (active ? 1 : 0);
+              return (
+                <Pressable
+                  key={r.emoji}
+                  onPress={() => toggleLike(i)}
+                  style={{
+                    flex: 1, paddingVertical: 8,
+                    backgroundColor: active ? colors.accent : 'transparent',
+                    borderRadius: 10, alignItems: 'center', gap: 2,
+                  }}
+                >
+                  <Text style={{ fontSize: 22, transform: [{ scale: active ? 1.15 : 1 }] }}>{r.emoji}</Text>
+                  <Text style={{ fontSize: 10, fontWeight: active ? '700' : '500', color: active ? colors.primaryDark : colors.textSub }}>{r.label}</Text>
+                  {count > 0 && <Text style={{ fontSize: 10, color: colors.textLight, fontWeight: '600' }}>{count}</Text>}
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+
+        {/* 댓글 */}
+        <View style={{ padding: 14, paddingHorizontal: 20 }}>
+          <Text style={{ fontSize: 12, fontWeight: '700', color: colors.textSub, letterSpacing: -0.1 }}>
+            댓글 {comments.length}개
+          </Text>
+        </View>
+
+        <View style={{ paddingHorizontal: 16, paddingBottom: 24, gap: 8 }}>
+          {comments.map((c) => {
+            const mine = c.user_id === myUserId;
+            return (
+              <View key={c.id} style={{
+                padding: 14,
+                backgroundColor: mine ? colors.accent + '66' : colors.card,
+                borderWidth: 1,
+                borderColor: mine ? colors.primary + '33' : colors.border,
+                borderRadius: 14,
+              }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                  <Avatar gender={c.gender} size={24} />
+                  <Text style={{ fontSize: 11.5, fontWeight: '600', color: colors.text }}>
+                    {c.nickname?.split(' ')[0] ?? ''}
+                    {mine && <Text style={{ color: colors.primaryDark, fontWeight: '700' }}> (나)</Text>}
+                  </Text>
+                  <GenderDot gender={c.gender} />
+                  <View style={{ flex: 1 }} />
+                  <Text style={{ fontSize: 10, color: colors.textLight }}>{timeAgo(c.created_at)}</Text>
+                </View>
+                <Text style={{ fontSize: 13.5, color: colors.text, lineHeight: 21 }}>{c.content}</Text>
+              </View>
+            );
+          })}
+        </View>
+      </ScrollView>
+
+      {/* 입력 */}
+      <View style={styles.inputRow}>
+        <TextInput
+          style={styles.input}
+          value={draft}
+          onChangeText={setDraft}
+          placeholder="따뜻한 말 한마디..."
+          placeholderTextColor={colors.textLight}
+          editable={!sending}
+        />
+        <Pressable
+          onPress={submitComment}
+          disabled={!draft.trim() || sending}
+          style={{
+            paddingHorizontal: 16, paddingVertical: 10,
+            borderRadius: radius.full,
+            backgroundColor: draft.trim() ? colors.primary : colors.tag,
+          }}
+        >
+          <Text style={{ fontSize: 12, fontWeight: '700', color: draft.trim() ? '#fff' : colors.textLight }}>
+            {sending ? '...' : '등록'}
+          </Text>
+        </Pressable>
+      </View>
+
+      {/* 수정 모달 */}
+      <Modal visible={editVisible} animationType="slide" presentationStyle="pageSheet">
+        <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
+          <View style={styles.modalHeader}>
+            <Pressable onPress={() => setEditVisible(false)}>
+              <Text style={{ fontSize: 15, color: colors.textSub }}>취소</Text>
+            </Pressable>
+            <Text style={{ fontSize: 16, fontWeight: '700', color: colors.text }}>게시글 수정</Text>
+            <Pressable onPress={saveEdit} disabled={editSaving}>
+              <Text style={{ fontSize: 15, fontWeight: '700', color: editSaving ? colors.textLight : colors.primary }}>
+                {editSaving ? '저장 중' : '저장'}
+              </Text>
+            </Pressable>
+          </View>
+          <ScrollView style={{ flex: 1, padding: 20 }}>
+            <TextInput
+              style={styles.editTitle}
+              value={editTitle}
+              onChangeText={setEditTitle}
+              placeholder="제목"
+              placeholderTextColor={colors.textLight}
+              maxLength={100}
+            />
+            <TextInput
+              style={styles.editContent}
+              value={editContent}
+              onChangeText={setEditContent}
+              placeholder="내용을 입력하세요"
+              placeholderTextColor={colors.textLight}
+              multiline
+              textAlignVertical="top"
+            />
+          </ScrollView>
+        </SafeAreaView>
+      </Modal>
+    </SafeAreaView>
+  );
+}
+
+function timeAgo(ts: number): string {
+  const m = Math.floor((Date.now() - ts) / 60000);
+  if (m < 1) return '방금';
+  if (m < 60) return `${m}분 전`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}시간 전`;
+  return `${Math.floor(h / 24)}일 전`;
+}
+
+const styles = StyleSheet.create({
+  header: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    paddingHorizontal: 16, paddingVertical: 12,
+    backgroundColor: colors.card,
+    borderBottomWidth: 1, borderBottomColor: colors.border,
+  },
+  reactPicker: {
+    flexDirection: 'row', gap: 6, padding: 12,
+    borderRadius: 14, backgroundColor: colors.bg,
+    borderWidth: 1, borderColor: colors.border,
+  },
+  inputRow: {
+    flexDirection: 'row', gap: 8, alignItems: 'center',
+    padding: 14, paddingBottom: 18,
+    backgroundColor: colors.card,
+    borderTopWidth: 1, borderTopColor: colors.border,
+  },
+  input: {
+    flex: 1, paddingHorizontal: 14, paddingVertical: 11,
+    borderRadius: radius.full, borderWidth: 1, borderColor: colors.border,
+    backgroundColor: colors.bg, fontSize: 13, color: colors.text,
+  },
+  modalHeader: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    paddingHorizontal: 20, paddingVertical: 16,
+    borderBottomWidth: 1, borderBottomColor: colors.border,
+    backgroundColor: colors.card,
+  },
+  editTitle: {
+    fontSize: 18, fontWeight: '700', color: colors.text,
+    borderBottomWidth: 1, borderBottomColor: colors.border,
+    paddingBottom: 14, marginBottom: 16,
+  },
+  editContent: {
+    fontSize: 15, color: colors.text, lineHeight: 26,
+    minHeight: 300,
+  },
+});

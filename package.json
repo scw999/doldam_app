@@ -1,0 +1,14 @@
+{
+  "name": "doldam",
+  "private": true,
+  "version": "0.0.1",
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "api:dev": "npm --workspace apps/api run dev",
+    "api:deploy": "npm --workspace apps/api run deploy",
+    "api:db:local": "npm --workspace apps/api run db:local",
+    "mobile:start": "npm --workspace apps/mobile run start"
+  }
+}
