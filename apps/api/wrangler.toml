@@ -46,7 +46,7 @@ crons = ["0 * * * *"]  # 매시간 — 만료 포인트/방 정리
 
 # ---- Vars ----
 [vars]
-ENV = "development"  # TODO: 출시 전 "production" + 다날 API 연결 필요
+ENV = "production"
 
 # Secrets (wrangler secret put 으로 주입):
 # - JWT_SECRET
