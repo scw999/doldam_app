@@ -88,15 +88,12 @@ auth.post('/certificate', requireTempPhone, async (c) => {
     httpMetadata: { contentType: file.type || 'application/octet-stream' },
   });
 
-  // OCR 대기 상태 플래그
+  // 관리자 수동 검증 대기 (7일 보관)
   await c.env.DOLDAM_KV.put(
     `cert:${jwt.sub}`,
-    JSON.stringify({ r2Key, status: 'pending' }),
-    { expirationTtl: 1800 }
+    JSON.stringify({ r2Key, status: 'pending', uploadedAt: Date.now() }),
+    { expirationTtl: 604800 }
   );
-
-  // Queue에 OCR 작업 투입
-  await c.env.DOLDAM_QUEUE.send({ type: 'ocr', userId: jwt.sub, r2Key });
 
   return c.json({ ok: true, status: 'pending' });
 });

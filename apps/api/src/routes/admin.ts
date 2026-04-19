@@ -34,4 +34,46 @@ admin.patch('/reports/:id', requireAuth, async (c) => {
   return c.json({ ok: true });
 });
 
+// ---- 증명서 수동 검증 ----
+admin.get('/certificates', requireAuth, async (c) => {
+  const list = await c.env.DOLDAM_KV.list({ prefix: 'cert:' });
+  const results = await Promise.all(
+    list.keys.map(async (k) => {
+      const raw = await c.env.DOLDAM_KV.get(k.name);
+      if (!raw) return null;
+      const data = JSON.parse(raw) as { status: string; uploadedAt: number; r2Key: string };
+      return { phoneHash: k.name.replace('cert:', ''), ...data };
+    })
+  );
+  const statusFilter = c.req.query('status') ?? 'pending';
+  return c.json(results.filter((r) => r && r.status === statusFilter));
+});
+
+admin.post('/certificates/:phoneHash/approve', requireAuth, async (c) => {
+  const { phoneHash } = c.req.param();
+  const raw = await c.env.DOLDAM_KV.get(`cert:${phoneHash}`);
+  if (!raw) return c.json({ error: 'not_found' }, 404);
+  const data = JSON.parse(raw);
+  await c.env.DOLDAM_KV.put(
+    `cert:${phoneHash}`,
+    JSON.stringify({ ...data, status: 'verified', verifiedAt: Date.now() }),
+    { expirationTtl: 604800 }
+  );
+  return c.json({ ok: true });
+});
+
+admin.post('/certificates/:phoneHash/reject', requireAuth, async (c) => {
+  const { phoneHash } = c.req.param();
+  const { reason = '검증 실패' } = await c.req.json<{ reason?: string }>().catch(() => ({}));
+  const raw = await c.env.DOLDAM_KV.get(`cert:${phoneHash}`);
+  if (!raw) return c.json({ error: 'not_found' }, 404);
+  const data = JSON.parse(raw);
+  await c.env.DOLDAM_KV.put(
+    `cert:${phoneHash}`,
+    JSON.stringify({ ...data, status: 'rejected', reason, rejectedAt: Date.now() }),
+    { expirationTtl: 86400 }
+  );
+  return c.json({ ok: true });
+});
+
 export default admin;

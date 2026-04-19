@@ -62,6 +62,7 @@
   <div class="container">
     <div class="tabs">
       <div class="tab active" data-tab="overview">개요</div>
+      <div class="tab" data-tab="certs">증명서 <span id="certBadge"></span></div>
       <div class="tab" data-tab="reports">신고 <span id="pendingBadge"></span></div>
       <div class="tab" data-tab="users">유저</div>
     </div>
@@ -79,6 +80,18 @@
           <li>방 만료: 매시 cron trigger에서 자동 처리됨</li>
         </ul>
       </div>
+    </div>
+
+    <div id="tab-certs" class="section">
+      <div class="filter-row">
+        <select id="certStatus">
+          <option value="pending">대기 중</option>
+          <option value="verified">승인됨</option>
+          <option value="rejected">반려됨</option>
+        </select>
+        <button id="refreshCerts">새로고침</button>
+      </div>
+      <div id="certsList"><div class="empty">로딩 중...</div></div>
     </div>
 
     <div id="tab-reports" class="section">
@@ -145,6 +158,7 @@ document.getElementById('loginBtn').addEventListener('click', async function() {
     document.getElementById('app').style.display = 'block';
     document.getElementById('headerInfo').textContent = API;
     loadOverview();
+    loadCerts();
     loadReports();
   } catch(e) {
     document.getElementById('loginErr').textContent = '로그인 실패: ' + esc(e.message);
@@ -165,11 +179,14 @@ document.querySelectorAll('.tab').forEach(function(tab) {
     document.querySelectorAll('.section').forEach(function(s) { s.classList.remove('active'); });
     document.getElementById('tab-' + name).classList.add('active');
     if (name === 'reports') loadReports();
+    if (name === 'certs') loadCerts();
   });
 });
 
 document.getElementById('refreshReports').addEventListener('click', loadReports);
 document.getElementById('reportStatus').addEventListener('change', loadReports);
+document.getElementById('refreshCerts').addEventListener('click', loadCerts);
+document.getElementById('certStatus').addEventListener('change', loadCerts);
 
 async function loadOverview() {
   try {
@@ -296,6 +313,82 @@ async function resolveReport(id, status) {
     });
     toast('처리 완료');
     loadReports();
+  } catch(e) { toast('실패: ' + e.message); }
+}
+
+async function loadCerts() {
+  var status = document.getElementById('certStatus').value;
+  var el = document.getElementById('certsList');
+  el.innerHTML = '<div class="empty">로딩 중...</div>';
+  try {
+    var arr = await apiFetch('/admin/certificates?status=' + encodeURIComponent(status));
+    arr = Array.isArray(arr) ? arr.filter(Boolean) : [];
+
+    var badge = document.getElementById('certBadge');
+    badge.textContent = (status === 'pending' && arr.length > 0) ? '(' + arr.length + ')' : '';
+
+    el.innerHTML = '';
+    if (!arr.length) {
+      el.innerHTML = '<div class="empty">없음</div>';
+      return;
+    }
+    arr.forEach(function(r) {
+      var card = document.createElement('div');
+      card.className = 'card';
+
+      var row = document.createElement('div');
+      row.className = 'row';
+
+      var badge2 = document.createElement('span');
+      badge2.className = 'badge badge-' + (r.status === 'verified' ? 'resolved' : r.status === 'rejected' ? 'dismissed' : 'pending');
+      badge2.textContent = r.status === 'verified' ? '승인' : r.status === 'rejected' ? '반려' : '대기';
+      row.appendChild(badge2);
+
+      var meta = document.createElement('div');
+      meta.className = 'meta';
+      meta.style.marginTop = '6px';
+      meta.textContent = '업로드: ' + (r.uploadedAt ? new Date(r.uploadedAt).toLocaleString('ko-KR') : '-');
+      card.appendChild(row);
+      card.appendChild(meta);
+
+      var hashEl = document.createElement('div');
+      hashEl.className = 'meta';
+      hashEl.style.marginTop = '4px';
+      hashEl.textContent = 'Hash: ' + r.phoneHash.slice(0, 16) + '…';
+      card.appendChild(hashEl);
+
+      if (r.status === 'pending') {
+        var actions = document.createElement('div');
+        actions.className = 'action-row';
+
+        var approveBtn = document.createElement('button');
+        approveBtn.textContent = '✓ 승인';
+        approveBtn.addEventListener('click', function() { certAction(r.phoneHash, 'approve'); });
+
+        var rejectBtn = document.createElement('button');
+        rejectBtn.className = 'danger';
+        rejectBtn.textContent = '✗ 반려';
+        rejectBtn.addEventListener('click', function() { certAction(r.phoneHash, 'reject'); });
+
+        actions.appendChild(approveBtn);
+        actions.appendChild(rejectBtn);
+        card.appendChild(actions);
+      }
+      el.appendChild(card);
+    });
+  } catch(e) {
+    el.innerHTML = '<div class="empty">오류: ' + esc(e.message) + '</div>';
+  }
+}
+
+async function certAction(phoneHash, action) {
+  try {
+    await apiFetch('/admin/certificates/' + encodeURIComponent(phoneHash) + '/' + action, {
+      method: 'POST',
+      body: JSON.stringify({}),
+    });
+    toast(action === 'approve' ? '승인 완료' : '반려 완료');
+    loadCerts();
   } catch(e) { toast('실패: ' + e.message); }
 }
 
