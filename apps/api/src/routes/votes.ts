@@ -16,7 +16,9 @@ votes.get('/', async (c) => {
     .prepare(
       `SELECT v.id, v.question, v.description, v.created_at, v.expires_at,
               u.nickname,
-              (SELECT COUNT(*) FROM vote_responses WHERE vote_id = v.id) AS total
+              (SELECT COUNT(*) FROM vote_responses WHERE vote_id = v.id) AS total,
+              (SELECT COUNT(*) FROM vote_responses WHERE vote_id = v.id AND choice = 'agree') AS agree,
+              (SELECT COUNT(*) FROM vote_responses WHERE vote_id = v.id AND choice = 'disagree') AS disagree
        FROM votes v JOIN users u ON u.id = v.user_id
        ORDER BY v.created_at DESC LIMIT ?`
     ).bind(limit).all();

@@ -16,6 +16,15 @@ export async function sendPush(
   body: string,
   data?: Record<string, unknown>
 ): Promise<void> {
+  // 알림 히스토리는 푸시 토큰 유무와 관계없이 항상 저장
+  await env.DOLDAM_DB
+    .prepare(
+      `INSERT INTO notifications (id, user_id, title, body, data, created_at)
+       VALUES (?, ?, ?, ?, ?, ?)`
+    )
+    .bind(crypto.randomUUID(), userId, title, body, data ? JSON.stringify(data) : null, Date.now())
+    .run();
+
   const { results } = await env.DOLDAM_DB
     .prepare('SELECT token FROM push_tokens WHERE user_id = ?')
     .bind(userId)
@@ -42,13 +51,4 @@ export async function sendPush(
   } catch (e) {
     console.error('[push] expo error', e);
   }
-
-  // 히스토리 저장
-  await env.DOLDAM_DB
-    .prepare(
-      `INSERT INTO notifications (id, user_id, title, body, data, created_at)
-       VALUES (?, ?, ?, ?, ?, ?)`
-    )
-    .bind(crypto.randomUUID(), userId, title, body, data ? JSON.stringify(data) : null, Date.now())
-    .run();
 }

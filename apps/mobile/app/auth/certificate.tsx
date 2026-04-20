@@ -70,8 +70,8 @@ export default function CertificateScreen() {
     <View style={styles.container}>
       <Text style={styles.title}>혼인관계증명서 업로드</Text>
       <Text style={styles.sub}>
-        사진 또는 PDF 캡처를 올려주세요. OCR로 이혼 기록을 확인하며,
-        검증 후 파일은 즉시 삭제됩니다.
+        사진 또는 PDF 캡처를 올려주세요. 담당자가 서류를 검토 후 승인해 드립니다.
+        검토 완료 후 파일은 즉시 삭제됩니다.
       </Text>
 
       {status === 'idle' && (
@@ -85,7 +85,13 @@ export default function CertificateScreen() {
       )}
 
       {status === 'pending' && (
-        <View style={styles.state}><ActivityIndicator /><Text style={styles.stateText}>검증 중입니다 (보통 10초 이내)</Text></View>
+        <View style={styles.state}>
+          <Text style={{ fontSize: 36 }}>📋</Text>
+          <Text style={styles.stateText}>검토 요청이 완료됐어요</Text>
+          <Text style={{ ...typography.caption, color: colors.textSub, textAlign: 'center', lineHeight: 20 }}>
+            담당자 검토 후 승인 알림을 보내드립니다.{'\n'}보통 1~2 영업일 이내에 처리됩니다.
+          </Text>
+        </View>
       )}
 
       {status === 'verified' && (

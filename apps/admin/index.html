@@ -14,9 +14,12 @@
     input,select{width:100%;padding:10px 12px;border:1px solid #EDE4DA;border-radius:8px;font-size:14px;color:#2C2420;background:#FAF6F1;margin-bottom:10px}
     button{background:#C4956A;color:#fff;border:none;padding:10px 20px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer}
     button:hover{background:#A07850}
-    button.danger{background:#E07B6B}
+    button.danger{background:#E07B6B} button.danger:hover{background:#C0504A}
+    button.warn{background:#E8A838} button.warn:hover{background:#C08020}
+    button.mute{background:#7B9CC0} button.mute:hover{background:#5A7EA0}
     button.ghost{background:transparent;color:#8C7B6B;border:1px solid #EDE4DA}
-    .container{max-width:900px;margin:0 auto;padding:20px}
+    button.sm{padding:6px 12px;font-size:12px}
+    .container{max-width:960px;margin:0 auto;padding:20px}
     .tabs{display:flex;gap:0;border-bottom:1px solid #EDE4DA;margin-bottom:20px}
     .tab{padding:10px 20px;cursor:pointer;font-size:13px;font-weight:500;color:#8C7B6B;border-bottom:2px solid transparent;margin-bottom:-1px}
     .tab.active{color:#2C2420;border-bottom-color:#C4956A;font-weight:700}
@@ -26,17 +29,28 @@
     .badge-pending{background:#FFF3CD;color:#856404}
     .badge-resolved{background:#D1FAD7;color:#155724}
     .badge-dismissed{background:#E2E3E5;color:#6c757d}
+    .badge-banned{background:#F8D7DA;color:#842029}
+    .badge-muted{background:#FFF3CD;color:#856404}
     .row{display:flex;gap:10px;align-items:flex-start;flex-wrap:wrap}
     .meta{font-size:11px;color:#8C7B6B;margin-top:4px}
     .stat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;margin-bottom:20px}
     .stat-card{background:#fff;border:1px solid #EDE4DA;border-radius:12px;padding:16px;text-align:center}
     .stat-card .num{font-size:28px;font-weight:700;color:#C4956A;letter-spacing:-1px}
     .stat-card .lbl{font-size:11px;color:#8C7B6B;margin-top:4px}
-    #toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#2C2420;color:#fff;padding:10px 20px;border-radius:999px;font-size:13px;display:none}
+    #toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#2C2420;color:#fff;padding:10px 20px;border-radius:999px;font-size:13px;display:none;z-index:999}
     .empty{text-align:center;color:#8C7B6B;padding:40px;font-size:13px}
     .filter-row{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap}
     .filter-row select,.filter-row input{flex:1;min-width:120px;margin-bottom:0}
-    .action-row{margin-top:10px;display:flex;gap:8px}
+    .action-row{margin-top:10px;display:flex;gap:6px;flex-wrap:wrap}
+    .target-box{background:#FAF6F1;border-radius:8px;padding:10px;margin:8px 0;font-size:12px;color:#2C2420;border-left:3px solid #C4956A}
+    .target-author{font-size:11px;font-weight:700;color:#A07850;margin-bottom:4px}
+    .penalty-row{border-top:1px solid #EDE4DA;margin-top:10px;padding-top:10px;display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+    .penalty-lbl{font-size:11px;color:#8C7B6B;margin-right:4px}
+    /* Image modal */
+    #imgModal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:1000;align-items:center;justify-content:center}
+    #imgModal.open{display:flex}
+    #imgModal img{max-width:90vw;max-height:88vh;border-radius:8px;background:#fff}
+    #imgModal .close{position:absolute;top:16px;right:20px;color:#fff;font-size:28px;cursor:pointer;line-height:1}
   </style>
 </head>
 <body>
@@ -74,10 +88,10 @@
       <div class="card">
         <p style="font-size:13px;font-weight:700;margin-bottom:8px">빠른 도움말</p>
         <ul style="font-size:12px;color:#8C7B6B;line-height:24px;padding-left:16px">
-          <li>신고 탭: 대기 중인 신고 처리 (resolved / dismissed)</li>
-          <li>유저 탭: 닉네임으로 게시글 검색</li>
-          <li>AI 필터: CLAUDE_API_KEY를 Cloudflare Secret에 등록해야 production에서 작동</li>
-          <li>방 만료: 매시 cron trigger에서 자동 처리됨</li>
+          <li>증명서 탭: 이미지 확인 후 승인 / 반려</li>
+          <li>신고 탭: 신고 내용 확인 후 처리 완료 / 기각 / 유저 페널티</li>
+          <li>신고 5개 이상 누적 게시글·댓글은 자동 숨김</li>
+          <li>페널티: 경고 → 임시정지(7일) → 영구정지 순서로 사용 권장</li>
         </ul>
       </div>
     </div>
@@ -115,6 +129,12 @@
   </div>
 </div>
 
+<!-- 이미지 모달 -->
+<div id="imgModal">
+  <span class="close" id="imgModalClose">✕</span>
+  <img id="imgModalImg" src="" alt="증명서" />
+</div>
+
 <div id="toast"></div>
 
 <script>
@@ -122,19 +142,14 @@
 let API = '', TOKEN = '';
 
 function esc(s) {
-  return String(s ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
+  return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
 
 function toast(msg) {
   const el = document.getElementById('toast');
   el.textContent = String(msg);
   el.style.display = 'block';
-  setTimeout(() => { el.style.display = 'none'; }, 2000);
+  setTimeout(function() { el.style.display = 'none'; }, 2500);
 }
 
 async function apiFetch(path, opts) {
@@ -149,6 +164,15 @@ async function apiFetch(path, opts) {
   return res.json();
 }
 
+async function apiFetchBlob(path) {
+  const res = await fetch(API + path, {
+    headers: { 'Authorization': 'Bearer ' + TOKEN },
+  });
+  if (!res.ok) throw new Error(String(res.status));
+  return res.blob();
+}
+
+// ---- 로그인 ----
 document.getElementById('loginBtn').addEventListener('click', async function() {
   API = document.getElementById('apiBase').value.replace(/\/$/, '');
   TOKEN = document.getElementById('tokenInput').value.trim();
@@ -188,120 +212,175 @@ document.getElementById('reportStatus').addEventListener('change', loadReports);
 document.getElementById('refreshCerts').addEventListener('click', loadCerts);
 document.getElementById('certStatus').addEventListener('change', loadCerts);
 
+// ---- 이미지 모달 ----
+document.getElementById('imgModalClose').addEventListener('click', function() {
+  document.getElementById('imgModal').classList.remove('open');
+  var img = document.getElementById('imgModalImg');
+  if (img.src.startsWith('blob:')) URL.revokeObjectURL(img.src);
+  img.src = '';
+});
+
+async function showCertImage(phoneHash) {
+  try {
+    const blob = await apiFetchBlob('/admin/certificates/' + encodeURIComponent(phoneHash) + '/image');
+    const url = URL.createObjectURL(blob);
+    document.getElementById('imgModalImg').src = url;
+    document.getElementById('imgModal').classList.add('open');
+  } catch(e) {
+    toast('이미지 로드 실패: ' + e.message);
+  }
+}
+
+// ---- 개요 ----
 async function loadOverview() {
   try {
     const health = await apiFetch('/health').catch(function() { return null; });
     const grid = document.getElementById('statsGrid');
     const cells = [
       { num: health ? '✓' : '✗', lbl: 'API 상태' },
-      { num: 'Dev', lbl: '환경' },
+      { num: 'Prod', lbl: '환경' },
       { num: '✓', lbl: 'D1 연결' },
     ];
     grid.textContent = '';
     cells.forEach(function(c) {
       const div = document.createElement('div');
       div.className = 'stat-card';
-      const numEl = document.createElement('div');
-      numEl.className = 'num';
-      numEl.textContent = c.num;
-      const lblEl = document.createElement('div');
-      lblEl.className = 'lbl';
-      lblEl.textContent = c.lbl;
-      div.appendChild(numEl);
-      div.appendChild(lblEl);
+      div.innerHTML = '<div class="num">' + esc(c.num) + '</div><div class="lbl">' + esc(c.lbl) + '</div>';
       grid.appendChild(div);
     });
-  } catch(e) { /* ignore */ }
+  } catch(e) {}
 }
 
+// ---- 신고 ----
 async function loadReports() {
   const status = document.getElementById('reportStatus').value;
   const el = document.getElementById('reportsList');
-  el.textContent = '';
-  const loading = document.createElement('div');
-  loading.className = 'empty';
-  loading.textContent = '로딩 중...';
-  el.appendChild(loading);
-
+  el.innerHTML = '<div class="empty">로딩 중...</div>';
   try {
-    const data = await apiFetch('/admin/reports?status=' + encodeURIComponent(status));
-    const arr = Array.isArray(data) ? data : (data.results || []);
-    el.textContent = '';
+    const arr = await apiFetch('/admin/reports?status=' + encodeURIComponent(status));
+    el.innerHTML = '';
 
     if (status === 'pending') {
-      const badge = document.getElementById('pendingBadge');
-      badge.textContent = arr.length > 0 ? '(' + arr.length + ')' : '';
+      document.getElementById('pendingBadge').textContent = arr.length > 0 ? '(' + arr.length + ')' : '';
     }
-
-    if (!arr.length) {
-      const empty = document.createElement('div');
-      empty.className = 'empty';
-      empty.textContent = '신고 없음';
-      el.appendChild(empty);
-      return;
-    }
+    if (!arr.length) { el.innerHTML = '<div class="empty">신고 없음</div>'; return; }
 
     arr.forEach(function(r) {
       const card = document.createElement('div');
       card.className = 'card';
 
-      const row = document.createElement('div');
-      row.className = 'row';
+      // 헤더 행
+      const headerRow = document.createElement('div');
+      headerRow.className = 'row';
+      headerRow.style.marginBottom = '8px';
+      headerRow.innerHTML =
+        '<span class="badge badge-' + esc(r.status) + '">' + esc(r.status) + '</span>' +
+        '<b style="font-size:13px">[' + esc(r.target_type || '') + ']</b>' +
+        '<span class="meta" style="margin-top:0">' + esc(r.reporter_nickname || '익명') + ' 신고</span>' +
+        '<span style="flex:1"></span>' +
+        '<span class="meta" style="margin-top:0">' + new Date(r.created_at).toLocaleString('ko-KR') + '</span>';
+      card.appendChild(headerRow);
 
-      const badge = document.createElement('span');
-      badge.className = 'badge badge-' + esc(r.status);
-      badge.textContent = r.status;
-
-      const type = document.createElement('b');
-      type.style.fontSize = '13px';
-      type.textContent = '[' + (r.target_type || '') + ']';
-
-      const reporter = document.createElement('span');
-      reporter.className = 'meta';
-      reporter.textContent = (r.reporter_nickname || '익명') + ' 신고';
-
-      row.appendChild(badge);
-      row.appendChild(type);
-      row.appendChild(reporter);
-      card.appendChild(row);
-
+      // 신고 사유
       const reason = document.createElement('div');
-      reason.style.cssText = 'margin:8px 0;font-size:13px';
-      reason.textContent = r.reason || '';
+      reason.style.cssText = 'font-size:13px;color:#E07B6B;font-weight:600;margin-bottom:6px';
+      reason.textContent = '사유: ' + (r.reason || '');
       card.appendChild(reason);
 
-      const meta = document.createElement('div');
-      meta.className = 'meta';
-      meta.style.marginTop = '4px';
-      meta.textContent = 'ID: ' + (r.target_id || '') + ' · ' + new Date(r.created_at).toLocaleString('ko-KR');
-      card.appendChild(meta);
+      // 신고된 콘텐츠
+      if (r.target_content || r.post_title) {
+        const box = document.createElement('div');
+        box.className = 'target-box';
+        if (r.target_user_nickname) {
+          const authorEl = document.createElement('div');
+          authorEl.className = 'target-author';
+          authorEl.textContent = '작성자: ' + r.target_user_nickname;
+          box.appendChild(authorEl);
+        }
+        if (r.post_title) {
+          const titleEl = document.createElement('div');
+          titleEl.style.cssText = 'font-weight:700;margin-bottom:4px;font-size:13px';
+          titleEl.textContent = r.post_title;
+          box.appendChild(titleEl);
+        }
+        if (r.target_content) {
+          const contentEl = document.createElement('div');
+          contentEl.style.cssText = 'font-size:12px;color:#5C4C3C;line-height:1.6';
+          contentEl.textContent = r.target_content.slice(0, 200) + (r.target_content.length > 200 ? '…' : '');
+          box.appendChild(contentEl);
+        }
+        card.appendChild(box);
+      }
+
+      // target ID (작은 글씨)
+      const idEl = document.createElement('div');
+      idEl.className = 'meta';
+      idEl.textContent = 'ID: ' + (r.target_id || '');
+      card.appendChild(idEl);
 
       if (r.status === 'pending') {
+        // 신고 처리 버튼
         const actions = document.createElement('div');
         actions.className = 'action-row';
 
         const resolveBtn = document.createElement('button');
-        resolveBtn.textContent = '처리 완료';
+        resolveBtn.className = 'sm';
+        resolveBtn.textContent = '✓ 처리 완료';
         resolveBtn.addEventListener('click', function() { resolveReport(r.id, 'resolved'); });
 
         const dismissBtn = document.createElement('button');
-        dismissBtn.className = 'ghost';
+        dismissBtn.className = 'ghost sm';
         dismissBtn.textContent = '기각';
         dismissBtn.addEventListener('click', function() { resolveReport(r.id, 'dismissed'); });
 
         actions.appendChild(resolveBtn);
         actions.appendChild(dismissBtn);
         card.appendChild(actions);
-      }
 
+        // 페널티 버튼 (작성자가 있을 때)
+        if (r.target_user_id) {
+          const penaltyRow = document.createElement('div');
+          penaltyRow.className = 'penalty-row';
+
+          const lbl = document.createElement('span');
+          lbl.className = 'penalty-lbl';
+          lbl.textContent = '작성자 페널티:';
+          penaltyRow.appendChild(lbl);
+
+          const warnBtn = document.createElement('button');
+          warnBtn.className = 'warn sm';
+          warnBtn.textContent = '⚠ 경고';
+          warnBtn.addEventListener('click', function() { issueWarn(r.target_user_id, r.id); });
+
+          const muteBtn = document.createElement('button');
+          muteBtn.className = 'mute sm';
+          muteBtn.textContent = '⏸ 7일 정지';
+          muteBtn.addEventListener('click', function() { issueMute(r.target_user_id, 7, r.id); });
+
+          const mute30Btn = document.createElement('button');
+          mute30Btn.className = 'mute sm';
+          mute30Btn.textContent = '⏸ 30일 정지';
+          mute30Btn.addEventListener('click', function() { issueMute(r.target_user_id, 30, r.id); });
+
+          const banBtn = document.createElement('button');
+          banBtn.className = 'danger sm';
+          banBtn.textContent = '🚫 영구정지';
+          banBtn.addEventListener('click', function() {
+            if (!confirm(esc(r.target_user_nickname || r.target_user_id) + ' 유저를 영구정지할까요?')) return;
+            issueBan(r.target_user_id, r.id);
+          });
+
+          penaltyRow.appendChild(warnBtn);
+          penaltyRow.appendChild(muteBtn);
+          penaltyRow.appendChild(mute30Btn);
+          penaltyRow.appendChild(banBtn);
+          card.appendChild(penaltyRow);
+        }
+      }
       el.appendChild(card);
     });
   } catch(e) {
-    el.textContent = '';
-    const err = document.createElement('div');
-    err.className = 'empty';
-    err.textContent = '오류: ' + e.message;
-    el.appendChild(err);
+    el.innerHTML = '<div class="empty">오류: ' + esc(e.message) + '</div>';
   }
 }
 
@@ -316,6 +395,34 @@ async function resolveReport(id, status) {
   } catch(e) { toast('실패: ' + e.message); }
 }
 
+async function issueWarn(userId, reportId) {
+  try {
+    const res = await apiFetch('/admin/users/' + encodeURIComponent(userId) + '/warn', { method: 'POST', body: '{}' });
+    await resolveReport(reportId, 'resolved');
+    toast('경고 발송 (누적 ' + res.warningCount + '회)');
+  } catch(e) { toast('실패: ' + e.message); }
+}
+
+async function issueMute(userId, days, reportId) {
+  try {
+    await apiFetch('/admin/users/' + encodeURIComponent(userId) + '/mute', {
+      method: 'POST',
+      body: JSON.stringify({ days: days }),
+    });
+    await resolveReport(reportId, 'resolved');
+    toast(days + '일 정지 완료');
+  } catch(e) { toast('실패: ' + e.message); }
+}
+
+async function issueBan(userId, reportId) {
+  try {
+    await apiFetch('/admin/users/' + encodeURIComponent(userId) + '/ban', { method: 'POST', body: '{}' });
+    await resolveReport(reportId, 'resolved');
+    toast('영구정지 완료');
+  } catch(e) { toast('실패: ' + e.message); }
+}
+
+// ---- 증명서 ----
 async function loadCerts() {
   var status = document.getElementById('certStatus').value;
   var el = document.getElementById('certsList');
@@ -324,49 +431,55 @@ async function loadCerts() {
     var arr = await apiFetch('/admin/certificates?status=' + encodeURIComponent(status));
     arr = Array.isArray(arr) ? arr.filter(Boolean) : [];
 
-    var badge = document.getElementById('certBadge');
-    badge.textContent = (status === 'pending' && arr.length > 0) ? '(' + arr.length + ')' : '';
-
+    document.getElementById('certBadge').textContent = (status === 'pending' && arr.length > 0) ? '(' + arr.length + ')' : '';
     el.innerHTML = '';
-    if (!arr.length) {
-      el.innerHTML = '<div class="empty">없음</div>';
-      return;
-    }
+    if (!arr.length) { el.innerHTML = '<div class="empty">없음</div>'; return; }
+
     arr.forEach(function(r) {
       var card = document.createElement('div');
       card.className = 'card';
 
       var row = document.createElement('div');
       row.className = 'row';
+      row.style.marginBottom = '8px';
 
       var badge2 = document.createElement('span');
       badge2.className = 'badge badge-' + (r.status === 'verified' ? 'resolved' : r.status === 'rejected' ? 'dismissed' : 'pending');
       badge2.textContent = r.status === 'verified' ? '승인' : r.status === 'rejected' ? '반려' : '대기';
       row.appendChild(badge2);
 
-      var meta = document.createElement('div');
-      meta.className = 'meta';
-      meta.style.marginTop = '6px';
-      meta.textContent = '업로드: ' + (r.uploadedAt ? new Date(r.uploadedAt).toLocaleString('ko-KR') : '-');
+      var uploadTime = document.createElement('span');
+      uploadTime.className = 'meta';
+      uploadTime.style.marginTop = '0';
+      uploadTime.textContent = r.uploadedAt ? new Date(r.uploadedAt).toLocaleString('ko-KR') : '-';
+      row.appendChild(uploadTime);
       card.appendChild(row);
-      card.appendChild(meta);
 
       var hashEl = document.createElement('div');
       hashEl.className = 'meta';
-      hashEl.style.marginTop = '4px';
       hashEl.textContent = 'Hash: ' + r.phoneHash.slice(0, 16) + '…';
+      hashEl.style.marginBottom = '8px';
       card.appendChild(hashEl);
+
+      // 이미지 보기 버튼
+      var imgBtn = document.createElement('button');
+      imgBtn.className = 'ghost sm';
+      imgBtn.textContent = '🔍 서류 이미지 보기';
+      imgBtn.style.marginBottom = '8px';
+      imgBtn.addEventListener('click', function() { showCertImage(r.phoneHash); });
+      card.appendChild(imgBtn);
 
       if (r.status === 'pending') {
         var actions = document.createElement('div');
         actions.className = 'action-row';
 
         var approveBtn = document.createElement('button');
+        approveBtn.className = 'sm';
         approveBtn.textContent = '✓ 승인';
         approveBtn.addEventListener('click', function() { certAction(r.phoneHash, 'approve'); });
 
         var rejectBtn = document.createElement('button');
-        rejectBtn.className = 'danger';
+        rejectBtn.className = 'danger sm';
         rejectBtn.textContent = '✗ 반려';
         rejectBtn.addEventListener('click', function() { certAction(r.phoneHash, 'reject'); });
 
@@ -392,77 +505,88 @@ async function certAction(phoneHash, action) {
   } catch(e) { toast('실패: ' + e.message); }
 }
 
+// ---- 유저 검색 ----
 let searchTimer;
 document.getElementById('userSearch').addEventListener('input', function() {
   clearTimeout(searchTimer);
   searchTimer = setTimeout(async function() {
     const q = document.getElementById('userSearch').value.trim();
     const el = document.getElementById('usersList');
-    if (!q) {
-      el.textContent = '';
-      const empty = document.createElement('div');
-      empty.className = 'empty';
-      empty.textContent = '검색어를 입력하세요';
-      el.appendChild(empty);
-      return;
-    }
-    el.textContent = '';
-    const loading = document.createElement('div');
-    loading.className = 'empty';
-    loading.textContent = '검색 중...';
-    el.appendChild(loading);
+    if (!q) { el.innerHTML = '<div class="empty">검색어를 입력하세요</div>'; return; }
+    el.innerHTML = '<div class="empty">검색 중...</div>';
     try {
-      const res = await apiFetch('/posts?category=all&limit=50');
-      const seen = new Set();
-      const users = (res.items || []).filter(function(p) {
-        if (!p.nickname || !p.nickname.includes(q)) return false;
-        if (seen.has(p.nickname)) return false;
-        seen.add(p.nickname);
-        return true;
-      });
-      el.textContent = '';
-      if (!users.length) {
-        const empty = document.createElement('div');
-        empty.className = 'empty';
-        empty.textContent = '결과 없음';
-        el.appendChild(empty);
-        return;
-      }
-      users.forEach(function(u) {
+      const arr = await apiFetch('/admin/users?q=' + encodeURIComponent(q));
+      el.innerHTML = '';
+      if (!arr.length) { el.innerHTML = '<div class="empty">결과 없음</div>'; return; }
+      arr.forEach(function(u) {
         const card = document.createElement('div');
         card.className = 'card';
 
         const row = document.createElement('div');
         row.className = 'row';
-
-        const name = document.createElement('b');
-        name.textContent = u.nickname || '';
-
-        const meta = document.createElement('span');
-        meta.className = 'meta';
-        meta.textContent = (u.gender === 'M' ? '남' : '여') + ' · ' + (u.age_range || '');
-
-        row.appendChild(name);
-        row.appendChild(meta);
+        row.style.marginBottom = '8px';
+        row.innerHTML =
+          '<b>' + esc(u.nickname) + '</b>' +
+          '<span class="meta" style="margin-top:0">' + (u.gender === 'M' ? '남' : '여') + ' · ' + esc(u.age_range || '') + '</span>' +
+          (u.banned ? '<span class="badge badge-banned">영구정지</span>' : '') +
+          (u.muted_until && u.muted_until > Date.now() ? '<span class="badge badge-muted">정지중</span>' : '') +
+          (u.warning_count > 0 ? '<span class="badge badge-pending">경고 ' + u.warning_count + '회</span>' : '');
         card.appendChild(row);
 
-        const postMeta = document.createElement('div');
-        postMeta.className = 'meta';
-        postMeta.style.marginTop = '4px';
-        postMeta.textContent = '최근 게시글: ' + (u.title || '');
-        card.appendChild(postMeta);
+        const meta = document.createElement('div');
+        meta.className = 'meta';
+        meta.textContent = 'ID: ' + u.id + (u.muted_until && u.muted_until > Date.now() ? ' · 정지 만료: ' + new Date(u.muted_until).toLocaleDateString('ko-KR') : '');
+        card.appendChild(meta);
+
+        const actions = document.createElement('div');
+        actions.className = 'action-row';
+        actions.style.marginTop = '10px';
+
+        const warnBtn = document.createElement('button');
+        warnBtn.className = 'warn sm';
+        warnBtn.textContent = '⚠ 경고';
+        warnBtn.addEventListener('click', function() { userAction(u.id, 'warn'); });
+
+        const muteBtn = document.createElement('button');
+        muteBtn.className = 'mute sm';
+        muteBtn.textContent = '⏸ 7일 정지';
+        muteBtn.addEventListener('click', function() { userAction(u.id, 'mute', { days: 7 }); });
+
+        const banBtn = document.createElement('button');
+        banBtn.className = 'danger sm';
+        banBtn.textContent = u.banned ? '🔓 정지 해제' : '🚫 영구정지';
+        banBtn.addEventListener('click', function() {
+          if (u.banned) {
+            userAction(u.id, 'unban');
+          } else {
+            if (confirm(esc(u.nickname) + ' 유저를 영구정지할까요?')) userAction(u.id, 'ban');
+          }
+        });
+
+        actions.appendChild(warnBtn);
+        actions.appendChild(muteBtn);
+        actions.appendChild(banBtn);
+        card.appendChild(actions);
 
         el.appendChild(card);
       });
     } catch(e) {
-      el.textContent = '';
-      const err = document.createElement('div');
-      err.className = 'empty';
-      err.textContent = '오류: ' + e.message;
-      el.appendChild(err);
+      el.innerHTML = '<div class="empty">오류: ' + esc(e.message) + '</div>';
     }
   }, 400);
 });
+
+async function userAction(userId, action, body) {
+  try {
+    const res = await apiFetch('/admin/users/' + encodeURIComponent(userId) + '/' + action, {
+      method: 'POST',
+      body: JSON.stringify(body || {}),
+    });
+    const msgs = { warn: '경고 발송 (누적 ' + (res.warningCount || '') + '회)', mute: '정지 완료', ban: '영구정지 완료', unban: '정지 해제 완료' };
+    toast(msgs[action] || '완료');
+    document.getElementById('userSearch').dispatchEvent(new Event('input'));
+  } catch(e) { toast('실패: ' + e.message); }
+}
 </script>
 </body>
 </html>

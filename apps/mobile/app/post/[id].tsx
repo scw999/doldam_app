@@ -12,11 +12,19 @@ import { api } from '@/api';
 interface Post {
   id: string; title: string; content: string; category: string;
   user_id: string; nickname: string; gender: 'M' | 'F'; age_range: string;
+  divorce_year: number | null;
   like_count: number; comment_count: number; created_at: number;
 }
 
+function divorceTag(year: number | null): string {
+  if (!year) return '';
+  const n = new Date().getFullYear() - year;
+  if (n <= 0) return '올해 이혼';
+  return `이혼 ${n}년차`;
+}
+
 interface Comment {
-  id: string; content: string;
+  id: string; content: string; parent_id: string | null;
   nickname: string; gender: 'M' | 'F'; created_at: number;
   user_id?: string;
 }
@@ -46,6 +54,7 @@ export default function PostDetail() {
   const [myReact, setMyReact] = useState<number | null>(null);
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
+  const [replyTo, setReplyTo] = useState<{ id: string; nickname: string } | null>(null);
 
   const [editVisible, setEditVisible] = useState(false);
   const [editTitle, setEditTitle] = useState('');
@@ -68,12 +77,45 @@ export default function PostDetail() {
     try { await api.post(`/posts/${id}/like`, {}); } catch {}
   }
 
+  async function deleteComment(commentId: string) {
+    try {
+      await api.delete(`/posts/${id}/comments/${commentId}`);
+      load();
+    } catch (e) { Alert.alert('삭제 실패', (e as Error).message); }
+  }
+
+  function openCommentMenu(c: Comment) {
+    const mine = c.user_id === myUserId;
+    if (mine) {
+      Alert.alert('댓글 관리', '', [
+        { text: '삭제', style: 'destructive', onPress: () => {
+          Alert.alert('댓글 삭제', '삭제하면 복구할 수 없어요.', [
+            { text: '취소', style: 'cancel' },
+            { text: '삭제', style: 'destructive', onPress: () => deleteComment(c.id) },
+          ]);
+        }},
+        { text: '취소', style: 'cancel' },
+      ]);
+    } else {
+      Alert.alert('댓글 신고', '신고 사유를 선택해 주세요.', [
+        { text: '개인정보 포함', onPress: () => submitReport('comment', c.id, '개인정보 포함') },
+        { text: '욕설/혐오 발언', onPress: () => submitReport('comment', c.id, '욕설/혐오 발언') },
+        { text: '스팸/홍보', onPress: () => submitReport('comment', c.id, '스팸/홍보') },
+        { text: '취소', style: 'cancel' },
+      ]);
+    }
+  }
+
   async function submitComment() {
     if (!draft.trim()) return;
     setSending(true);
     try {
-      await api.post(`/posts/${id}/comments`, { content: draft });
+      await api.post(`/posts/${id}/comments`, {
+        content: draft,
+        ...(replyTo ? { parentId: replyTo.id } : {}),
+      });
       setDraft('');
+      setReplyTo(null);
       load();
     } catch (e) { Alert.alert('댓글 실패', (e as Error).message); }
     finally { setSending(false); }
@@ -172,7 +214,7 @@ export default function PostDetail() {
                 <GenderDot gender={post.gender} />
               </View>
               <Text style={{ fontSize: 11, color: colors.textSub, marginTop: 2 }}>
-                {post.age_range} · {timeAgo(post.created_at)}
+                {divorceTag(post.divorce_year) || post.age_range} · {timeAgo(post.created_at)}
               </Text>
             </View>
           </View>
@@ -219,50 +261,65 @@ export default function PostDetail() {
         <View style={{ paddingHorizontal: 16, paddingBottom: 24, gap: 8 }}>
           {comments.map((c) => {
             const mine = c.user_id === myUserId;
+            const isReply = !!c.parent_id;
             return (
-              <Pressable
-                key={c.id}
-                onLongPress={() => {
-                  if (!mine) {
-                    Alert.alert('댓글 신고', '', [
-                      { text: '개인정보 포함', onPress: () => submitReport('comment', c.id, '개인정보 포함') },
-                      { text: '욕설/혐오', onPress: () => submitReport('comment', c.id, '욕설/혐오 발언') },
-                      { text: '취소', style: 'cancel' },
-                    ]);
-                  }
-                }}
-                style={{
-                  padding: 14,
-                  backgroundColor: mine ? colors.accent + '66' : colors.card,
-                  borderWidth: 1,
-                  borderColor: mine ? colors.primary + '33' : colors.border,
-                  borderRadius: 14,
-                }}
-              >
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-                  <Avatar gender={c.gender} size={24} />
-                  <Text style={{ fontSize: 11.5, fontWeight: '600', color: colors.text }}>
-                    {c.nickname?.split(' ')[0] ?? ''}
-                    {mine && <Text style={{ color: colors.primaryDark, fontWeight: '700' }}> (나)</Text>}
-                  </Text>
-                  <GenderDot gender={c.gender} />
-                  <View style={{ flex: 1 }} />
-                  <Text style={{ fontSize: 10, color: colors.textLight }}>{timeAgo(c.created_at)}</Text>
+              <View key={c.id} style={isReply ? { marginLeft: 28 } : undefined}>
+                <View
+                  style={{
+                    padding: 14,
+                    backgroundColor: isReply ? colors.bg : mine ? colors.accent + '66' : colors.card,
+                    borderWidth: 1,
+                    borderColor: isReply ? colors.border : mine ? colors.primary + '33' : colors.border,
+                    borderRadius: 14,
+                  }}
+                >
+                  {isReply && (
+                    <Text style={{ fontSize: 10, color: colors.textLight, marginBottom: 4 }}>↳ 답글</Text>
+                  )}
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                    <Avatar gender={c.gender} size={24} />
+                    <Text style={{ fontSize: 11.5, fontWeight: '600', color: colors.text }}>
+                      {c.nickname?.split(' ')[0] ?? ''}
+                      {mine && <Text style={{ color: colors.primaryDark, fontWeight: '700' }}> (나)</Text>}
+                    </Text>
+                    <GenderDot gender={c.gender} />
+                    <View style={{ flex: 1 }} />
+                    <Text style={{ fontSize: 10, color: colors.textLight }}>{timeAgo(c.created_at)}</Text>
+                    <Pressable onPress={() => openCommentMenu(c)} style={{ padding: 4, marginLeft: 2 }}>
+                      <Text style={{ fontSize: 16, color: colors.textSub }}>⋯</Text>
+                    </Pressable>
+                  </View>
+                  <Text style={{ fontSize: 13.5, color: colors.text, lineHeight: 21 }}>{c.content}</Text>
+                  {!isReply && (
+                    <Pressable
+                      onPress={() => setReplyTo({ id: c.id, nickname: c.nickname?.split(' ')[0] ?? '익명' })}
+                      style={{ marginTop: 8, alignSelf: 'flex-start' }}
+                    >
+                      <Text style={{ fontSize: 11, color: colors.textSub }}>↩ 답글</Text>
+                    </Pressable>
+                  )}
                 </View>
-                <Text style={{ fontSize: 13.5, color: colors.text, lineHeight: 21 }}>{c.content}</Text>
-              </Pressable>
+              </View>
             );
           })}
         </View>
       </ScrollView>
 
       {/* 입력 */}
+      {replyTo && (
+        <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 6, backgroundColor: colors.accent + '55', borderTopWidth: 1, borderTopColor: colors.border }}>
+          <Text style={{ flex: 1, fontSize: 12, color: colors.textSub }}>↩ {replyTo.nickname}에게 답글</Text>
+          <Pressable onPress={() => setReplyTo(null)}>
+            <Text style={{ fontSize: 16, color: colors.textSub, padding: 4 }}>✕</Text>
+          </Pressable>
+        </View>
+      )}
       <View style={styles.inputRow}>
         <TextInput
           style={styles.input}
           value={draft}
           onChangeText={setDraft}
-          placeholder="따뜻한 말 한마디..."
+          placeholder={replyTo ? `${replyTo.nickname}에게 답글...` : '따뜻한 말 한마디...'}
           placeholderTextColor={colors.textLight}
           editable={!sending}
         />

@@ -11,15 +11,26 @@ const profiles = new Hono<{ Bindings: Env; Variables: Vars }>();
 const UNLOCKABLE_FIELDS = ['job', 'has_kids', 'intro', 'interests'] as const;
 type UnlockField = typeof UNLOCKABLE_FIELDS[number];
 
-// 내 프로필 업데이트 (유료 항목 포함, 본인이니까 제한 없음)
-profiles.put('/me', requireAuth, moderate, async (c) => {
+// 내 프로필 업데이트 (유료 항목 + 닉네임 포함, 본인이니까 제한 없음)
+const updateMe = async (c: any) => {
   const user = c.get('user');
-  const { job, hasKids, intro, interests } = await c.req.json<{
-    job?: string | null;
-    hasKids?: boolean | null;
-    intro?: string | null;
-    interests?: string | null;
+  const { job, hasKids, intro, interests, nickname } = await c.req.json<{
+    job?: string | null; hasKids?: boolean | null;
+    intro?: string | null; interests?: string | null;
+    nickname?: string | null;
   }>();
+
+  if (nickname !== undefined && nickname !== null) {
+    const trimmed = nickname.trim();
+    if (trimmed.length < 2 || trimmed.length > 12) return c.json({ error: 'invalid_nickname' }, 400);
+    const dup = await c.env.DOLDAM_DB
+      .prepare('SELECT 1 FROM users WHERE nickname = ? AND id != ?')
+      .bind(trimmed, user.id).first();
+    if (dup) return c.json({ error: 'nickname_taken' }, 409);
+    await c.env.DOLDAM_DB
+      .prepare('UPDATE users SET nickname = ? WHERE id = ?')
+      .bind(trimmed, user.id).run();
+  }
 
   await c.env.DOLDAM_DB
     .prepare(
@@ -39,7 +50,9 @@ profiles.put('/me', requireAuth, moderate, async (c) => {
     )
     .run();
   return c.json({ ok: true });
-});
+};
+profiles.put('/me', requireAuth, moderate, updateMe);
+profiles.patch('/me', requireAuth, moderate, updateMe);
 
 // 다른 유저 프로필 — 무료 요약(별명/성별/나이대/지역) + 이미 언락한 항목
 profiles.get('/:id', requireAuth, async (c) => {
@@ -48,12 +61,13 @@ profiles.get('/:id', requireAuth, async (c) => {
 
   const target = await c.env.DOLDAM_DB
     .prepare(
-      `SELECT id, nickname, gender, age_range, region, job, has_kids, intro, interests
+      `SELECT id, nickname, gender, age_range, region, divorce_year, job, has_kids, intro, interests
        FROM users WHERE id = ? AND deleted_at IS NULL`
     )
     .bind(targetId)
     .first<{
       id: string; nickname: string; gender: 'M' | 'F'; age_range: string; region: string;
+      divorce_year: number | null;
       job: string | null; has_kids: number | null; intro: string | null; interests: string | null;
     }>();
   if (!target) return c.json({ error: 'not_found' }, 404);

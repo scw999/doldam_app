@@ -116,10 +116,11 @@ auth.post('/signup', requireTempPhone, async (c) => {
   const cert = JSON.parse(certRaw) as { status: string };
   if (cert.status !== 'verified') return c.json({ error: 'certificate_not_verified' }, 400);
 
-  const { gender, ageRange, region } = await c.req.json<{
+  const { gender, ageRange, region, divorceYear } = await c.req.json<{
     gender: 'M' | 'F';
     ageRange: string;
     region: string;
+    divorceYear?: number;
   }>();
   if (!['M', 'F'].includes(gender)) return c.json({ error: 'invalid_gender' }, 400);
 
@@ -129,10 +130,10 @@ auth.post('/signup', requireTempPhone, async (c) => {
 
   await c.env.DOLDAM_DB
     .prepare(
-      `INSERT INTO users (id, phone_hash, nickname, gender, age_range, region, verified, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, 1, ?)`
+      `INSERT INTO users (id, phone_hash, nickname, gender, age_range, region, divorce_year, verified, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)`
     )
-    .bind(id, phoneHash, nickname, gender, ageRange, region, now)
+    .bind(id, phoneHash, nickname, gender, ageRange, region, divorceYear ?? null, now)
     .run();
 
   await c.env.DOLDAM_DB

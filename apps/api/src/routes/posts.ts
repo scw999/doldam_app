@@ -4,6 +4,7 @@ import { requireAuth } from '../middleware/auth';
 import { moderate } from '../middleware/moderation';
 import { awardPoints } from '../services/points';
 import { POINTS, CATEGORIES, type Category } from '../utils/constants';
+import { REPORT_HIDE_THRESHOLD } from './reports';
 import { sendPush } from '../services/push';
 
 type Vars = { user: AuthedUser };
@@ -21,22 +22,22 @@ posts.get('/', async (c) => {
     ? await c.env.DOLDAM_DB
         .prepare(
           `SELECT p.id, p.title, p.content, p.category, p.view_count, p.like_count,
-                  p.comment_count, p.created_at, u.nickname, u.gender, u.age_range
+                  p.comment_count, p.created_at, u.nickname, u.gender, u.age_range, u.divorce_year
            FROM posts p JOIN users u ON u.id = p.user_id
-           WHERE p.deleted_at IS NULL AND p.created_at < ?
+           WHERE p.deleted_at IS NULL AND p.created_at < ? AND p.report_count < ?
            ORDER BY p.created_at DESC LIMIT ?`
         )
-        .bind(cursor, limit)
+        .bind(cursor, REPORT_HIDE_THRESHOLD, limit)
         .all<{ created_at: number }>()
     : await c.env.DOLDAM_DB
         .prepare(
           `SELECT p.id, p.title, p.content, p.category, p.view_count, p.like_count,
-                  p.comment_count, p.created_at, u.nickname, u.gender, u.age_range
+                  p.comment_count, p.created_at, u.nickname, u.gender, u.age_range, u.divorce_year
            FROM posts p JOIN users u ON u.id = p.user_id
-           WHERE p.category = ? AND p.deleted_at IS NULL AND p.created_at < ?
+           WHERE p.category = ? AND p.deleted_at IS NULL AND p.created_at < ? AND p.report_count < ?
            ORDER BY p.created_at DESC LIMIT ?`
         )
-        .bind(categoryParam, cursor, limit)
+        .bind(categoryParam, cursor, REPORT_HIDE_THRESHOLD, limit)
         .all<{ created_at: number }>();
 
   const nextCursor = results.length === limit ? results[results.length - 1].created_at : null;
@@ -67,6 +68,13 @@ posts.post('/', requireAuth, moderate, async (c) => {
   if (category === 'men_only' && user.gender !== 'M') return c.json({ error: 'forbidden_category' }, 403);
   if (category === 'women_only' && user.gender !== 'F') return c.json({ error: 'forbidden_category' }, 403);
   if (!title?.trim() || !content?.trim()) return c.json({ error: 'empty_content' }, 400);
+
+  const muteRow = await c.env.DOLDAM_DB
+    .prepare('SELECT muted_until FROM users WHERE id = ?')
+    .bind(user.id).first<{ muted_until: number | null }>();
+  if (muteRow?.muted_until && muteRow.muted_until > Date.now()) {
+    return c.json({ error: 'muted', mutedUntil: muteRow.muted_until }, 403);
+  }
 
   const id = crypto.randomUUID();
   await c.env.DOLDAM_DB
@@ -180,10 +188,10 @@ posts.get('/:id/comments', async (c) => {
     .prepare(
       `SELECT cm.id, cm.content, cm.parent_id, cm.created_at, u.nickname, u.gender
        FROM comments cm JOIN users u ON u.id = cm.user_id
-       WHERE cm.post_id = ? AND cm.deleted_at IS NULL
+       WHERE cm.post_id = ? AND cm.deleted_at IS NULL AND cm.report_count < ?
        ORDER BY cm.created_at ASC LIMIT 200`
     )
-    .bind(id).all();
+    .bind(id, REPORT_HIDE_THRESHOLD).all();
   return c.json({ items: results });
 });
 
@@ -193,6 +201,13 @@ posts.post('/:id/comments', requireAuth, moderate, async (c) => {
   const postId = c.req.param('id');
   const { content, parentId } = await c.req.json<{ content: string; parentId?: string }>();
   if (!content?.trim()) return c.json({ error: 'empty_content' }, 400);
+
+  const muteRow2 = await c.env.DOLDAM_DB
+    .prepare('SELECT muted_until FROM users WHERE id = ?')
+    .bind(user.id).first<{ muted_until: number | null }>();
+  if (muteRow2?.muted_until && muteRow2.muted_until > Date.now()) {
+    return c.json({ error: 'muted', mutedUntil: muteRow2.muted_until }, 403);
+  }
 
   const id = crypto.randomUUID();
   await c.env.DOLDAM_DB
@@ -212,11 +227,14 @@ posts.post('/:id/comments', requireAuth, moderate, async (c) => {
     .prepare('SELECT user_id FROM posts WHERE id = ?')
     .bind(postId).first<{ user_id: string }>();
   if (author && author.user_id !== user.id) {
+    const commenter = await c.env.DOLDAM_DB
+      .prepare('SELECT nickname FROM users WHERE id = ?')
+      .bind(user.id).first<{ nickname: string }>();
     await c.env.DOLDAM_QUEUE.send({
       type: 'notification',
       userId: author.user_id,
       title: '새 댓글이 달렸어요',
-      body: `${user.nickname}: ${content.trim().slice(0, 40)}`,
+      body: `${commenter?.nickname ?? '익명'}: ${content.trim().slice(0, 40)}`,
     });
   }
 

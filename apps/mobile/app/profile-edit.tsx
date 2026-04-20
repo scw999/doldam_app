@@ -7,6 +7,7 @@ import { useAuth } from '@/store/auth';
 
 export default function ProfileEdit() {
   const userId = useAuth((s) => s.userId);
+  const [nickname, setNickname] = useState('');
   const [job, setJob] = useState('');
   const [hasKids, setHasKids] = useState<boolean | null>(null);
   const [intro, setIntro] = useState('');
@@ -17,10 +18,11 @@ export default function ProfileEdit() {
   useEffect(() => {
     if (!userId) return;
     api.get<{
-      job: string | null; has_kids: number | null;
+      nickname: string; job: string | null; has_kids: number | null;
       intro: string | null; interests: string | null;
     }>(`/profiles/${userId}`)
       .then((p) => {
+        if (p.nickname) setNickname(p.nickname);
         if (p.job) setJob(p.job);
         if (p.has_kids !== null) setHasKids(p.has_kids === 1);
         if (p.intro) setIntro(p.intro);
@@ -33,7 +35,7 @@ export default function ProfileEdit() {
   async function save() {
     setSaving(true);
     try {
-      await api.patch('/profiles/me', { job, hasKids, intro, interests });
+      await api.patch('/profiles/me', { nickname: nickname.trim() || undefined, job, hasKids, intro, interests });
       Alert.alert('저장 완료');
       router.back();
     } catch (e) {
@@ -45,6 +47,10 @@ export default function ProfileEdit() {
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
+      <Text style={styles.label}>닉네임</Text>
+      <TextInput style={styles.input} value={nickname} onChangeText={setNickname}
+        placeholder="2~12자" placeholderTextColor={colors.textSub} maxLength={12} />
+
       <Text style={styles.label}>직업</Text>
       <TextInput style={styles.input} value={job} onChangeText={setJob}
         placeholder="예: 회사원, 자영업, 프리랜서..." placeholderTextColor={colors.textSub} />

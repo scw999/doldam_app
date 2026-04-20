@@ -10,11 +10,19 @@ interface Profile {
   gender: 'M' | 'F';
   age_range: string;
   region: string;
+  divorce_year: number | null;
   job: string | null;
   has_kids: number | null;
   intro: string | null;
   interests: string | null;
   unlocked: string[];
+}
+
+function divorceTag(year: number | null): string | null {
+  if (!year) return null;
+  const n = new Date().getFullYear() - year;
+  if (n <= 0) return '올해 이혼';
+  return `이혼 ${n}년차`;
 }
 
 type Field = 'job' | 'has_kids' | 'intro' | 'interests';
@@ -80,6 +88,11 @@ export default function UserProfile() {
         <Text style={styles.meta}>
           {profile.gender === 'M' ? '남성' : '여성'} · {profile.age_range} · {profile.region}
         </Text>
+        {divorceTag(profile.divorce_year) && (
+          <View style={styles.divorceBadge}>
+            <Text style={styles.divorceBadgeText}>{divorceTag(profile.divorce_year)}</Text>
+          </View>
+        )}
       </View>
 
       <View style={styles.card}>
@@ -93,7 +106,15 @@ const styles = StyleSheet.create({
   container: { padding: spacing.md, backgroundColor: colors.bg, flexGrow: 1 },
   hero: { alignItems: 'center', padding: spacing.lg },
   nick: { ...typography.h1, color: colors.primary, marginBottom: spacing.xs },
-  meta: { ...typography.body, color: colors.textSub },
+  meta: { ...typography.body, color: colors.textSub, marginBottom: spacing.sm },
+  divorceBadge: {
+    marginTop: spacing.xs,
+    backgroundColor: colors.primary + '20',
+    borderWidth: 1, borderColor: colors.primary + '60',
+    borderRadius: radius.full,
+    paddingHorizontal: 14, paddingVertical: 5,
+  },
+  divorceBadgeText: { fontSize: 13, fontWeight: '700', color: colors.primary },
   card: {
     backgroundColor: colors.card, borderRadius: radius.md,
     borderWidth: 1, borderColor: colors.border, padding: spacing.md,

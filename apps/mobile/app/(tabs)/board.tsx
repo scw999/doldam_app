@@ -8,8 +8,15 @@ import { api } from '@/api';
 
 interface Post {
   id: string; title: string; content: string; category: string;
-  nickname: string; gender: 'M' | 'F'; age_range: string;
+  nickname: string; gender: 'M' | 'F'; age_range: string; divorce_year: number | null;
   like_count: number; comment_count: number; created_at: number;
+}
+
+function divorceTag(year: number | null): string {
+  if (!year) return '';
+  const n = new Date().getFullYear() - year;
+  if (n <= 0) return '올해 이혼';
+  return `이혼 ${n}년차`;
 }
 
 const CATEGORIES = [
@@ -37,7 +44,7 @@ export default function BoardScreen() {
   const load = useCallback(async (c: string) => {
     setLoading(true);
     try {
-      const query = c === 'all' ? '' : `?category=${c}`;
+      const query = `?category=${c}`;
       const [posts, pts] = await Promise.all([
         api.get<{ items: Post[] }>(`/posts${query}`),
         api.get<{ balance: number }>('/points/balance'),
@@ -120,7 +127,7 @@ export default function BoardScreen() {
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                 <GenderDot gender={p.gender} />
                 <Text style={{ fontSize: 11, color: colors.textSub }}>
-                  {p.nickname} · {p.age_range}
+                  {p.nickname}{divorceTag(p.divorce_year) ? ` · ${divorceTag(p.divorce_year)}` : ` · ${p.age_range}`}
                 </Text>
                 <View style={{ flex: 1 }} />
                 <ReactionRow reactions={{ '💛': p.like_count }} compact />
