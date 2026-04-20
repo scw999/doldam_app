@@ -46,26 +46,31 @@ export default function HomeScreen() {
 
   const load = useCallback(async () => {
     try {
-      const [meRes, pts, votes, board] = await Promise.all([
+      const [meRes, pts, votes, board, moodRes] = await Promise.all([
         api.get<Me>('/auth/me'),
         api.get<{ balance: number }>('/points/balance'),
         api.get<{ items: Vote[] }>('/votes?limit=3'),
         api.get<{ items: Post[] }>('/posts?category=all&limit=3'),
+        api.get<{ items: { created_at: number }[] }>('/moods/feed?limit=1&mine=true').catch(() => ({ items: [] })),
       ]);
       setMe(meRes); setBalance(pts.balance);
       setTopVotes(votes.items); setPosts(board.items);
+      const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+      if (moodRes.items[0]?.created_at >= todayStart.getTime()) setMood(0);
     } catch (e) { console.warn('home load', e); }
   }, []);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
   async function selectMood(i: number) {
+    if (mood !== null) return;
     setMood(i);
     try {
       await api.post('/moods', { mood: MOODS[i].key, visibility: 'private' });
+      setBalance((b) => b + 3);
       setToast('+3P 기분 기록 완료');
       setTimeout(() => setToast(null), 1800);
-    } catch {}
+    } catch { setMood(null); }
   }
 
   const nick = me?.nickname?.split(' ')[0] ?? '';

@@ -141,18 +141,36 @@ admin.post('/certificates/:phoneHash/reject', requireAdmin, async (c) => {
   return c.json({ ok: true });
 });
 
-// ---- 유저 검색 ----
+// ---- 유저 검색 / 전체 목록 ----
 admin.get('/users', requireAdmin, async (c) => {
   const q = c.req.query('q') ?? '';
-  if (!q) return c.json([]);
-  const { results } = await c.env.DOLDAM_DB
-    .prepare(
-      `SELECT id, nickname, gender, age_range, region, verified, banned,
-              warning_count, muted_until, created_at
-       FROM users WHERE nickname LIKE ? AND deleted_at IS NULL LIMIT 20`
-    )
-    .bind(`%${q}%`).all();
-  return c.json(results);
+  const { limit = '50', offset = '0' } = c.req.query();
+
+  if (q) {
+    const { results } = await c.env.DOLDAM_DB
+      .prepare(
+        `SELECT id, nickname, gender, age_range, region, verified, banned,
+                warning_count, muted_until, created_at
+         FROM users WHERE nickname LIKE ? AND deleted_at IS NULL LIMIT 20`
+      )
+      .bind(`%${q}%`).all();
+    return c.json({ results, total: results.length });
+  }
+
+  const [{ results }, totalRow] = await Promise.all([
+    c.env.DOLDAM_DB
+      .prepare(
+        `SELECT id, nickname, gender, age_range, region, verified, banned,
+                warning_count, muted_until, created_at
+         FROM users WHERE deleted_at IS NULL
+         ORDER BY created_at DESC LIMIT ? OFFSET ?`
+      )
+      .bind(Number(limit), Number(offset)).all(),
+    c.env.DOLDAM_DB
+      .prepare(`SELECT COUNT(*) AS n FROM users WHERE deleted_at IS NULL`)
+      .first<{ n: number }>(),
+  ]);
+  return c.json({ results, total: totalRow?.n ?? 0 });
 });
 
 // ---- 유저 페널티 ----

@@ -87,22 +87,32 @@ webhooks.post('/eas', async (c) => {
     },
   ];
 
+  const buildUrl = `https://expo.dev/accounts/scw999/projects/doldam/builds/${payload.id}`;
+  const contextParts: string[] = [`빌드 ID: <${buildUrl}|\`${payload.id.slice(0, 8)}\`>`];
   if (payload.gitCommitHash) {
-    blocks.push({
-      type: 'context',
-      elements: [{ type: 'mrkdwn', text: `커밋: \`${payload.gitCommitHash.slice(0, 8)}\`` }],
-    });
+    contextParts.push(`커밋: \`${payload.gitCommitHash.slice(0, 8)}\``);
   }
+  blocks.push({
+    type: 'context',
+    elements: [{ type: 'mrkdwn', text: contextParts.join('  ·  ') }],
+  });
 
   if (payload.status === 'finished' && downloadUrl) {
     blocks.push({
       type: 'actions',
-      elements: [{
-        type: 'button',
-        text: { type: 'plain_text', text: '📦 APK 다운로드', emoji: true },
-        url: downloadUrl,
-        style: 'primary',
-      }],
+      elements: [
+        {
+          type: 'button',
+          text: { type: 'plain_text', text: '📦 APK 다운로드', emoji: true },
+          url: downloadUrl,
+          style: 'primary',
+        },
+        {
+          type: 'button',
+          text: { type: 'plain_text', text: '🔍 빌드 상세', emoji: true },
+          url: buildUrl,
+        },
+      ],
     });
   }
 

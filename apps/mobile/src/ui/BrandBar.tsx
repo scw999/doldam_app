@@ -42,6 +42,7 @@ export function BrandBar({ points, hasNewNotification = false }: Props) {
 
         {/* 포인트 칩 */}
         <Pressable
+          onPress={() => router.push('/points' as any)}
           style={{
             flexDirection: 'row', alignItems: 'center', gap: 4,
             paddingVertical: 5, paddingLeft: 8, paddingRight: 11,

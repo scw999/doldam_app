@@ -4,6 +4,7 @@ import {
   Alert, ActivityIndicator, SafeAreaView, Modal,
 } from 'react-native';
 import { useLocalSearchParams, useFocusEffect, router } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, radius, spacing, typography } from '@/theme';
 import { Avatar, Tag, GenderDot } from '@/ui/atoms';
 import { useAuth } from '@/store/auth';
@@ -14,6 +15,7 @@ interface Post {
   user_id: string; nickname: string; gender: 'M' | 'F'; age_range: string;
   divorce_year: number | null;
   like_count: number; comment_count: number; created_at: number;
+  myLiked?: boolean;
 }
 
 function divorceTag(year: number | null): string {
@@ -67,13 +69,15 @@ export default function PostDetail() {
       api.get<{ items: Comment[] }>(`/posts/${id}/comments`),
     ]);
     setPost(p); setComments(c.items);
+    if (p.myLiked && myReact === null) setMyReact(0);
   }, [id]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
   async function toggleLike(i: number) {
-    if (myReact === i) { setMyReact(null); return; }
-    setMyReact(i);
+    const next = myReact === i ? null : i;
+    setMyReact(next);
+    setPost((p) => p ? { ...p, like_count: p.like_count + (next !== null ? 1 : -1) } : p);
     try { await api.post(`/posts/${id}/like`, {}); } catch {}
   }
 
@@ -97,11 +101,9 @@ export default function PostDetail() {
         { text: '닫기', style: 'cancel' },
       ]);
     } else {
-      Alert.alert('신고 사유 선택', '해당하는 사유를 선택해 주세요.\n취소하려면 닫기를 누르세요.', [
-        { text: '개인정보 포함', onPress: () => submitReport('comment', c.id, '개인정보 포함') },
-        { text: '욕설 / 혐오 발언', onPress: () => submitReport('comment', c.id, '욕설/혐오 발언') },
-        { text: '스팸 / 홍보', onPress: () => submitReport('comment', c.id, '스팸/홍보') },
-        { text: '닫기 (신고 안 함)', style: 'cancel' },
+      Alert.alert('댓글', '', [
+        { text: '🚨 신고하기', onPress: () => openReportReasons('comment', c.id) },
+        { text: '취소', style: 'cancel' },
       ]);
     }
   }
@@ -153,12 +155,19 @@ export default function PostDetail() {
     ]);
   }
 
+  function openReportReasons(targetType: string, targetId: string) {
+    Alert.alert('신고 사유 선택', '해당하는 사유를 선택해 주세요.', [
+      { text: '개인정보 포함', onPress: () => submitReport(targetType, targetId, '개인정보 포함') },
+      { text: '욕설 / 혐오 발언', onPress: () => submitReport(targetType, targetId, '욕설/혐오 발언') },
+      { text: '스팸 / 홍보', onPress: () => submitReport(targetType, targetId, '스팸/홍보') },
+      { text: '취소', style: 'cancel' },
+    ]);
+  }
+
   function reportPost() {
-    Alert.alert('신고 사유 선택', '해당하는 사유를 선택해 주세요.\n취소하려면 닫기를 누르세요.', [
-      { text: '개인정보 포함', onPress: () => submitReport('post', id, '개인정보 포함') },
-      { text: '욕설 / 혐오 발언', onPress: () => submitReport('post', id, '욕설/혐오 발언') },
-      { text: '스팸 / 홍보', onPress: () => submitReport('post', id, '스팸/홍보') },
-      { text: '닫기 (신고 안 함)', style: 'cancel' },
+    Alert.alert('게시글', '', [
+      { text: '🚨 신고하기', onPress: () => openReportReasons('post', id) },
+      { text: '취소', style: 'cancel' },
     ]);
   }
 
@@ -185,6 +194,7 @@ export default function PostDetail() {
     }
   }
 
+  const insets = useSafeAreaInsets();
   if (!post) return <ActivityIndicator style={{ marginTop: 40 }} />;
   const cat = CATEGORY_COLORS[post.category] ?? { label: post.category, color: colors.textSub };
   const isMine = post.user_id === myUserId;
@@ -192,7 +202,7 @@ export default function PostDetail() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
       {/* 헤더 */}
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: Math.max(insets.top + 8, 20) }]}>
         <Pressable onPress={() => router.back()} style={{ padding: 4 }}>
           <Text style={{ fontSize: 22, color: colors.text }}>←</Text>
         </Pressable>
@@ -231,7 +241,7 @@ export default function PostDetail() {
           <View style={styles.reactPicker}>
             {REACTIONS.map((r, i) => {
               const active = myReact === i;
-              const count = (i === 0 ? post.like_count : 0) + (active ? 1 : 0);
+              const count = active ? post.like_count : (myReact === null && i === 0 ? post.like_count : 0);
               return (
                 <Pressable
                   key={r.emoji}
@@ -389,7 +399,7 @@ function timeAgo(ts: number): string {
 const styles = StyleSheet.create({
   header: {
     flexDirection: 'row', alignItems: 'center', gap: 10,
-    paddingHorizontal: 16, paddingVertical: 12,
+    paddingHorizontal: 16, paddingBottom: 12,
     backgroundColor: colors.card,
     borderBottomWidth: 1, borderBottomColor: colors.border,
   },

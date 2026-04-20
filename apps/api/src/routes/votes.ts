@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import type { Env, AuthedUser, Gender } from '../types';
 import { requireAuth } from '../middleware/auth';
+import { verifyJwt } from '../utils/jwt';
 import { moderate } from '../middleware/moderation';
 import { awardPoints } from '../services/points';
 import { buildVoteCardSvg } from '../services/shareCard';
@@ -50,7 +51,20 @@ votes.get('/:id', async (c) => {
 
   const agree = agg.results.find((r) => r.choice === 'agree')?.n ?? 0;
   const disagree = agg.results.find((r) => r.choice === 'disagree')?.n ?? 0;
-  return c.json({ ...vote, agree, disagree, total: agree + disagree });
+
+  let myChoice: string | null = null;
+  if (!genderFilter) {
+    const token = c.req.header('Authorization')?.replace(/^Bearer\s+/i, '');
+    const jwt = token ? await verifyJwt(token, c.env.JWT_SECRET).catch(() => null) : null;
+    if (jwt?.sub) {
+      const row = await c.env.DOLDAM_DB
+        .prepare('SELECT choice FROM vote_responses WHERE vote_id = ? AND user_id = ?')
+        .bind(id, jwt.sub).first<{ choice: string }>();
+      myChoice = row?.choice ?? null;
+    }
+  }
+
+  return c.json({ ...vote, agree, disagree, total: agree + disagree, myChoice });
 });
 
 // ---- 생성 ----

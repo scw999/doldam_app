@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import type { Env, AuthedUser } from '../types';
 import { requireAuth } from '../middleware/auth';
+import { verifyJwt } from '../utils/jwt';
 import { moderate } from '../middleware/moderation';
 import { awardPoints } from '../services/points';
 import { POINTS, CATEGORIES, type Category } from '../utils/constants';
@@ -94,7 +95,7 @@ posts.get('/:id', async (c) => {
   const id = c.req.param('id');
   const row = await c.env.DOLDAM_DB
     .prepare(
-      `SELECT p.*, u.nickname, u.gender, u.age_range FROM posts p
+      `SELECT p.*, u.nickname, u.gender, u.age_range, u.divorce_year FROM posts p
        JOIN users u ON u.id = p.user_id
        WHERE p.id = ? AND p.deleted_at IS NULL`
     )
@@ -107,7 +108,17 @@ posts.get('/:id', async (c) => {
     .bind(id)
     .run();
 
-  return c.json(row);
+  const token = c.req.header('Authorization')?.replace(/^Bearer\s+/i, '');
+  const jwt = token ? await verifyJwt(token, c.env.JWT_SECRET).catch(() => null) : null;
+  let myLiked = false;
+  if (jwt?.sub) {
+    const liked = await c.env.DOLDAM_DB
+      .prepare('SELECT 1 FROM post_likes WHERE post_id = ? AND user_id = ?')
+      .bind(id, jwt.sub).first();
+    myLiked = !!liked;
+  }
+
+  return c.json({ ...row, myLiked });
 });
 
 // ---- 수정 (작성자만) ----

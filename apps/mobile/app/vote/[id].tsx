@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, SafeAreaView, Alert, ActivityIndicator, Share } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useFocusEffect, router } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, radius, spacing, typography } from '@/theme';
 import { Pill } from '@/ui/atoms';
 import { api } from '@/api';
@@ -14,6 +15,7 @@ interface VoteDetail {
   agree: number;
   disagree: number;
   total: number;
+  myChoice?: string | null;
 }
 
 export default function VoteDetailScreen() {
@@ -31,6 +33,7 @@ export default function VoteDetailScreen() {
     ]);
     setVote(all);
     setByGender({ M: m ?? undefined, F: f ?? undefined });
+    if (all.myChoice) setSelected(all.myChoice as 'agree' | 'disagree');
   }, [id]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
@@ -45,6 +48,7 @@ export default function VoteDetailScreen() {
     finally { setSubmitting(false); }
   }
 
+  const insets = useSafeAreaInsets();
   if (!vote) return <ActivityIndicator style={{ marginTop: 40 }} />;
 
   const pct = vote.total ? Math.round((vote.agree / vote.total) * 100) : 0;
@@ -61,11 +65,18 @@ export default function VoteDetailScreen() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
       {/* 헤더 */}
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: Math.max(insets.top + 8, 20) }]}>
         <Pressable onPress={() => router.back()} style={{ padding: 4 }}>
           <Text style={{ fontSize: 22, color: colors.text }}>←</Text>
         </Pressable>
         <Text style={[typography.h3, { color: colors.text }]}>돌싱 딜레마</Text>
+        {vote.myChoice && (
+          <View style={{ marginLeft: 'auto', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, backgroundColor: colors.accent }}>
+            <Text style={{ fontSize: 11, fontWeight: '600', color: colors.primaryDark }}>
+              {vote.myChoice === 'agree' ? '⭕ 찬성 참여함' : '❌ 반대 참여함'}
+            </Text>
+          </View>
+        )}
       </View>
 
       <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 20, paddingBottom: 40 }}>
@@ -210,7 +221,7 @@ export default function VoteDetailScreen() {
 const styles = StyleSheet.create({
   header: {
     flexDirection: 'row', alignItems: 'center', gap: 10,
-    paddingHorizontal: 16, paddingVertical: 14,
+    paddingHorizontal: 16, paddingBottom: 14,
     backgroundColor: colors.card,
     borderBottomWidth: 1, borderBottomColor: colors.border,
   },
