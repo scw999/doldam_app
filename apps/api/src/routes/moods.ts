@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import type { Env, AuthedUser } from '../types';
 import { requireAuth } from '../middleware/auth';
+import { verifyJwt } from '../utils/jwt';
 import { moderate } from '../middleware/moderation';
 
 type Vars = { user: AuthedUser };
@@ -54,19 +55,64 @@ moods.get('/summary', requireAuth, async (c) => {
   return c.json({ since, items: results });
 });
 
-// ---- 공개 피드 ----
+// ---- 공개 피드 (mine=true 이면 내 기록 포함) ----
 moods.get('/feed', requireAuth, async (c) => {
+  const user = c.get('user');
   const limit = Math.min(Number(c.req.query('limit') ?? 30), 50);
+  const mine = c.req.query('mine') === 'true';
+
+  if (mine) {
+    const since = new Date(); since.setHours(0, 0, 0, 0);
+    const { results } = await c.env.DOLDAM_DB
+      .prepare(`SELECT id, mood, note, created_at FROM moods WHERE user_id = ? AND created_at >= ? ORDER BY created_at DESC LIMIT ?`)
+      .bind(user.id, since.getTime(), limit).all();
+    return c.json({ items: results });
+  }
+
+  const token = c.req.header('Authorization')?.replace(/^Bearer\s+/i, '');
+  const jwt = token ? await verifyJwt(token, c.env.JWT_SECRET).catch(() => null) : null;
+  const myUserId = jwt?.sub ?? null;
+
   const { results } = await c.env.DOLDAM_DB
     .prepare(
-      `SELECT m.id, m.mood, m.note, m.created_at,
+      `SELECT m.id, m.mood, m.note, m.like_count, m.created_at,
               u.nickname, u.gender, u.age_range
        FROM moods m JOIN users u ON u.id = m.user_id
        WHERE m.visibility = 'public' AND u.deleted_at IS NULL
        ORDER BY m.created_at DESC LIMIT ?`
     )
-    .bind(limit).all();
-  return c.json({ items: results });
+    .bind(limit).all<Record<string, unknown>>();
+
+  const withLiked = myUserId
+    ? await Promise.all(results.map(async (r) => {
+        const liked = await c.env.DOLDAM_DB
+          .prepare('SELECT 1 FROM mood_likes WHERE mood_id = ? AND user_id = ?')
+          .bind(r.id, myUserId).first();
+        return { ...r, myLiked: !!liked };
+      }))
+    : results.map((r) => ({ ...r, myLiked: false }));
+
+  return c.json({ items: withLiked });
+});
+
+// ---- 기분 좋아요 토글 ----
+moods.post('/:id/like', requireAuth, async (c) => {
+  const user = c.get('user');
+  const moodId = c.req.param('id');
+
+  const existing = await c.env.DOLDAM_DB
+    .prepare('SELECT 1 FROM mood_likes WHERE mood_id = ? AND user_id = ?')
+    .bind(moodId, user.id).first();
+
+  if (existing) {
+    await c.env.DOLDAM_DB.prepare('DELETE FROM mood_likes WHERE mood_id = ? AND user_id = ?').bind(moodId, user.id).run();
+    await c.env.DOLDAM_DB.prepare('UPDATE moods SET like_count = MAX(0, like_count - 1) WHERE id = ?').bind(moodId).run();
+    return c.json({ liked: false });
+  }
+
+  await c.env.DOLDAM_DB.prepare('INSERT INTO mood_likes (mood_id, user_id, created_at) VALUES (?, ?, ?)').bind(moodId, user.id, Date.now()).run();
+  await c.env.DOLDAM_DB.prepare('UPDATE moods SET like_count = like_count + 1 WHERE id = ?').bind(moodId).run();
+  return c.json({ liked: true });
 });
 
 export default moods;

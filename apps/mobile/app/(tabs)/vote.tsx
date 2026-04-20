@@ -28,14 +28,7 @@ export default function VoteScreen() {
         api.get<{ items: Vote[] }>('/votes'),
         api.get<{ balance: number }>('/points/balance'),
       ]);
-      // list 응답엔 agree/disagree가 없으므로 상세 병합
-      const withCounts = await Promise.all(votes.items.map(async (v: any) => {
-        try {
-          const d = await api.get<Vote>(`/votes/${v.id}${filter === 'all' ? '' : `?gender=${filter}`}`);
-          return { ...v, agree: d.agree, disagree: d.disagree, total: d.total };
-        } catch { return { ...v, agree: 0, disagree: 0, total: v.total ?? 0 }; }
-      }));
-      setItems(withCounts);
+      setItems(votes.items);
       setBalance(pts.balance);
     } finally { setLoading(false); }
   }, [filter]);
