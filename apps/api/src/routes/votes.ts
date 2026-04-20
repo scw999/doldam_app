@@ -23,6 +23,7 @@ votes.get('/', async (c) => {
        FROM votes v JOIN users u ON u.id = v.user_id
        ORDER BY v.created_at DESC LIMIT ?`
     ).bind(limit).all();
+  c.header('Cache-Control', 'public, max-age=20, stale-while-revalidate=40');
   return c.json({ items: results });
 });
 

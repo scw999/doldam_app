@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import type { Env, AuthedUser } from '../types';
 import { requireAdmin } from '../middleware/auth';
+import { pollEasBuilds } from '../services/easPoller';
 
 type Vars = { user: AuthedUser };
 const admin = new Hono<{ Bindings: Env; Variables: Vars }>();
@@ -209,6 +210,11 @@ admin.post('/users/:id/unban', requireAdmin, async (c) => {
   await c.env.DOLDAM_DB
     .prepare('UPDATE users SET banned = 0, muted_until = NULL WHERE id = ?')
     .bind(id).run();
+  return c.json({ ok: true });
+});
+
+admin.post('/poll-eas', requireAdmin, async (c) => {
+  await pollEasBuilds(c.env);
   return c.json({ ok: true });
 });
 

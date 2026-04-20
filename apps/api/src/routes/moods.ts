@@ -7,7 +7,7 @@ import { moderate } from '../middleware/moderation';
 type Vars = { user: AuthedUser };
 const moods = new Hono<{ Bindings: Env; Variables: Vars }>();
 
-const MOOD_ENUM = ['good', 'soso', 'sad', 'angry', 'anxious', 'hopeful', 'lonely'] as const;
+const MOOD_ENUM = ['good', 'soso', 'sad', 'angry', 'anxious', 'hopeful', 'lonely', 'joyful', 'happy', 'excited'] as const;
 type Mood = typeof MOOD_ENUM[number];
 
 // ---- 기록 ----
@@ -64,7 +64,7 @@ moods.get('/feed', requireAuth, async (c) => {
   if (mine) {
     const since = new Date(); since.setHours(0, 0, 0, 0);
     const { results } = await c.env.DOLDAM_DB
-      .prepare(`SELECT id, mood, note, created_at FROM moods WHERE user_id = ? AND created_at >= ? ORDER BY created_at DESC LIMIT ?`)
+      .prepare(`SELECT id, mood, note, visibility, created_at FROM moods WHERE user_id = ? AND created_at >= ? ORDER BY created_at DESC LIMIT ?`)
       .bind(user.id, since.getTime(), limit).all();
     return c.json({ items: results });
   }
@@ -93,6 +93,31 @@ moods.get('/feed', requireAuth, async (c) => {
     : results.map((r) => ({ ...r, myLiked: false }));
 
   return c.json({ items: withLiked });
+});
+
+// ---- 오늘 기분 수정 ----
+moods.patch('/:id', requireAuth, moderate, async (c) => {
+  const user = c.get('user');
+  const id = c.req.param('id');
+  const { mood, note, visibility } = await c.req.json<{
+    mood?: string; note?: string; visibility?: string;
+  }>();
+
+  const row = await c.env.DOLDAM_DB
+    .prepare('SELECT user_id FROM moods WHERE id = ?')
+    .bind(id).first<{ user_id: string }>();
+  if (!row) return c.json({ error: 'not_found' }, 404);
+  if (row.user_id !== user.id) return c.json({ error: 'forbidden' }, 403);
+
+  const sets: string[] = []; const vals: unknown[] = [];
+  if (mood && MOOD_ENUM.includes(mood as typeof MOOD_ENUM[number])) { sets.push('mood = ?'); vals.push(mood); }
+  if (note !== undefined) { sets.push('note = ?'); vals.push(note?.trim() ?? null); }
+  if (visibility) { sets.push('visibility = ?'); vals.push(visibility); }
+  if (!sets.length) return c.json({ error: 'nothing_to_update' }, 400);
+  vals.push(id);
+
+  await c.env.DOLDAM_DB.prepare(`UPDATE moods SET ${sets.join(', ')} WHERE id = ?`).bind(...vals).run();
+  return c.json({ ok: true });
 });
 
 // ---- 기분 좋아요 토글 ----

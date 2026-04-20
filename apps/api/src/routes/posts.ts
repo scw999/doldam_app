@@ -11,6 +11,17 @@ import { sendPush } from '../services/push';
 type Vars = { user: AuthedUser };
 const posts = new Hono<{ Bindings: Env; Variables: Vars }>();
 
+async function getReqGender(req: Request, env: Env): Promise<'M' | 'F' | null> {
+  const token = req.headers.get('Authorization')?.replace(/^Bearer\s+/i, '');
+  if (!token) return null;
+  const jwt = await verifyJwt(token, env.JWT_SECRET).catch(() => null);
+  if (!jwt?.sub) return null;
+  const row = await env.DOLDAM_DB
+    .prepare('SELECT gender FROM users WHERE id = ? AND deleted_at IS NULL')
+    .bind(jwt.sub).first<{ gender: 'M' | 'F' }>();
+  return row?.gender ?? null;
+}
+
 // ---- 목록 (커서 페이지네이션) ----
 posts.get('/', async (c) => {
   const categoryParam = c.req.query('category') ?? 'free';
@@ -42,6 +53,7 @@ posts.get('/', async (c) => {
         .all<{ created_at: number }>();
 
   const nextCursor = results.length === limit ? results[results.length - 1].created_at : null;
+  c.header('Cache-Control', 'public, max-age=20, stale-while-revalidate=40');
   return c.json({ items: results, nextCursor });
 });
 
@@ -100,8 +112,14 @@ posts.get('/:id', async (c) => {
        WHERE p.id = ? AND p.deleted_at IS NULL`
     )
     .bind(id)
-    .first();
+    .first<{ category: string }>();
   if (!row) return c.json({ error: 'not_found' }, 404);
+
+  if (row.category === 'men_only' || row.category === 'women_only') {
+    const myGender = await getReqGender(c.req.raw, c.env);
+    if (row.category === 'men_only' && myGender !== 'M') return c.json({ error: 'forbidden_category' }, 403);
+    if (row.category === 'women_only' && myGender !== 'F') return c.json({ error: 'forbidden_category' }, 403);
+  }
 
   await c.env.DOLDAM_DB
     .prepare('UPDATE posts SET view_count = view_count + 1 WHERE id = ?')
@@ -110,15 +128,15 @@ posts.get('/:id', async (c) => {
 
   const token = c.req.header('Authorization')?.replace(/^Bearer\s+/i, '');
   const jwt = token ? await verifyJwt(token, c.env.JWT_SECRET).catch(() => null) : null;
-  let myLiked = false;
+  let myReaction: number | null = null;
   if (jwt?.sub) {
     const liked = await c.env.DOLDAM_DB
-      .prepare('SELECT 1 FROM post_likes WHERE post_id = ? AND user_id = ?')
-      .bind(id, jwt.sub).first();
-    myLiked = !!liked;
+      .prepare('SELECT reaction FROM post_likes WHERE post_id = ? AND user_id = ?')
+      .bind(id, jwt.sub).first<{ reaction: number }>();
+    if (liked) myReaction = liked.reaction;
   }
 
-  return c.json({ ...row, myLiked });
+  return c.json({ ...row, myReaction });
 });
 
 // ---- 수정 (작성자만) ----
@@ -168,6 +186,7 @@ posts.delete('/:id', requireAuth, async (c) => {
 posts.post('/:id/like', requireAuth, async (c) => {
   const user = c.get('user');
   const id = c.req.param('id');
+  const { reaction = 0 } = await c.req.json<{ reaction?: number }>().catch(() => ({}));
 
   const existing = await c.env.DOLDAM_DB
     .prepare('SELECT 1 FROM post_likes WHERE post_id = ? AND user_id = ?')
@@ -184,8 +203,8 @@ posts.post('/:id/like', requireAuth, async (c) => {
   }
 
   await c.env.DOLDAM_DB
-    .prepare('INSERT INTO post_likes (post_id, user_id, created_at) VALUES (?, ?, ?)')
-    .bind(id, user.id, Date.now()).run();
+    .prepare('INSERT INTO post_likes (post_id, user_id, reaction, created_at) VALUES (?, ?, ?, ?)')
+    .bind(id, user.id, reaction, Date.now()).run();
   await c.env.DOLDAM_DB
     .prepare('UPDATE posts SET like_count = like_count + 1 WHERE id = ?')
     .bind(id).run();
@@ -195,9 +214,20 @@ posts.post('/:id/like', requireAuth, async (c) => {
 // ---- 댓글 목록 ----
 posts.get('/:id/comments', async (c) => {
   const id = c.req.param('id');
+
+  const postRow = await c.env.DOLDAM_DB
+    .prepare('SELECT category FROM posts WHERE id = ? AND deleted_at IS NULL')
+    .bind(id).first<{ category: string }>();
+  if (!postRow) return c.json({ error: 'not_found' }, 404);
+  if (postRow.category === 'men_only' || postRow.category === 'women_only') {
+    const myGender = await getReqGender(c.req.raw, c.env);
+    if (postRow.category === 'men_only' && myGender !== 'M') return c.json({ error: 'forbidden_category' }, 403);
+    if (postRow.category === 'women_only' && myGender !== 'F') return c.json({ error: 'forbidden_category' }, 403);
+  }
+
   const { results } = await c.env.DOLDAM_DB
     .prepare(
-      `SELECT cm.id, cm.content, cm.parent_id, cm.created_at, u.nickname, u.gender
+      `SELECT cm.id, cm.content, cm.parent_id, cm.created_at, cm.user_id, u.nickname, u.gender
        FROM comments cm JOIN users u ON u.id = cm.user_id
        WHERE cm.post_id = ? AND cm.deleted_at IS NULL AND cm.report_count < ?
        ORDER BY cm.created_at ASC LIMIT 200`
@@ -206,12 +236,38 @@ posts.get('/:id/comments', async (c) => {
   return c.json({ items: results });
 });
 
+// ---- 댓글 수정 ----
+posts.patch('/:postId/comments/:id', requireAuth, moderate, async (c) => {
+  const user = c.get('user');
+  const commentId = c.req.param('id');
+  const { content } = await c.req.json<{ content: string }>();
+  if (!content?.trim()) return c.json({ error: 'empty_content' }, 400);
+
+  const row = await c.env.DOLDAM_DB
+    .prepare('SELECT user_id FROM comments WHERE id = ? AND deleted_at IS NULL')
+    .bind(commentId).first<{ user_id: string }>();
+  if (!row) return c.json({ error: 'not_found' }, 404);
+  if (row.user_id !== user.id) return c.json({ error: 'forbidden' }, 403);
+
+  await c.env.DOLDAM_DB
+    .prepare('UPDATE comments SET content = ? WHERE id = ?')
+    .bind(content.trim(), commentId).run();
+  return c.json({ ok: true });
+});
+
 // ---- 댓글 작성 ----
 posts.post('/:id/comments', requireAuth, moderate, async (c) => {
   const user = c.get('user');
   const postId = c.req.param('id');
   const { content, parentId } = await c.req.json<{ content: string; parentId?: string }>();
   if (!content?.trim()) return c.json({ error: 'empty_content' }, 400);
+
+  // 성별 전용 방 댓글 제한
+  const postRow = await c.env.DOLDAM_DB
+    .prepare('SELECT category FROM posts WHERE id = ? AND deleted_at IS NULL')
+    .bind(postId).first<{ category: string }>();
+  if (postRow?.category === 'men_only' && user.gender !== 'M') return c.json({ error: 'forbidden_category' }, 403);
+  if (postRow?.category === 'women_only' && user.gender !== 'F') return c.json({ error: 'forbidden_category' }, 403);
 
   const muteRow2 = await c.env.DOLDAM_DB
     .prepare('SELECT muted_until FROM users WHERE id = ?')
@@ -234,19 +290,37 @@ posts.post('/:id/comments', requireAuth, moderate, async (c) => {
 
   await awardPoints(c.env, user.id, POINTS.REWARD_COMMENT, 'comment_create');
 
+  const commenter = await c.env.DOLDAM_DB
+    .prepare('SELECT nickname FROM users WHERE id = ?')
+    .bind(user.id).first<{ nickname: string }>();
+  const nick = commenter?.nickname ?? '익명';
+
+  // 게시글 작성자에게 알림
   const author = await c.env.DOLDAM_DB
     .prepare('SELECT user_id FROM posts WHERE id = ?')
     .bind(postId).first<{ user_id: string }>();
   if (author && author.user_id !== user.id) {
-    const commenter = await c.env.DOLDAM_DB
-      .prepare('SELECT nickname FROM users WHERE id = ?')
-      .bind(user.id).first<{ nickname: string }>();
     await c.env.DOLDAM_QUEUE.send({
       type: 'notification',
       userId: author.user_id,
       title: '새 댓글이 달렸어요',
-      body: `${commenter?.nickname ?? '익명'}: ${content.trim().slice(0, 40)}`,
+      body: `${nick}: ${content.trim().slice(0, 40)}`,
     });
+  }
+
+  // 대댓글인 경우 부모 댓글 작성자에게도 알림
+  if (parentId) {
+    const parentComment = await c.env.DOLDAM_DB
+      .prepare('SELECT user_id FROM comments WHERE id = ?')
+      .bind(parentId).first<{ user_id: string }>();
+    if (parentComment && parentComment.user_id !== user.id && parentComment.user_id !== author?.user_id) {
+      await c.env.DOLDAM_QUEUE.send({
+        type: 'notification',
+        userId: parentComment.user_id,
+        title: '답글이 달렸어요',
+        body: `${nick}: ${content.trim().slice(0, 40)}`,
+      });
+    }
   }
 
   return c.json({ id });

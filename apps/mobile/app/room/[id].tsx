@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TextInput, Pressable,
-  Alert, KeyboardAvoidingView, Platform, SafeAreaView,
+  Alert, KeyboardAvoidingView, Platform, SafeAreaView, ActivityIndicator,
 } from 'react-native';
 import { useLocalSearchParams, useFocusEffect, router } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, radius, spacing, typography } from '@/theme';
 import { Avatar, fmtRemaining } from '@/ui/atoms';
 import { useAuth } from '@/store/auth';
@@ -26,11 +27,14 @@ export default function RoomScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const token = useAuth((s) => s.token);
   const myUserId = useAuth((s) => s.userId);
+  const insets = useSafeAreaInsets();
   const [room, setRoom] = useState<RoomInfo | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [draft, setDraft] = useState('');
   const [connected, setConnected] = useState(false);
   const [now, setNow] = useState(Date.now());
+  const [keepVoting, setKeepVoting] = useState(false);
+  const [myVote, setMyVote] = useState<'keep' | 'destroy' | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const listRef = useRef<FlatList<Message>>(null);
@@ -105,18 +109,36 @@ export default function RoomScreen() {
     setDraft('');
   }
 
+  function confirmKeepVote(keep: boolean) {
+    if (keepVoting || myVote !== null) return;
+    Alert.alert(
+      keep ? '✅ 방 유지 투표' : '💥 방 폭파 투표',
+      '한번 입력하면 다시 바꿀 수 없습니다.\n계속하시겠습니까?',
+      [
+        { text: '취소', style: 'cancel' },
+        { text: '투표하기', style: keep ? 'default' : 'destructive', onPress: () => keepVote(keep) },
+      ]
+    );
+  }
+
   async function keepVote(keep: boolean) {
+    if (keepVoting || myVote !== null) return;
+    setKeepVoting(true);
+    setMyVote(keep ? 'keep' : 'destroy');
     try {
       const r = await api.post<{ kept: boolean; yes: number; total: number }>(
         `/rooms/${id}/keep-vote`, { keep }
       );
       if (r.kept) {
-        Alert.alert('방 유지', '3일 연장되었어요');
+        Alert.alert('방 유지 🎉', '투표 완료! 방이 3일 연장되었어요');
         loadRoom();
       } else {
         Alert.alert('투표 완료', `유지 ${r.yes} / ${r.total}명`);
       }
-    } catch (e) { Alert.alert('실패', (e as Error).message); }
+    } catch (e) {
+      setMyVote(null);
+      Alert.alert('실패', (e as Error).message);
+    } finally { setKeepVoting(false); }
   }
 
   async function revive() {
@@ -143,7 +165,7 @@ export default function RoomScreen() {
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
 
         {/* 헤더 */}
-        <View style={styles.header}>
+        <View style={[styles.header, { paddingTop: Math.max(insets.top + 8, 16) }]}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 }}>
             <Pressable onPress={() => router.back()} style={{ padding: 4 }}>
               <Text style={{ fontSize: 22, color: colors.text }}>←</Text>
@@ -153,13 +175,8 @@ export default function RoomScreen() {
                 {isThemed && '🔥 '}{room?.theme ?? '소그룹'}
               </Text>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 }}>
-                <Text style={{ fontSize: 11, color: colors.textSub }}>
-                  👥 {room?.members?.length ?? 0}명
-                </Text>
-                <View style={{
-                  width: 6, height: 6, borderRadius: 3,
-                  backgroundColor: connected ? colors.green : colors.textLight,
-                }} />
+                <Text style={{ fontSize: 11, color: colors.textSub }}>👥 {room?.members?.length ?? 0}명</Text>
+                <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: connected ? colors.green : colors.textLight }} />
                 <Text style={{ fontSize: 10, color: connected ? colors.green : colors.textLight }}>
                   {connected ? '연결됨' : '연결 중...'}
                 </Text>
@@ -167,39 +184,42 @@ export default function RoomScreen() {
             </View>
           </View>
 
-          {/* 남은시간 + 유지 투표 */}
-          <View style={{
-            flexDirection: 'row', alignItems: 'center', gap: 8,
-            padding: 10, borderRadius: 10,
-            backgroundColor: rem.urgent ? colors.badge + '14' : colors.tag,
-          }}>
-            <Text style={{
-              fontSize: 11, fontWeight: '700',
-              color: rem.urgent ? colors.badge : colors.primaryDark,
-            }}>⏱ {rem.label} 남음</Text>
+          {/* 남은시간 + 유지/폭파 투표 */}
+          <View style={[styles.timerBar, rem.urgent && styles.timerBarUrgent]}>
+            <Text style={[styles.timerText, rem.urgent && styles.timerTextUrgent]}>
+              ⏱ {rem.label} 남음
+            </Text>
             <View style={{ flex: 1 }} />
             {isExpired ? (
-              <Pressable
-                onPress={revive}
-                style={{ paddingHorizontal: 10, paddingVertical: 4, borderRadius: radius.full, backgroundColor: colors.error }}
-              >
-                <Text style={{ fontSize: 10, fontWeight: '600', color: '#fff' }}>부활 200P</Text>
+              <Pressable onPress={revive} style={styles.reviveBtn}>
+                <Text style={styles.reviveBtnText}>💫 부활 200P</Text>
               </Pressable>
+            ) : myVote !== null ? (
+              <View style={[styles.voteChip, myVote === 'keep' ? styles.voteChipKeep : styles.voteChipDestroy]}>
+                <Text style={styles.voteChipText}>
+                  {myVote === 'keep' ? '✅ 유지 투표완료' : '💥 폭파 투표완료'}
+                </Text>
+              </View>
             ) : (
-              <>
+              <View style={{ flexDirection: 'row', gap: 6 }}>
                 <Pressable
-                  onPress={() => keepVote(true)}
-                  style={{ paddingHorizontal: 10, paddingVertical: 4, borderRadius: radius.full, backgroundColor: colors.green }}
+                  onPress={() => confirmKeepVote(true)}
+                  disabled={keepVoting}
+                  style={styles.keepBtn}
                 >
-                  <Text style={{ fontSize: 10, fontWeight: '600', color: '#fff' }}>유지</Text>
+                  {keepVoting
+                    ? <ActivityIndicator size="small" color="#fff" style={{ width: 40 }} />
+                    : <Text style={styles.keepBtnText}>✅ 유지</Text>
+                  }
                 </Pressable>
                 <Pressable
-                  onPress={() => keepVote(false)}
-                  style={{ paddingHorizontal: 10, paddingVertical: 4, borderRadius: radius.full, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card }}
+                  onPress={() => confirmKeepVote(false)}
+                  disabled={keepVoting}
+                  style={styles.destroyBtn}
                 >
-                  <Text style={{ fontSize: 10, fontWeight: '600', color: colors.textSub }}>폭파</Text>
+                  <Text style={styles.destroyBtnText}>💥 폭파</Text>
                 </Pressable>
-              </>
+              </View>
             )}
           </View>
         </View>
@@ -305,10 +325,44 @@ function fmtHhmm(ts: number): string {
 
 const styles = StyleSheet.create({
   header: {
-    paddingHorizontal: 16, paddingTop: 12, paddingBottom: 14,
+    paddingHorizontal: 16, paddingBottom: 14,
     backgroundColor: colors.card,
     borderBottomWidth: 1, borderBottomColor: colors.border,
   },
+  timerBar: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    paddingHorizontal: 12, paddingVertical: 10,
+    borderRadius: 12, backgroundColor: colors.tag,
+  },
+  timerBarUrgent: { backgroundColor: '#E85D4A12' },
+  timerText: { fontSize: 12, fontWeight: '700', color: colors.primaryDark },
+  timerTextUrgent: { color: '#E85D4A' },
+  keepBtn: {
+    paddingHorizontal: 14, paddingVertical: 8,
+    borderRadius: radius.full, backgroundColor: colors.green,
+    minWidth: 60, alignItems: 'center',
+  },
+  keepBtnText: { fontSize: 12, fontWeight: '700', color: '#fff' },
+  destroyBtn: {
+    paddingHorizontal: 14, paddingVertical: 8,
+    borderRadius: radius.full,
+    borderWidth: 1.5, borderColor: '#E85D4A',
+    backgroundColor: '#E85D4A12',
+    minWidth: 60, alignItems: 'center',
+  },
+  destroyBtnText: { fontSize: 12, fontWeight: '700', color: '#E85D4A' },
+  reviveBtn: {
+    paddingHorizontal: 14, paddingVertical: 8,
+    borderRadius: radius.full, backgroundColor: colors.primary,
+  },
+  reviveBtnText: { fontSize: 12, fontWeight: '700', color: '#fff' },
+  voteChip: {
+    paddingHorizontal: 12, paddingVertical: 6,
+    borderRadius: radius.full,
+  },
+  voteChipKeep: { backgroundColor: colors.green + '20' },
+  voteChipDestroy: { backgroundColor: '#E85D4A15' },
+  voteChipText: { fontSize: 11, fontWeight: '600', color: colors.text },
   inputRow: {
     flexDirection: 'row', gap: 8, alignItems: 'center',
     padding: 14, paddingBottom: 18,

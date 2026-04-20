@@ -2,7 +2,7 @@
   "expo": {
     "name": "돌담",
     "slug": "doldam",
-    "version": "0.0.1",
+    "version": "0.0.2",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "scheme": "doldam",
@@ -29,7 +29,12 @@
     },
     "plugins": [
       "expo-router",
-      "expo-font"
+      "expo-font",
+      ["expo-notifications", {
+        "icon": "./assets/icon.png",
+        "color": "#C4956A",
+        "sounds": []
+      }]
     ],
     "experiments": {
       "typedRoutes": true

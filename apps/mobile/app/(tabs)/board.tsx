@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, ScrollView, Pressable, RefreshControl, ActivityIndicator } from 'react-native';
+import React from 'react';
+import { View, Text, StyleSheet, FlatList, ScrollView, Pressable, RefreshControl, ActivityIndicator, Alert } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { colors, radius, spacing, typography } from '@/theme';
 import { BrandBar } from '@/ui/BrandBar';
@@ -12,6 +13,22 @@ interface Post {
   like_count: number; comment_count: number; created_at: number;
 }
 
+// 앱 세션 동안 살아있는 모듈 레벨 캐시
+const postCache: Record<string, { items: Post[]; ts: number }> = {};
+const CACHE_TTL = 60_000; // 1분
+let myGenderCache: 'M' | 'F' | null | undefined = undefined;
+
+async function getMyGender(): Promise<'M' | 'F' | null> {
+  if (myGenderCache !== undefined) return myGenderCache;
+  try {
+    const me = await api.get<{ gender: 'M' | 'F' }>('/auth/me');
+    myGenderCache = me.gender;
+  } catch {
+    myGenderCache = null;
+  }
+  return myGenderCache;
+}
+
 function divorceTag(year: number | null): string {
   if (!year) return '';
   const n = new Date().getFullYear() - year;
@@ -20,15 +37,26 @@ function divorceTag(year: number | null): string {
 }
 
 const CATEGORIES = [
-  { id: 'all',      label: '전체',     color: '#8C7B6B' },
-  { id: 'free',     label: '자유톡',   color: '#6BAF7B' },
-  { id: 'heart',    label: '속마음',   color: '#D4728C' },
-  { id: 'kids',     label: '양육일기', color: '#5B8FC9' },
-  { id: 'dating',   label: '연애/관계', color: '#C4956A' },
-  { id: 'legal',    label: '법률/돈',  color: '#8C7B6B' },
-  { id: 'men_only', label: '남성방',   color: '#5B8FC9' },
-  { id: 'women_only', label: '여성방', color: '#D4728C' },
+  { id: 'all',        label: '전체',     color: '#8C7B6B', genderOnly: null },
+  { id: 'free',       label: '자유톡',   color: '#6BAF7B', genderOnly: null },
+  { id: 'heart',      label: '속마음',   color: '#D4728C', genderOnly: null },
+  { id: 'kids',       label: '양육일기', color: '#5B8FC9', genderOnly: null },
+  { id: 'dating',     label: '연애/관계', color: '#C4956A', genderOnly: null },
+  { id: 'legal',      label: '법률/돈',  color: '#8C7B6B', genderOnly: null },
+  { id: 'men_only',   label: '남성방',   color: '#5B8FC9', genderOnly: 'M' as const },
+  { id: 'women_only', label: '여성방',   color: '#D4728C', genderOnly: 'F' as const },
 ];
+
+const RESTRICTED_MSG: Record<string, { title: string; body: string }> = {
+  women_only: {
+    title: '여성 전용 공간이에요',
+    body: '이 글은 여성 회원들만의 이야기 공간이에요.\n서로의 공간을 소중히 여겨주세요 🌸',
+  },
+  men_only: {
+    title: '남성 전용 공간이에요',
+    body: '이 글은 남성 회원들만의 이야기 공간이에요.\n서로의 공간을 소중히 여겨주세요 🪨',
+  },
+};
 
 function catInfo(id: string) {
   return CATEGORIES.find((c) => c.id === id) ?? CATEGORIES[0];
@@ -41,21 +69,44 @@ export default function BoardScreen() {
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
-  const load = useCallback(async (c: string) => {
-    setLoading(true);
+  const load = useCallback(async (c: string, force = false) => {
+    const cached = postCache[c];
+    const fresh = cached && Date.now() - cached.ts < CACHE_TTL;
+    if (!force && fresh) {
+      setItems(cached.items);
+      setLoading(false);
+    } else {
+      if (!cached) setLoading(true);
+    }
     try {
-      const query = `?category=${c}`;
       const [posts, pts] = await Promise.all([
-        api.get<{ items: Post[] }>(`/posts${query}`),
+        api.get<{ items: Post[] }>(`/posts?category=${c}`),
         api.get<{ balance: number }>('/points/balance'),
       ]);
+      postCache[c] = { items: posts.items, ts: Date.now() };
       setItems(posts.items);
       setBalance(pts.balance);
     } catch (e) { console.warn('board load', e); }
     finally { setLoading(false); }
   }, []);
 
-  useFocusEffect(useCallback(() => { load(cat); }, [cat, load]));
+  useFocusEffect(useCallback(() => {
+    load(cat);
+    getMyGender(); // 미리 패치
+  }, [cat, load]));
+
+  async function onPressPost(post: Post) {
+    const catMeta = CATEGORIES.find((c) => c.id === post.category);
+    if (catMeta?.genderOnly) {
+      const gender = await getMyGender();
+      if (gender !== catMeta.genderOnly) {
+        const msg = RESTRICTED_MSG[post.category];
+        Alert.alert(msg.title, msg.body, [{ text: '확인' }]);
+        return;
+      }
+    }
+    router.push(`/post/${post.id}`);
+  }
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
@@ -78,7 +129,7 @@ export default function BoardScreen() {
         keyExtractor={(p) => p.id}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={async () => {
-            setRefreshing(true); await load(cat); setRefreshing(false);
+            setRefreshing(true); await load(cat, true); setRefreshing(false);
           }} />
         }
         ListEmptyComponent={
@@ -112,7 +163,7 @@ export default function BoardScreen() {
         renderItem={({ item: p }) => {
           const c = catInfo(p.category);
           return (
-            <Card onPress={() => router.push(`/post/${p.id}`)} style={{ padding: 16 }}>
+            <Card onPress={() => onPressPost(p)} style={{ padding: 16 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
                 <Tag label={c.label} color={c.color} />
                 <View style={{ flex: 1 }} />
@@ -142,7 +193,8 @@ export default function BoardScreen() {
         onPress={() => router.push({ pathname: '/post/new', params: { category: cat === 'all' ? 'free' : cat } })}
         style={styles.fab}
       >
-        <Text style={{ color: '#fff', fontSize: 24, lineHeight: 28 }}>✎</Text>
+        <Text style={{ color: '#fff', fontSize: 22, lineHeight: 26 }}>✏️</Text>
+        <Text style={{ color: '#fff', fontSize: 11, fontWeight: '700', letterSpacing: -0.3 }}>글쓰기</Text>
       </Pressable>
     </View>
   );
@@ -167,12 +219,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: 12,
   },
   fab: {
-    position: 'absolute', right: 20, bottom: 100,
-    width: 56, height: 56, borderRadius: 28,
-    backgroundColor: colors.primary,
+    position: 'absolute', right: 20, bottom: 110,
+    paddingHorizontal: 16, paddingVertical: 10,
+    borderRadius: 28,
+    backgroundColor: colors.primaryDark,
     alignItems: 'center', justifyContent: 'center',
-    shadowColor: '#A07850', shadowOpacity: 0.32,
-    shadowRadius: 12, shadowOffset: { width: 0, height: 6 },
-    elevation: 6,
+    flexDirection: 'row', gap: 6,
+    shadowColor: '#000', shadowOpacity: 0.25,
+    shadowRadius: 10, shadowOffset: { width: 0, height: 4 },
+    elevation: 8,
   },
 });

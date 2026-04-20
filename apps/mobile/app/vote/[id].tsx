@@ -120,14 +120,21 @@ export default function VoteDetailScreen() {
           </View>
         ) : (
           <>
-            {/* 내 선택 */}
+            {/* 내 선택 + 변경 */}
             <View style={{
               padding: 14, backgroundColor: colors.accent,
               borderRadius: 12, marginBottom: 16,
+              flexDirection: 'row', alignItems: 'center',
             }}>
-              <Text style={{ fontSize: 12, color: colors.primaryDark, fontWeight: '600' }}>
+              <Text style={{ fontSize: 12, color: colors.primaryDark, fontWeight: '600', flex: 1 }}>
                 내 선택: {selected === 'agree' ? '⭕ 찬성' : '❌ 반대'}
               </Text>
+              <Pressable
+                onPress={() => setSelected(null)}
+                style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 10, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border }}
+              >
+                <Text style={{ fontSize: 11, color: colors.textSub }}>🔄 변경</Text>
+              </Pressable>
             </View>
 
             {/* 전체 바 */}

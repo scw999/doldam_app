@@ -16,13 +16,16 @@ interface Post {
 }
 
 const MOODS = [
+  { e: '🥰', label: '행복해요',  key: 'happy' },
+  { e: '😄', label: '즐거워요',  key: 'joyful' },
+  { e: '🤩', label: '기뻐요',   key: 'excited' },
   { e: '🌤️', label: '괜찮아요',  key: 'good' },
-  { e: '😔', label: '울적해요',  key: 'sad' },
-  { e: '😤', label: '답답해요',  key: 'anxious' },
-  { e: '😭', label: '무너져요',  key: 'lonely' },
-  { e: '🔥', label: '열받아요',  key: 'angry' },
   { e: '🌱', label: '희망보여요', key: 'hopeful' },
   { e: '😶', label: '멍해요',   key: 'soso' },
+  { e: '😔', label: '울적해요',  key: 'sad' },
+  { e: '😭', label: '무너져요',  key: 'lonely' },
+  { e: '😤', label: '답답해요',  key: 'anxious' },
+  { e: '🔥', label: '열받아요',  key: 'angry' },
 ];
 
 const CATEGORY_COLORS: Record<string, { label: string; color: string }> = {
@@ -35,42 +38,47 @@ const CATEGORY_COLORS: Record<string, { label: string; color: string }> = {
   women_only: { label: '여성방', color: '#D4728C' },
 };
 
+// 앱 세션 캐시 — 탭 전환 시 즉시 표시
+let homeCache: {
+  me: Me | null; balance: number; topVotes: Vote[]; posts: Post[];
+  todayMoodKey: string | null; ts: number;
+} | null = null;
+const HOME_CACHE_TTL = 90_000; // 1.5분
+
 export default function HomeScreen() {
-  const [me, setMe] = useState<Me | null>(null);
-  const [balance, setBalance] = useState(0);
-  const [topVotes, setTopVotes] = useState<Vote[]>([]);
-  const [posts, setPosts] = useState<Post[]>([]);
-  const [mood, setMood] = useState<number | null>(null);
+  const [me, setMe] = useState<Me | null>(homeCache?.me ?? null);
+  const [balance, setBalance] = useState(homeCache?.balance ?? 0);
+  const [topVotes, setTopVotes] = useState<Vote[]>(homeCache?.topVotes ?? []);
+  const [posts, setPosts] = useState<Post[]>(homeCache?.posts ?? []);
+  const [todayMoodKey, setTodayMoodKey] = useState<string | null>(homeCache?.todayMoodKey ?? null);
   const [toast, setToast] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (force = false) => {
+    if (!force && homeCache && Date.now() - homeCache.ts < HOME_CACHE_TTL) return;
     try {
       const [meRes, pts, votes, board, moodRes] = await Promise.all([
         api.get<Me>('/auth/me'),
         api.get<{ balance: number }>('/points/balance'),
         api.get<{ items: Vote[] }>('/votes?limit=3'),
         api.get<{ items: Post[] }>('/posts?category=all&limit=3'),
-        api.get<{ items: { created_at: number }[] }>('/moods/feed?limit=1&mine=true').catch(() => ({ items: [] })),
+        api.get<{ items: { created_at: number; mood: string }[] }>('/moods/feed?limit=1&mine=true').catch(() => ({ items: [] })),
       ]);
+      const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+      const todayItem = moodRes.items[0];
+      const newMoodKey = todayItem?.created_at >= todayStart.getTime() ? todayItem.mood : null;
       setMe(meRes); setBalance(pts.balance);
       setTopVotes(votes.items); setPosts(board.items);
-      const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
-      if (moodRes.items[0]?.created_at >= todayStart.getTime()) setMood(0);
+      setTodayMoodKey(newMoodKey);
+      homeCache = { me: meRes, balance: pts.balance, topVotes: votes.items, posts: board.items, todayMoodKey: newMoodKey, ts: Date.now() };
     } catch (e) { console.warn('home load', e); }
   }, []);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
-  async function selectMood(i: number) {
-    if (mood !== null) return;
-    setMood(i);
-    try {
-      await api.post('/moods', { mood: MOODS[i].key, visibility: 'private' });
-      setBalance((b) => b + 3);
-      setToast('+3P 기분 기록 완료');
-      setTimeout(() => setToast(null), 1800);
-    } catch { setMood(null); }
+  function selectMood(key: string) {
+    if (todayMoodKey !== null) return;
+    router.push({ pathname: '/mood', params: { preset: key } } as any);
   }
 
   const nick = me?.nickname?.split(' ')[0] ?? '';
@@ -84,7 +92,7 @@ export default function HomeScreen() {
         contentContainerStyle={styles.container}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={async () => {
-            setRefreshing(true); await load(); setRefreshing(false);
+            setRefreshing(true); await load(true); setRefreshing(false);
           }} />
         }
       >
@@ -98,13 +106,13 @@ export default function HomeScreen() {
         </View>
 
         {/* 오늘의 기분 */}
-        <Section title="오늘의 기분" hint={mood !== null ? '기록됨' : '하루 한 번, +3P'}>
+        <Section title="오늘의 기분" hint={todayMoodKey !== null ? '기록됨 ✓' : '하루 한 번, +3P'}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false}
             contentContainerStyle={{ gap: 8, paddingVertical: 2 }}>
             {MOODS.map((m, i) => {
-              const active = mood === i;
+              const active = todayMoodKey === m.key;
               return (
-                <Pressable key={i} onPress={() => selectMood(i)} style={{
+                <Pressable key={i} onPress={() => selectMood(m.key)} style={{
                   minWidth: 68, paddingVertical: 10, paddingHorizontal: 6,
                   borderRadius: 14,
                   borderWidth: active ? 1.5 : 1,

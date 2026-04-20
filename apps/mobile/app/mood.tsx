@@ -3,15 +3,18 @@ import {
   View, Text, StyleSheet, TextInput, Pressable,
   ScrollView, Alert, ActivityIndicator, SafeAreaView,
 } from 'react-native';
-import { useFocusEffect, router } from 'expo-router';
+import { useFocusEffect, router, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, spacing, typography, radius } from '@/theme';
 import { api } from '@/api';
 
-type MoodKey = 'good' | 'hopeful' | 'soso' | 'sad' | 'lonely' | 'anxious' | 'angry';
+type MoodKey = 'good' | 'hopeful' | 'soso' | 'sad' | 'lonely' | 'anxious' | 'angry' | 'joyful' | 'happy' | 'excited';
 type Visibility = 'private' | 'friends' | 'public';
 
 const MOODS: { k: MoodKey; label: string; emoji: string }[] = [
+  { k: 'happy',   label: '행복해요',  emoji: '🥰' },
+  { k: 'joyful',  label: '즐거워요',  emoji: '😄' },
+  { k: 'excited', label: '기뻐요',   emoji: '🤩' },
   { k: 'good',    label: '괜찮아요',  emoji: '🌤️' },
   { k: 'hopeful', label: '희망보여요', emoji: '🌱' },
   { k: 'soso',    label: '멍해요',   emoji: '😶' },
@@ -33,6 +36,13 @@ interface MoodItem {
   age_range?: string;
 }
 
+interface TodayMood {
+  id: string;
+  mood: MoodKey;
+  note?: string;
+  visibility: 'private' | 'friends' | 'public';
+}
+
 function timeAgo(ts: number): string {
   const m = Math.floor((Date.now() - ts) / 60000);
   if (m < 1) return '방금';
@@ -44,11 +54,13 @@ function timeAgo(ts: number): string {
 
 export default function MoodScreen() {
   const insets = useSafeAreaInsets();
-  const [mood, setMood] = useState<MoodKey | null>(null);
+  const { preset } = useLocalSearchParams<{ preset?: string }>();
+  const [mood, setMood] = useState<MoodKey | null>((preset as MoodKey) ?? null);
   const [note, setNote] = useState('');
   const [visibility, setVisibility] = useState<Visibility>('public');
   const [sending, setSending] = useState(false);
-  const [todayDone, setTodayDone] = useState(false);
+  const [todayMood, setTodayMood] = useState<TodayMood | null>(null);
+  const [editing, setEditing] = useState(false);
   const [feed, setFeed] = useState<MoodItem[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -57,25 +69,43 @@ export default function MoodScreen() {
     try {
       const [feedRes, mineRes] = await Promise.all([
         api.get<{ items: MoodItem[] }>('/moods/feed'),
-        api.get<{ items: { created_at: number }[] }>('/moods/feed?mine=true&limit=1'),
+        api.get<{ items: TodayMood[] }>('/moods/feed?mine=true&limit=1'),
       ]);
       setFeed(feedRes.items);
       const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
-      setTodayDone((mineRes.items[0]?.created_at ?? 0) >= todayStart.getTime());
+      const tm = mineRes.items[0];
+      if (tm && (tm as any).created_at >= todayStart.getTime()) {
+        setTodayMood(tm);
+        if (!editing) {
+          setMood(tm.mood);
+          setNote(tm.note ?? '');
+          setVisibility(tm.visibility);
+        }
+      } else {
+        setTodayMood(null);
+      }
     } catch {}
     finally { setLoading(false); }
-  }, []);
+  }, [editing]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
   async function submit() {
     if (!mood) return Alert.alert('선택 필요', '지금 기분을 골라주세요');
-    if (todayDone) return;
     setSending(true);
     try {
-      await api.post('/moods', { mood, note: note.trim() || undefined, visibility });
-      setMood(null); setNote('');
-      setTodayDone(true);
+      if (todayMood && !editing) {
+        // 이미 있지만 아직 수정 모드 아님 → 수정 모드로 진입
+        setEditing(true);
+        setSending(false);
+        return;
+      }
+      if (todayMood) {
+        await api.patch(`/moods/${todayMood.id}`, { mood, note: note.trim() || undefined, visibility });
+        setEditing(false);
+      } else {
+        await api.post('/moods', { mood, note: note.trim() || undefined, visibility });
+      }
       load();
     } catch (e) {
       Alert.alert('실패', (e as Error).message);
@@ -115,15 +145,23 @@ export default function MoodScreen() {
       <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
         {/* 오늘의 기분 기록 */}
         <View style={styles.recordBox}>
-          {todayDone ? (
-            <View style={{ alignItems: 'center', paddingVertical: 16 }}>
+          {(todayMood && !editing) ? (
+            <View style={{ alignItems: 'center', paddingVertical: 12 }}>
               <Text style={{ fontSize: 28, marginBottom: 6 }}>✅</Text>
               <Text style={{ fontSize: 14, fontWeight: '600', color: colors.primaryDark }}>
                 오늘 기분 기록 완료
               </Text>
-              <Text style={{ fontSize: 12, color: colors.textSub, marginTop: 4 }}>
-                내일 또 기록할 수 있어요
-              </Text>
+              {todayMood.note ? (
+                <Text style={{ fontSize: 12, color: colors.textSub, marginTop: 4 }}>
+                  "{todayMood.note}"
+                </Text>
+              ) : null}
+              <Pressable
+                onPress={() => setEditing(true)}
+                style={{ marginTop: 10, paddingHorizontal: 16, paddingVertical: 7, borderRadius: 20, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.bg }}
+              >
+                <Text style={{ fontSize: 12, color: colors.textSub }}>✏️ 수정하기</Text>
+              </Pressable>
             </View>
           ) : (
             <>
@@ -178,7 +216,7 @@ export default function MoodScreen() {
                   >
                     {sending
                       ? <ActivityIndicator color="#fff" />
-                      : <Text style={styles.ctaText}>기록하기 +3P</Text>
+                      : <Text style={styles.ctaText}>{editing ? '수정 저장' : '기록하기 +3P'}</Text>
                     }
                   </Pressable>
                 </>

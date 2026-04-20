@@ -93,6 +93,22 @@ export class ChatRoom {
         };
         await this.state.storage.put(`msg:${msg.ts}:${msg.id}`, msg);
         this.broadcast(msg);
+
+        // 오프라인 멤버에게 푸시 알림
+        const onlineIds = new Set([...this.sessions.values()].map((s) => s.userId));
+        const { results: members } = await this.env.DOLDAM_DB
+          .prepare('SELECT user_id FROM room_members WHERE room_id = ?')
+          .bind(roomId).all<{ user_id: string }>();
+        for (const m of members) {
+          if (!onlineIds.has(m.user_id) && m.user_id !== jwt.sub) {
+            await this.env.DOLDAM_QUEUE.send({
+              type: 'notification',
+              userId: m.user_id,
+              title: `💬 ${user.nickname}`,
+              body: text.slice(0, 60),
+            }).catch(() => {});
+          }
+        }
       } catch {
         server.send(JSON.stringify({ type: 'error', error: 'invalid_message' }));
       }

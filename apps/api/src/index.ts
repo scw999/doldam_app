@@ -22,6 +22,7 @@ import { cleanupExpiredPoints, expireRooms } from './services/cleanup';
 import { tryMatch } from './services/matching';
 import { detectHotAndOpenRooms } from './services/themedRooms';
 import { sendPush } from './services/push';
+import { pollEasBuilds } from './services/easPoller';
 
 export { ChatRoom } from './durable-objects/ChatRoom';
 
@@ -102,6 +103,7 @@ export default {
       cleanupExpiredPoints(env),
       expireRooms(env),
       detectHotAndOpenRooms(env),
+      pollEasBuilds(env),
     ]);
   },
 };

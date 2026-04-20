@@ -39,8 +39,8 @@ async function verifyEasSignature(body: string, signature: string | null, secret
   return crypto.subtle.verify('HMAC', key, sigBytes, new TextEncoder().encode(body));
 }
 
-async function postToSlack(token: string, channel: string, blocks: unknown[], text: string): Promise<void> {
-  await fetch('https://slack.com/api/chat.postMessage', {
+async function postToSlack(token: string, channel: string, blocks: unknown[], text: string): Promise<{ ok: boolean; error?: string }> {
+  const res = await fetch('https://slack.com/api/chat.postMessage', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json; charset=utf-8',
@@ -48,7 +48,20 @@ async function postToSlack(token: string, channel: string, blocks: unknown[], te
     },
     body: JSON.stringify({ channel, text, blocks }),
   });
+  return res.json() as Promise<{ ok: boolean; error?: string }>;
 }
+
+// 디버그: EAS가 실제로 호출하는지 확인용 (서명 검증 없음)
+webhooks.post('/eas-debug', async (c) => {
+  const rawBody = await c.req.text();
+  const signature = c.req.header('expo-signature') ?? 'none';
+  await c.env.DOLDAM_KV.put(
+    `eas:debug:${Date.now()}`,
+    JSON.stringify({ signature: signature.slice(0, 30), body: rawBody.slice(0, 500) }),
+    { expirationTtl: 86400 }
+  );
+  return c.json({ ok: true });
+});
 
 webhooks.post('/eas', async (c) => {
   const rawBody = await c.req.text();
@@ -124,9 +137,9 @@ webhooks.post('/eas', async (c) => {
   }
 
   const fallbackText = `${statusIcon} 돌담 앱 ${statusLabel} (${platformIcon} · ${payload.buildProfile})`;
-  await postToSlack(c.env.SLACK_BOT_TOKEN, c.env.SLACK_CHANNEL_ID, blocks, fallbackText);
+  const slackRes = await postToSlack(c.env.SLACK_BOT_TOKEN, c.env.SLACK_CHANNEL_ID, blocks, fallbackText);
 
-  return c.json({ ok: true });
+  return c.json({ ok: true, slack: slackRes });
 });
 
 export default webhooks;

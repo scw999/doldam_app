@@ -20,6 +20,7 @@ export interface Env {
   SLACK_BOT_TOKEN: string;
   SLACK_CHANNEL_ID: string;
   EAS_WEBHOOK_SECRET: string;
+  EXPO_ACCESS_TOKEN: string;
 }
 
 export type QueueMessage =

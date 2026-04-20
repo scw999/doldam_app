@@ -1,10 +1,21 @@
 import { useEffect } from 'react';
+import { Platform } from 'react-native';
 import { Stack, router, useSegments, useRootNavigationState } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useFonts, NotoSerifKR_600SemiBold, NotoSerifKR_700Bold } from '@expo-google-fonts/noto-serif-kr';
+import * as Notifications from 'expo-notifications';
 import { useAuth } from '@/store/auth';
+import { api } from '@/api';
 import { colors } from '@/theme';
+
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: true,
+  }),
+});
 
 function AuthGate() {
   const { token, hydrated } = useAuth();
@@ -24,6 +35,7 @@ function AuthGate() {
 
 export default function RootLayout() {
   const hydrate = useAuth((s) => s.hydrate);
+  const token = useAuth((s) => s.token);
   const [fontsLoaded] = useFonts({
     NotoSerifKR_600SemiBold,
     NotoSerifKR_700Bold,
@@ -34,6 +46,21 @@ export default function RootLayout() {
   });
 
   useEffect(() => { hydrate(); }, [hydrate]);
+
+  useEffect(() => {
+    if (!token) return;
+    (async () => {
+      const { status } = await Notifications.requestPermissionsAsync();
+      if (status !== 'granted') return;
+      const pushToken = await Notifications.getExpoPushTokenAsync({
+        projectId: 'e319fb49-251c-4449-b120-d58ddb2ddc8d',
+      });
+      await api.post('/notifications/token', {
+        token: pushToken.data,
+        platform: Platform.OS,
+      }).catch(() => {});
+    })();
+  }, [token]);
 
   if (!fontsLoaded) return null;
 

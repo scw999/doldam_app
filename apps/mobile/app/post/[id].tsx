@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TextInput, Pressable,
-  Alert, ActivityIndicator, SafeAreaView, Modal,
+  Alert, ActivityIndicator, SafeAreaView, Modal, TouchableOpacity,
 } from 'react-native';
 import { useLocalSearchParams, useFocusEffect, router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -15,7 +15,7 @@ interface Post {
   user_id: string; nickname: string; gender: 'M' | 'F'; age_range: string;
   divorce_year: number | null;
   like_count: number; comment_count: number; created_at: number;
-  myLiked?: boolean;
+  myReaction?: number | null;
 }
 
 function divorceTag(year: number | null): string {
@@ -63,22 +63,44 @@ export default function PostDetail() {
   const [editContent, setEditContent] = useState('');
   const [editSaving, setEditSaving] = useState(false);
 
+  const [editingComment, setEditingComment] = useState<Comment | null>(null);
+  const [editCommentContent, setEditCommentContent] = useState('');
+  const [editCommentSaving, setEditCommentSaving] = useState(false);
+
+  const [reportTarget, setReportTarget] = useState<{ type: string; id: string } | null>(null);
+
   const load = useCallback(async () => {
     const [p, c] = await Promise.all([
       api.get<Post>(`/posts/${id}`),
       api.get<{ items: Comment[] }>(`/posts/${id}/comments`),
     ]);
-    setPost(p); setComments(c.items);
-    if (p.myLiked && myReact === null) setMyReact(0);
+    setPost(p);
+    setComments(c.items);
+    setMyReact(p.myReaction ?? null);
   }, [id]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
   async function toggleLike(i: number) {
-    const next = myReact === i ? null : i;
-    setMyReact(next);
-    setPost((p) => p ? { ...p, like_count: p.like_count + (next !== null ? 1 : -1) } : p);
-    try { await api.post(`/posts/${id}/like`, {}); } catch {}
+    if (myReact === i) {
+      // 같은 반응 → 취소
+      setMyReact(null);
+      setPost((p) => p ? { ...p, like_count: Math.max(0, p.like_count - 1) } : p);
+      try { await api.post(`/posts/${id}/like`, { reaction: i }); } catch {}
+    } else if (myReact === null) {
+      // 새로 반응
+      setMyReact(i);
+      setPost((p) => p ? { ...p, like_count: p.like_count + 1 } : p);
+      try { await api.post(`/posts/${id}/like`, { reaction: i }); } catch {}
+    } else {
+      // 다른 반응으로 변경 → 기존 취소 후 새로 등록
+      const prev = myReact;
+      setMyReact(i);
+      try {
+        await api.post(`/posts/${id}/like`, { reaction: prev }); // 기존 것 삭제 (toggle off)
+        await api.post(`/posts/${id}/like`, { reaction: i });    // 새 것 등록
+      } catch { setMyReact(prev); }
+    }
   }
 
   async function deleteComment(commentId: string) {
@@ -92,20 +114,39 @@ export default function PostDetail() {
     const mine = c.user_id === myUserId;
     if (mine) {
       Alert.alert('댓글 관리', '', [
-        { text: '삭제', style: 'destructive', onPress: () => {
-          Alert.alert('댓글 삭제', '삭제하면 복구할 수 없어요.', [
-            { text: '취소', style: 'cancel' },
-            { text: '삭제', style: 'destructive', onPress: () => deleteComment(c.id) },
-          ]);
-        }},
+        {
+          text: '✏️ 수정하기', onPress: () => {
+            setEditingComment(c);
+            setEditCommentContent(c.content);
+          },
+        },
+        {
+          text: '🗑️ 삭제', style: 'destructive', onPress: () => {
+            Alert.alert('댓글 삭제', '삭제하면 복구할 수 없어요.', [
+              { text: '취소', style: 'cancel' },
+              { text: '삭제', style: 'destructive', onPress: () => deleteComment(c.id) },
+            ]);
+          },
+        },
         { text: '닫기', style: 'cancel' },
       ]);
     } else {
-      Alert.alert('댓글', '', [
-        { text: '🚨 신고하기', onPress: () => openReportReasons('comment', c.id) },
+      Alert.alert('댓글 메뉴', '', [
+        { text: '🚨 신고하기', onPress: () => setReportTarget({ type: 'comment', id: c.id }) },
         { text: '취소', style: 'cancel' },
       ]);
     }
+  }
+
+  async function saveCommentEdit() {
+    if (!editingComment || !editCommentContent.trim()) return;
+    setEditCommentSaving(true);
+    try {
+      await api.patch(`/posts/${id}/comments/${editingComment.id}`, { content: editCommentContent.trim() });
+      setEditingComment(null);
+      load();
+    } catch (e) { Alert.alert('수정 실패', (e as Error).message); }
+    finally { setEditCommentSaving(false); }
   }
 
   async function submitComment() {
@@ -155,22 +196,6 @@ export default function PostDetail() {
     ]);
   }
 
-  function openReportReasons(targetType: string, targetId: string) {
-    Alert.alert('신고 사유 선택', '해당하는 사유를 선택해 주세요.', [
-      { text: '개인정보 포함', onPress: () => submitReport(targetType, targetId, '개인정보 포함') },
-      { text: '욕설 / 혐오 발언', onPress: () => submitReport(targetType, targetId, '욕설/혐오 발언') },
-      { text: '스팸 / 홍보', onPress: () => submitReport(targetType, targetId, '스팸/홍보') },
-      { text: '취소', style: 'cancel' },
-    ]);
-  }
-
-  function reportPost() {
-    Alert.alert('게시글', '', [
-      { text: '🚨 신고하기', onPress: () => openReportReasons('post', id) },
-      { text: '취소', style: 'cancel' },
-    ]);
-  }
-
   async function submitReport(targetType: string, targetId: string, reason: string) {
     try {
       await api.post('/reports', { targetType, targetId, reason });
@@ -182,13 +207,13 @@ export default function PostDetail() {
     if (!post) return;
     if (post.user_id === myUserId) {
       Alert.alert('게시글 관리', '', [
-        { text: '수정', onPress: openEdit },
-        { text: '삭제', style: 'destructive', onPress: confirmDelete },
+        { text: '✏️ 수정', onPress: openEdit },
+        { text: '🗑️ 삭제', style: 'destructive', onPress: confirmDelete },
         { text: '취소', style: 'cancel' },
       ]);
     } else {
-      Alert.alert('게시글', '', [
-        { text: '신고하기', style: 'destructive', onPress: reportPost },
+      Alert.alert('게시글 메뉴', '', [
+        { text: '🚨 신고하기', onPress: () => setReportTarget({ type: 'post', id }) },
         { text: '취소', style: 'cancel' },
       ]);
     }
@@ -241,7 +266,7 @@ export default function PostDetail() {
           <View style={styles.reactPicker}>
             {REACTIONS.map((r, i) => {
               const active = myReact === i;
-              const count = active ? post.like_count : (myReact === null && i === 0 ? post.like_count : 0);
+              const count = i === 0 ? (myReact === null || myReact === 0 ? post.like_count : 0) : (active ? 1 : 0);
               return (
                 <Pressable
                   key={r.emoji}
@@ -272,6 +297,7 @@ export default function PostDetail() {
           {comments.map((c) => {
             const mine = c.user_id === myUserId;
             const isReply = !!c.parent_id;
+            const isEditing = editingComment?.id === c.id;
             return (
               <View key={c.id} style={isReply ? { marginLeft: 28 } : undefined}>
                 <View
@@ -299,8 +325,34 @@ export default function PostDetail() {
                       <Text style={{ fontSize: 16, color: colors.textSub }}>⋯</Text>
                     </Pressable>
                   </View>
-                  <Text style={{ fontSize: 13.5, color: colors.text, lineHeight: 21 }}>{c.content}</Text>
-                  {!isReply && (
+                  {isEditing ? (
+                    <View>
+                      <TextInput
+                        style={[styles.input, { marginBottom: 8 }]}
+                        value={editCommentContent}
+                        onChangeText={setEditCommentContent}
+                        multiline
+                        autoFocus
+                      />
+                      <View style={{ flexDirection: 'row', gap: 8, justifyContent: 'flex-end' }}>
+                        <Pressable onPress={() => setEditingComment(null)} style={{ padding: 8 }}>
+                          <Text style={{ fontSize: 13, color: colors.textSub }}>취소</Text>
+                        </Pressable>
+                        <Pressable
+                          onPress={saveCommentEdit}
+                          disabled={editCommentSaving}
+                          style={{ padding: 8, backgroundColor: colors.primary, borderRadius: 8 }}
+                        >
+                          <Text style={{ fontSize: 13, color: '#fff', fontWeight: '700' }}>
+                            {editCommentSaving ? '저장 중...' : '저장'}
+                          </Text>
+                        </Pressable>
+                      </View>
+                    </View>
+                  ) : (
+                    <Text style={{ fontSize: 13.5, color: colors.text, lineHeight: 21 }}>{c.content}</Text>
+                  )}
+                  {!isReply && !isEditing && (
                     <Pressable
                       onPress={() => setReplyTo({ id: c.id, nickname: c.nickname?.split(' ')[0] ?? '익명' })}
                       style={{ marginTop: 8, alignSelf: 'flex-start' }}
@@ -315,7 +367,7 @@ export default function PostDetail() {
         </View>
       </ScrollView>
 
-      {/* 입력 */}
+      {/* 답글 대상 표시 */}
       {replyTo && (
         <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 6, backgroundColor: colors.accent + '55', borderTopWidth: 1, borderTopColor: colors.border }}>
           <Text style={{ flex: 1, fontSize: 12, color: colors.textSub }}>↩ {replyTo.nickname}에게 답글</Text>
@@ -348,7 +400,7 @@ export default function PostDetail() {
         </Pressable>
       </View>
 
-      {/* 수정 모달 */}
+      {/* 게시글 수정 모달 */}
       <Modal visible={editVisible} animationType="slide" presentationStyle="pageSheet">
         <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
           <View style={styles.modalHeader}>
@@ -382,6 +434,47 @@ export default function PostDetail() {
             />
           </ScrollView>
         </SafeAreaView>
+      </Modal>
+
+      {/* 신고 모달 */}
+      <Modal visible={!!reportTarget} transparent animationType="fade">
+        <TouchableOpacity
+          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}
+          activeOpacity={1}
+          onPress={() => setReportTarget(null)}
+        >
+          <TouchableOpacity activeOpacity={1}>
+            <View style={{ backgroundColor: colors.card, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, paddingBottom: 36 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 18 }}>
+                <Text style={{ fontSize: 16, fontWeight: '700', color: colors.text, flex: 1 }}>신고 사유 선택</Text>
+                <Pressable onPress={() => setReportTarget(null)} style={{ padding: 4 }}>
+                  <Text style={{ fontSize: 22, color: colors.textSub, lineHeight: 24 }}>✕</Text>
+                </Pressable>
+              </View>
+              {[
+                { label: '🔐 개인정보 포함', reason: '개인정보 포함' },
+                { label: '🤬 욕설 / 혐오 발언', reason: '욕설/혐오 발언' },
+                { label: '📢 스팸 / 홍보', reason: '스팸/홍보' },
+                { label: '🚫 기타', reason: '기타' },
+              ].map((opt) => (
+                <Pressable
+                  key={opt.reason}
+                  onPress={async () => {
+                    if (!reportTarget) return;
+                    setReportTarget(null);
+                    await submitReport(reportTarget.type, reportTarget.id, opt.reason);
+                  }}
+                  style={{ paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: colors.border }}
+                >
+                  <Text style={{ fontSize: 15, color: colors.text }}>{opt.label}</Text>
+                </Pressable>
+              ))}
+              <Pressable onPress={() => setReportTarget(null)} style={{ paddingTop: 16, alignItems: 'center' }}>
+                <Text style={{ fontSize: 14, color: colors.textSub }}>취소</Text>
+              </Pressable>
+            </View>
+          </TouchableOpacity>
+        </TouchableOpacity>
       </Modal>
     </SafeAreaView>
   );

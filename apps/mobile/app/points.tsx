@@ -17,14 +17,20 @@ const PRODUCTS = [
 ];
 
 const REASON_LABEL: Record<string, string> = {
-  signup_bonus:   '가입 보너스',
-  post_create:    '게시글 작성',
-  comment_create: '댓글 작성',
-  mood_record:    '기분 기록',
-  mission_reward: 'Q&A 미션 완료',
-  profile_view:   '프로필 열람',
-  room_revive:    '방 부활',
-  vote_create:    '투표 생성',
+  signup_bonus:    '가입 보너스',
+  post_create:     '게시글 작성',
+  comment_create:  '댓글 작성',
+  mood_record:     '기분 기록',
+  mission_reward:  'Q&A 미션 완료',
+  profile_view:    '프로필 열람',
+  room_revive:     '방 부활 (-200P)',
+  vote_create:     '투표 생성',
+  vote_cast:       '투표 참여',
+  chat_join:       '채팅 참여',
+  purchase:        '포인트 충전',
+  reaction_give:   '반응 남기기',
+  daily_bonus:     '일일 보너스',
+  referral:        '친구 초대',
 };
 
 function timeAgo(ts: number) {
