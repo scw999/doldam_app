@@ -54,8 +54,12 @@ export default function HomeScreen() {
   const [toast, setToast] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
-  const load = useCallback(async (force = false) => {
-    if (!force && homeCache && Date.now() - homeCache.ts < HOME_CACHE_TTL) return;
+  const load = useCallback(async () => {
+    if (homeCache) {
+      setMe(homeCache.me); setBalance(homeCache.balance);
+      setTopVotes(homeCache.topVotes); setPosts(homeCache.posts);
+      setTodayMoodKey(homeCache.todayMoodKey);
+    }
     try {
       const [meRes, pts, votes, board, moodRes] = await Promise.all([
         api.get<Me>('/auth/me'),
@@ -92,7 +96,7 @@ export default function HomeScreen() {
         contentContainerStyle={styles.container}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={async () => {
-            setRefreshing(true); await load(true); setRefreshing(false);
+            setRefreshing(true); await load(); setRefreshing(false);
           }} />
         }
       >

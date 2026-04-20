@@ -34,7 +34,7 @@ posts.get('/', async (c) => {
     ? await c.env.DOLDAM_DB
         .prepare(
           `SELECT p.id, p.title, p.content, p.category, p.view_count, p.like_count,
-                  p.comment_count, p.created_at, u.nickname, u.gender, u.age_range, u.divorce_year
+                  p.comment_count, p.created_at, u.nickname, u.gender, u.age_range, u.divorce_year, u.divorce_month
            FROM posts p JOIN users u ON u.id = p.user_id
            WHERE p.deleted_at IS NULL AND p.created_at < ? AND p.report_count < ?
            ORDER BY p.created_at DESC LIMIT ?`
@@ -44,7 +44,7 @@ posts.get('/', async (c) => {
     : await c.env.DOLDAM_DB
         .prepare(
           `SELECT p.id, p.title, p.content, p.category, p.view_count, p.like_count,
-                  p.comment_count, p.created_at, u.nickname, u.gender, u.age_range, u.divorce_year
+                  p.comment_count, p.created_at, u.nickname, u.gender, u.age_range, u.divorce_year, u.divorce_month
            FROM posts p JOIN users u ON u.id = p.user_id
            WHERE p.category = ? AND p.deleted_at IS NULL AND p.created_at < ? AND p.report_count < ?
            ORDER BY p.created_at DESC LIMIT ?`
@@ -53,7 +53,6 @@ posts.get('/', async (c) => {
         .all<{ created_at: number }>();
 
   const nextCursor = results.length === limit ? results[results.length - 1].created_at : null;
-  c.header('Cache-Control', 'public, max-age=20, stale-while-revalidate=40');
   return c.json({ items: results, nextCursor });
 });
 
@@ -107,7 +106,7 @@ posts.get('/:id', async (c) => {
   const id = c.req.param('id');
   const row = await c.env.DOLDAM_DB
     .prepare(
-      `SELECT p.*, u.nickname, u.gender, u.age_range, u.divorce_year FROM posts p
+      `SELECT p.*, u.nickname, u.gender, u.age_range, u.divorce_year, u.divorce_month FROM posts p
        JOIN users u ON u.id = p.user_id
        WHERE p.id = ? AND p.deleted_at IS NULL`
     )

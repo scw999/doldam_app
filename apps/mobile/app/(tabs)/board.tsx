@@ -9,7 +9,8 @@ import { api } from '@/api';
 
 interface Post {
   id: string; title: string; content: string; category: string;
-  nickname: string; gender: 'M' | 'F'; age_range: string; divorce_year: number | null;
+  nickname: string; gender: 'M' | 'F'; age_range: string;
+  divorce_year: number | null; divorce_month: number | null;
   like_count: number; comment_count: number; created_at: number;
 }
 
@@ -29,11 +30,15 @@ async function getMyGender(): Promise<'M' | 'F' | null> {
   return myGenderCache;
 }
 
-function divorceTag(year: number | null): string {
+function divorceTag(year: number | null, month: number | null): string {
   if (!year) return '';
-  const n = new Date().getFullYear() - year;
-  if (n <= 0) return '올해 이혼';
-  return `이혼 ${n}년차`;
+  const now = new Date();
+  const totalMonths = (now.getFullYear() - year) * 12 + (now.getMonth() + 1) - (month ?? 6);
+  if (totalMonths < 1) return '이혼 예정';
+  if (totalMonths < 12) return `이혼 ${totalMonths}개월차`;
+  const y = Math.floor(totalMonths / 12);
+  const m = totalMonths % 12;
+  return m === 0 ? `이혼 ${y}년차` : `이혼 ${y}년 ${m}개월차`;
 }
 
 const CATEGORIES = [
@@ -62,6 +67,15 @@ function catInfo(id: string) {
   return CATEGORIES.find((c) => c.id === id) ?? CATEGORIES[0];
 }
 
+export function patchBoardPost(postId: string, patch: { like_count?: number }) {
+  for (const key of Object.keys(postCache)) {
+    const cached = postCache[key];
+    if (!cached) continue;
+    const idx = cached.items.findIndex((p) => p.id === postId);
+    if (idx >= 0) cached.items[idx] = { ...cached.items[idx], ...patch };
+  }
+}
+
 export default function BoardScreen() {
   const [cat, setCat] = useState('free');
   const [balance, setBalance] = useState(0);
@@ -69,15 +83,15 @@ export default function BoardScreen() {
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
-  const load = useCallback(async (c: string, force = false) => {
+  const load = useCallback(async (c: string) => {
     const cached = postCache[c];
-    const fresh = cached && Date.now() - cached.ts < CACHE_TTL;
-    if (!force && fresh) {
-      setItems(cached.items);
+    if (cached) {
+      setItems(cached.items); // 캐시 즉시 표시
       setLoading(false);
     } else {
-      if (!cached) setLoading(true);
+      setLoading(true);
     }
+    // 항상 백그라운드 리프레시 (좋아요 카운트 등 최신 반영)
     try {
       const [posts, pts] = await Promise.all([
         api.get<{ items: Post[] }>(`/posts?category=${c}`),
@@ -129,7 +143,7 @@ export default function BoardScreen() {
         keyExtractor={(p) => p.id}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={async () => {
-            setRefreshing(true); await load(cat, true); setRefreshing(false);
+            setRefreshing(true); await load(cat); setRefreshing(false);
           }} />
         }
         ListEmptyComponent={
@@ -178,7 +192,7 @@ export default function BoardScreen() {
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                 <GenderDot gender={p.gender} />
                 <Text style={{ fontSize: 11, color: colors.textSub }}>
-                  {p.nickname}{divorceTag(p.divorce_year) ? ` · ${divorceTag(p.divorce_year)}` : ` · ${p.age_range}`}
+                  {p.nickname}{divorceTag(p.divorce_year, p.divorce_month) ? ` · ${divorceTag(p.divorce_year, p.divorce_month)}` : ` · ${p.age_range}`}
                 </Text>
                 <View style={{ flex: 1 }} />
                 <ReactionRow reactions={{ '💛': p.like_count }} compact />

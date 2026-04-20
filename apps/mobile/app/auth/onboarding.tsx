@@ -12,12 +12,17 @@ const AGES: AgeRange[] = ['20s', '30s', '40s', '50s+'];
 const REGIONS = ['서울', '경기', '인천', '부산', '대구', '대전', '광주', '울산', '기타'];
 
 const CURRENT_YEAR = new Date().getFullYear();
-const YEARS = Array.from({ length: CURRENT_YEAR - 1999 }, (_, i) => CURRENT_YEAR - i); // 최신연도 먼저
+const YEARS = Array.from({ length: CURRENT_YEAR - 1999 }, (_, i) => CURRENT_YEAR - i);
+const MONTHS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
 
-function divorceLabel(year: number): string {
-  const n = CURRENT_YEAR - year;
-  if (n <= 0) return '올해';
-  return `${n}년차`;
+function divorceLabel(year: number, month: number | null): string {
+  const now = new Date();
+  const totalMonths = (now.getFullYear() - year) * 12 + (now.getMonth() + 1) - (month ?? 6);
+  if (totalMonths < 1) return '이혼 예정';
+  if (totalMonths < 12) return `${totalMonths}개월차`;
+  const y = Math.floor(totalMonths / 12);
+  const m = totalMonths % 12;
+  return m === 0 ? `${y}년차` : `${y}년 ${m}개월차`;
 }
 
 export default function OnboardingScreen() {
@@ -25,11 +30,12 @@ export default function OnboardingScreen() {
   const [ageRange, setAgeRange] = useState<AgeRange | null>(null);
   const [region, setRegion] = useState<string | null>(null);
   const [divorceYear, setDivorceYear] = useState<number | null>(null);
+  const [divorceMonth, setDivorceMonth] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const setUser = useAuth((s) => s.setUser);
 
   async function onSubmit() {
-    if (!gender || !ageRange || !region || !divorceYear) {
+    if (!gender || !ageRange || !region || !divorceYear || !divorceMonth) {
       Alert.alert('입력 필요', '모든 항목을 선택해주세요');
       return;
     }
@@ -37,7 +43,7 @@ export default function OnboardingScreen() {
     try {
       const resp = await api.post<{ userId: string; nickname: string; token: string }>(
         '/auth/signup',
-        { gender, ageRange, region, divorceYear },
+        { gender, ageRange, region, divorceYear, divorceMonth },
         { auth: 'temp' }
       );
       await setUser(resp.token, resp.userId);
@@ -85,32 +91,50 @@ export default function OnboardingScreen() {
         {YEARS.map((y) => (
           <Pressable
             key={y}
-            onPress={() => setDivorceYear(y)}
+            onPress={() => { setDivorceYear(y); setDivorceMonth(null); }}
             style={[styles.yearChip, divorceYear === y && styles.yearChipOn]}
           >
             <Text style={[styles.yearNum, divorceYear === y && { color: '#fff' }]}>{y}</Text>
             <Text style={[styles.yearSub, divorceYear === y && { color: 'rgba(255,255,255,.8)' }]}>
-              {divorceLabel(y)}
+              {divorceLabel(y, null)}
             </Text>
           </Pressable>
         ))}
       </ScrollView>
 
       {divorceYear && (
+        <>
+          <Text style={[styles.label, { marginTop: 20 }]}>이혼 월</Text>
+          <Text style={styles.labelSub}>{divorceYear}년 몇 월에 이혼하셨나요?</Text>
+          <View style={styles.rowWrap}>
+            {MONTHS.map((m) => (
+              <Pressable
+                key={m}
+                onPress={() => setDivorceMonth(m)}
+                style={[styles.chip, divorceMonth === m && styles.chipOn]}
+              >
+                <Text style={[styles.chipText, divorceMonth === m && styles.chipTextOn]}>{m}월</Text>
+              </Pressable>
+            ))}
+          </View>
+        </>
+      )}
+
+      {divorceYear && divorceMonth && (
         <View style={styles.selectedYear}>
           <Text style={styles.selectedYearText}>
-            {divorceYear}년 이혼 · 이혼{' '}
+            {divorceYear}년 {divorceMonth}월 이혼 · 이혼{' '}
             <Text style={{ fontWeight: '700', color: colors.primary }}>
-              {divorceLabel(divorceYear)}
+              {divorceLabel(divorceYear, divorceMonth)}
             </Text>
           </Text>
         </View>
       )}
 
       <Pressable
-        style={[styles.cta, (!gender || !ageRange || !region || !divorceYear || loading) && { opacity: 0.5 }]}
+        style={[styles.cta, (!gender || !ageRange || !region || !divorceYear || !divorceMonth || loading) && { opacity: 0.5 }]}
         onPress={onSubmit}
-        disabled={!gender || !ageRange || !region || !divorceYear || loading}
+        disabled={!gender || !ageRange || !region || !divorceYear || !divorceMonth || loading}
       >
         {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.ctaText}>돌담 시작하기</Text>}
       </Pressable>

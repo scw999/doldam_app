@@ -103,7 +103,7 @@ export default {
       cleanupExpiredPoints(env),
       expireRooms(env),
       detectHotAndOpenRooms(env),
-      pollEasBuilds(env),
+      // pollEasBuilds(env),  // 수동 전송으로 전환 (/admin/poll-eas)
     ]);
   },
 };

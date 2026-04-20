@@ -11,7 +11,18 @@ import { api } from '@/api';
 interface Me {
   id: string; nickname: string;
   gender: 'M' | 'F'; age_range: string; region: string;
+  divorce_year: number | null; divorce_month: number | null;
   verified: number; created_at: number;
+}
+
+function divorceTag(year: number | null, month: number | null): string | null {
+  if (!year) return null;
+  const now = new Date();
+  const total = (now.getFullYear() - year) * 12 + (now.getMonth() + 1) - (month ?? 6);
+  if (total < 1) return '이혼 예정';
+  if (total < 12) return `이혼 ${total}개월차`;
+  const y = Math.floor(total / 12), m = total % 12;
+  return m === 0 ? `이혼 ${y}년차` : `이혼 ${y}년 ${m}개월차`;
 }
 
 export default function MyScreen() {
@@ -113,15 +124,27 @@ export default function MyScreen() {
                 {me ? `${me.gender === 'M' ? '남' : '여'} · ${me.age_range} · ${me.region}` : ''}
               </Text>
               {me && (
-                <View style={{
-                  marginTop: 6, alignSelf: 'flex-start',
-                  backgroundColor: colors.accent,
-                  paddingHorizontal: 10, paddingVertical: 3,
-                  borderRadius: radius.full,
-                }}>
-                  <Text style={{ fontSize: 11, fontWeight: '600', color: colors.primaryDark }}>
-                    가입 {daysJoined}일차
-                  </Text>
+                <View style={{ flexDirection: 'row', gap: 6, marginTop: 6, flexWrap: 'wrap' }}>
+                  <View style={{
+                    backgroundColor: colors.accent,
+                    paddingHorizontal: 10, paddingVertical: 3,
+                    borderRadius: radius.full,
+                  }}>
+                    <Text style={{ fontSize: 11, fontWeight: '600', color: colors.primaryDark }}>
+                      가입 {daysJoined}일차
+                    </Text>
+                  </View>
+                  {divorceTag(me.divorce_year, me.divorce_month) && (
+                    <View style={{
+                      backgroundColor: colors.primary + '22',
+                      paddingHorizontal: 10, paddingVertical: 3,
+                      borderRadius: radius.full,
+                    }}>
+                      <Text style={{ fontSize: 11, fontWeight: '600', color: colors.primary }}>
+                        {divorceTag(me.divorce_year, me.divorce_month)}
+                      </Text>
+                    </View>
+                  )}
                 </View>
               )}
             </View>

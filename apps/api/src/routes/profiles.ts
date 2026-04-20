@@ -61,13 +61,13 @@ profiles.get('/:id', requireAuth, async (c) => {
 
   const target = await c.env.DOLDAM_DB
     .prepare(
-      `SELECT id, nickname, gender, age_range, region, divorce_year, job, has_kids, intro, interests
+      `SELECT id, nickname, gender, age_range, region, divorce_year, divorce_month, job, has_kids, intro, interests
        FROM users WHERE id = ? AND deleted_at IS NULL`
     )
     .bind(targetId)
     .first<{
       id: string; nickname: string; gender: 'M' | 'F'; age_range: string; region: string;
-      divorce_year: number | null;
+      divorce_year: number | null; divorce_month: number | null;
       job: string | null; has_kids: number | null; intro: string | null; interests: string | null;
     }>();
   if (!target) return c.json({ error: 'not_found' }, 404);

@@ -11,6 +11,7 @@ interface Profile {
   age_range: string;
   region: string;
   divorce_year: number | null;
+  divorce_month: number | null;
   job: string | null;
   has_kids: number | null;
   intro: string | null;
@@ -18,11 +19,15 @@ interface Profile {
   unlocked: string[];
 }
 
-function divorceTag(year: number | null): string | null {
+function divorceTag(year: number | null, month: number | null): string | null {
   if (!year) return null;
-  const n = new Date().getFullYear() - year;
-  if (n <= 0) return '올해 이혼';
-  return `이혼 ${n}년차`;
+  const now = new Date();
+  const totalMonths = (now.getFullYear() - year) * 12 + (now.getMonth() + 1) - (month ?? 6);
+  if (totalMonths < 1) return '이혼 예정';
+  if (totalMonths < 12) return `이혼 ${totalMonths}개월차`;
+  const y = Math.floor(totalMonths / 12);
+  const m = totalMonths % 12;
+  return m === 0 ? `이혼 ${y}년차` : `이혼 ${y}년 ${m}개월차`;
 }
 
 type Field = 'job' | 'has_kids' | 'intro' | 'interests';
@@ -88,9 +93,9 @@ export default function UserProfile() {
         <Text style={styles.meta}>
           {profile.gender === 'M' ? '남성' : '여성'} · {profile.age_range} · {profile.region}
         </Text>
-        {divorceTag(profile.divorce_year) && (
+        {divorceTag(profile.divorce_year, profile.divorce_month) && (
           <View style={styles.divorceBadge}>
-            <Text style={styles.divorceBadgeText}>{divorceTag(profile.divorce_year)}</Text>
+            <Text style={styles.divorceBadgeText}>{divorceTag(profile.divorce_year, profile.divorce_month)}</Text>
           </View>
         )}
       </View>

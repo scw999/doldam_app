@@ -163,6 +163,15 @@ let API = '', TOKEN = '';
 
 function esc(s){ return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;') }
 function fmt(ts){ return ts ? new Date(ts).toLocaleString('ko-KR',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}) : '-' }
+function divorceTag(year,month){
+  if(!year) return '-';
+  const now=new Date();
+  const total=(now.getFullYear()-year)*12+(now.getMonth()+1)-(month||6);
+  if(total<1) return '이혼 예정';
+  if(total<12) return '이혼 '+total+'개월차';
+  const y=Math.floor(total/12), m=total%12;
+  return m===0?'이혼 '+y+'년차':'이혼 '+y+'년 '+m+'개월차';
+}
 
 function toast(msg, duration){
   const el=document.getElementById('toast');
@@ -552,6 +561,7 @@ async function loadUsers(offset,reset){
         grid.innerHTML=
           '<span class="field">성별/나이대</span><span class="val">'+(u.gender==='M'?'남':'여')+' / '+esc(u.age_range)+'</span>'+
           '<span class="field">지역</span><span class="val">'+esc(u.region||'-')+'</span>'+
+          '<span class="field">이혼</span><span class="val">'+esc(divorceTag(u.divorce_year,u.divorce_month))+'</span>'+
           '<span class="field">가입일</span><span class="val">'+fmt(u.created_at)+'</span>'+
           '<span class="field">정지 만료</span><span class="val">'+(u.muted_until&&u.muted_until>Date.now()?fmt(u.muted_until):'-')+'</span>';
         card.appendChild(grid);

@@ -9,20 +9,25 @@ import { colors, radius, spacing, typography } from '@/theme';
 import { Avatar, Tag, GenderDot } from '@/ui/atoms';
 import { useAuth } from '@/store/auth';
 import { api } from '@/api';
+import { patchBoardPost } from '../(tabs)/board';
 
 interface Post {
   id: string; title: string; content: string; category: string;
   user_id: string; nickname: string; gender: 'M' | 'F'; age_range: string;
-  divorce_year: number | null;
+  divorce_year: number | null; divorce_month: number | null;
   like_count: number; comment_count: number; created_at: number;
   myReaction?: number | null;
 }
 
-function divorceTag(year: number | null): string {
+function divorceTag(year: number | null, month: number | null): string {
   if (!year) return '';
-  const n = new Date().getFullYear() - year;
-  if (n <= 0) return '올해 이혼';
-  return `이혼 ${n}년차`;
+  const now = new Date();
+  const totalMonths = (now.getFullYear() - year) * 12 + (now.getMonth() + 1) - (month ?? 6);
+  if (totalMonths < 1) return '이혼 예정';
+  if (totalMonths < 12) return `이혼 ${totalMonths}개월차`;
+  const y = Math.floor(totalMonths / 12);
+  const m = totalMonths % 12;
+  return m === 0 ? `이혼 ${y}년차` : `이혼 ${y}년 ${m}개월차`;
 }
 
 interface Comment {
@@ -83,22 +88,27 @@ export default function PostDetail() {
 
   async function toggleLike(i: number) {
     if (myReact === i) {
-      // 같은 반응 → 취소
       setMyReact(null);
-      setPost((p) => p ? { ...p, like_count: Math.max(0, p.like_count - 1) } : p);
+      setPost((p) => {
+        const updated = p ? { ...p, like_count: Math.max(0, p.like_count - 1) } : p;
+        if (updated) patchBoardPost(id, { like_count: updated.like_count });
+        return updated;
+      });
       try { await api.post(`/posts/${id}/like`, { reaction: i }); } catch {}
     } else if (myReact === null) {
-      // 새로 반응
       setMyReact(i);
-      setPost((p) => p ? { ...p, like_count: p.like_count + 1 } : p);
+      setPost((p) => {
+        const updated = p ? { ...p, like_count: p.like_count + 1 } : p;
+        if (updated) patchBoardPost(id, { like_count: updated.like_count });
+        return updated;
+      });
       try { await api.post(`/posts/${id}/like`, { reaction: i }); } catch {}
     } else {
-      // 다른 반응으로 변경 → 기존 취소 후 새로 등록
       const prev = myReact;
       setMyReact(i);
       try {
-        await api.post(`/posts/${id}/like`, { reaction: prev }); // 기존 것 삭제 (toggle off)
-        await api.post(`/posts/${id}/like`, { reaction: i });    // 새 것 등록
+        await api.post(`/posts/${id}/like`, { reaction: prev });
+        await api.post(`/posts/${id}/like`, { reaction: i });
       } catch { setMyReact(prev); }
     }
   }
@@ -249,7 +259,7 @@ export default function PostDetail() {
                 <GenderDot gender={post.gender} />
               </View>
               <Text style={{ fontSize: 11, color: colors.textSub, marginTop: 2 }}>
-                {divorceTag(post.divorce_year) || post.age_range} · {timeAgo(post.created_at)}
+                {divorceTag(post.divorce_year, post.divorce_month) || post.age_range} · {timeAgo(post.created_at)}
               </Text>
             </View>
           </View>

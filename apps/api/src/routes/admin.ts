@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import type { Env, AuthedUser } from '../types';
 import { requireAdmin } from '../middleware/auth';
 import { pollEasBuilds } from '../services/easPoller';
+import { sendPush } from '../services/push';
 
 type Vars = { user: AuthedUser };
 const admin = new Hono<{ Bindings: Env; Variables: Vars }>();
@@ -150,7 +151,7 @@ admin.get('/users', requireAdmin, async (c) => {
   if (q) {
     const { results } = await c.env.DOLDAM_DB
       .prepare(
-        `SELECT id, nickname, gender, age_range, region, verified, banned,
+        `SELECT id, nickname, gender, age_range, region, divorce_year, divorce_month, verified, banned,
                 warning_count, muted_until, created_at
          FROM users WHERE nickname LIKE ? AND deleted_at IS NULL LIMIT 20`
       )
@@ -161,7 +162,7 @@ admin.get('/users', requireAdmin, async (c) => {
   const [{ results }, totalRow] = await Promise.all([
     c.env.DOLDAM_DB
       .prepare(
-        `SELECT id, nickname, gender, age_range, region, verified, banned,
+        `SELECT id, nickname, gender, age_range, region, divorce_year, divorce_month, verified, banned,
                 warning_count, muted_until, created_at
          FROM users WHERE deleted_at IS NULL
          ORDER BY created_at DESC LIMIT ? OFFSET ?`
@@ -215,6 +216,21 @@ admin.post('/users/:id/unban', requireAdmin, async (c) => {
 
 admin.post('/poll-eas', requireAdmin, async (c) => {
   await pollEasBuilds(c.env);
+  return c.json({ ok: true });
+});
+
+// ---- 테스트 푸시 알림 전송 ----
+admin.post('/push-test', requireAdmin, async (c) => {
+  const { userId, title = '테스트 알림', body = '돌담 푸시 알림이 작동하고 있어요!' } =
+    await c.req.json<{ userId: string; title?: string; body?: string }>();
+  if (!userId) return c.json({ error: 'userId_required' }, 400);
+
+  const user = await c.env.DOLDAM_DB
+    .prepare('SELECT id FROM users WHERE id = ?')
+    .bind(userId).first<{ id: string }>();
+  if (!user) return c.json({ error: 'user_not_found' }, 404);
+
+  await sendPush(c.env, userId, title, body, { type: 'admin_test' });
   return c.json({ ok: true });
 });
 

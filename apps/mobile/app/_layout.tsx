@@ -52,15 +52,27 @@ export default function RootLayout() {
     (async () => {
       const { status } = await Notifications.requestPermissionsAsync();
       if (status !== 'granted') return;
-      const pushToken = await Notifications.getExpoPushTokenAsync({
-        projectId: 'e319fb49-251c-4449-b120-d58ddb2ddc8d',
-      });
-      await api.post('/notifications/token', {
-        token: pushToken.data,
-        platform: Platform.OS,
-      }).catch(() => {});
+      try {
+        const pushToken = await Notifications.getExpoPushTokenAsync({
+          projectId: 'e319fb49-251c-4449-b120-d58ddb2ddc8d',
+        });
+        await api.post('/notifications/token', {
+          token: pushToken.data,
+          platform: Platform.OS,
+        }).catch(() => {});
+      } catch (e) {
+        console.warn('[push] token error', e);
+      }
     })();
   }, [token]);
+
+  // 알림 탭 시 알림 화면으로 이동
+  useEffect(() => {
+    const sub = Notifications.addNotificationResponseReceivedListener(() => {
+      router.push('/notifications' as any);
+    });
+    return () => sub.remove();
+  }, []);
 
   if (!fontsLoaded) return null;
 
