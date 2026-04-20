@@ -5,6 +5,28 @@ import { requireAdmin } from '../middleware/auth';
 type Vars = { user: AuthedUser };
 const admin = new Hono<{ Bindings: Env; Variables: Vars }>();
 
+// ---- 통계 ----
+admin.get('/stats', requireAdmin, async (c) => {
+  const [users, posts, pendingReports] = await Promise.all([
+    c.env.DOLDAM_DB.prepare(
+      `SELECT COUNT(*) AS total,
+              SUM(CASE WHEN verified=1 THEN 1 ELSE 0 END) AS verified,
+              SUM(CASE WHEN banned=1 THEN 1 ELSE 0 END) AS banned,
+              SUM(CASE WHEN muted_until > ? THEN 1 ELSE 0 END) AS muted
+       FROM users WHERE deleted_at IS NULL`
+    ).bind(Date.now()).first<{ total: number; verified: number; banned: number; muted: number }>(),
+    c.env.DOLDAM_DB.prepare(
+      `SELECT COUNT(*) AS total,
+              SUM(CASE WHEN deleted_at IS NULL THEN 1 ELSE 0 END) AS active
+       FROM posts`
+    ).first<{ total: number; active: number }>(),
+    c.env.DOLDAM_DB.prepare(
+      `SELECT COUNT(*) AS pending FROM reports WHERE status='pending'`
+    ).first<{ pending: number }>(),
+  ]);
+  return c.json({ users, posts, pendingReports: pendingReports?.pending ?? 0 });
+});
+
 // ---- 신고 목록 (target 내용 포함) ----
 admin.get('/reports', requireAdmin, async (c) => {
   const { status = 'pending', limit = '50', offset = '0' } = c.req.query();
@@ -40,6 +62,23 @@ admin.patch('/reports/:id', requireAdmin, async (c) => {
     .prepare(`UPDATE reports SET status = ?, resolved_at = ? WHERE id = ?`)
     .bind(status, Date.now(), id)
     .run();
+  return c.json({ ok: true });
+});
+
+// ---- 콘텐츠 강제 삭제 ----
+admin.delete('/posts/:id', requireAdmin, async (c) => {
+  const { id } = c.req.param();
+  await c.env.DOLDAM_DB
+    .prepare('UPDATE posts SET deleted_at = ? WHERE id = ?')
+    .bind(Date.now(), id).run();
+  return c.json({ ok: true });
+});
+
+admin.delete('/comments/:id', requireAdmin, async (c) => {
+  const { id } = c.req.param();
+  await c.env.DOLDAM_DB
+    .prepare('UPDATE comments SET deleted_at = ? WHERE id = ?')
+    .bind(Date.now(), id).run();
   return c.json({ ok: true });
 });
 
