@@ -15,6 +15,7 @@ import profiles from './routes/profiles';
 import notifications from './routes/notifications';
 import reports from './routes/reports';
 import admin from './routes/admin';
+import webhooks from './routes/webhooks';
 
 import { runOcr } from './services/ocr';
 import { cleanupExpiredPoints, expireRooms } from './services/cleanup';
@@ -44,6 +45,7 @@ app.route('/profiles', profiles);
 app.route('/notifications', notifications);
 app.route('/reports', reports);
 app.route('/admin', admin);
+app.route('/webhooks', webhooks);
 
 app.notFound((c) => c.json({ error: 'not_found' }, 404));
 app.onError((err, c) => {

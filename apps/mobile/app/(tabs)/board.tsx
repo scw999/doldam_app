@@ -73,7 +73,7 @@ export default function BoardScreen() {
       </ScrollView>
 
       <FlatList
-        contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 120, gap: 12 }}
+        contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 200, gap: 12 }}
         data={items}
         keyExtractor={(p) => p.id}
         refreshControl={
@@ -160,7 +160,7 @@ function timeAgo(ts: number): string {
 const styles = StyleSheet.create({
   empty: { textAlign: 'center', color: colors.textSub, marginTop: spacing.xxl, fontSize: 14 },
   matchBanner: {
-    marginTop: 22, padding: 16,
+    marginTop: 22, marginBottom: 16, padding: 16,
     borderRadius: radius.lg,
     backgroundColor: colors.card,
     borderWidth: 1, borderColor: colors.primary + '66', borderStyle: 'dashed',

@@ -94,14 +94,14 @@ export default function PostDetail() {
             { text: '삭제', style: 'destructive', onPress: () => deleteComment(c.id) },
           ]);
         }},
-        { text: '취소', style: 'cancel' },
+        { text: '닫기', style: 'cancel' },
       ]);
     } else {
-      Alert.alert('댓글 신고', '신고 사유를 선택해 주세요.', [
+      Alert.alert('신고 사유 선택', '해당하는 사유를 선택해 주세요.\n취소하려면 닫기를 누르세요.', [
         { text: '개인정보 포함', onPress: () => submitReport('comment', c.id, '개인정보 포함') },
-        { text: '욕설/혐오 발언', onPress: () => submitReport('comment', c.id, '욕설/혐오 발언') },
-        { text: '스팸/홍보', onPress: () => submitReport('comment', c.id, '스팸/홍보') },
-        { text: '취소', style: 'cancel' },
+        { text: '욕설 / 혐오 발언', onPress: () => submitReport('comment', c.id, '욕설/혐오 발언') },
+        { text: '스팸 / 홍보', onPress: () => submitReport('comment', c.id, '스팸/홍보') },
+        { text: '닫기 (신고 안 함)', style: 'cancel' },
       ]);
     }
   }
@@ -154,11 +154,11 @@ export default function PostDetail() {
   }
 
   function reportPost() {
-    Alert.alert('신고 사유 선택', '', [
+    Alert.alert('신고 사유 선택', '해당하는 사유를 선택해 주세요.\n취소하려면 닫기를 누르세요.', [
       { text: '개인정보 포함', onPress: () => submitReport('post', id, '개인정보 포함') },
-      { text: '욕설/혐오 발언', onPress: () => submitReport('post', id, '욕설/혐오 발언') },
-      { text: '스팸/홍보', onPress: () => submitReport('post', id, '스팸/홍보') },
-      { text: '취소', style: 'cancel' },
+      { text: '욕설 / 혐오 발언', onPress: () => submitReport('post', id, '욕설/혐오 발언') },
+      { text: '스팸 / 홍보', onPress: () => submitReport('post', id, '스팸/홍보') },
+      { text: '닫기 (신고 안 함)', style: 'cancel' },
     ]);
   }
 
