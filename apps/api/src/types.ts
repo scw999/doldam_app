@@ -17,7 +17,8 @@ export interface Env {
   GOOGLE_VISION_KEY: string;
   DANAL_API_KEY: string;
   ADMIN_TOKEN: string;
-  SLACK_WEBHOOK_URL: string;
+  SLACK_BOT_TOKEN: string;
+  SLACK_CHANNEL_ID: string;
   EAS_WEBHOOK_SECRET: string;
 }
 
