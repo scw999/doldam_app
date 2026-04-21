@@ -242,6 +242,27 @@ admin.post('/users/:id/unban', requireAdmin, async (c) => {
   return c.json({ ok: true });
 });
 
+admin.post('/users/:id/unmute', requireAdmin, async (c) => {
+  const { id } = c.req.param();
+  await c.env.DOLDAM_DB
+    .prepare('UPDATE users SET muted_until = NULL WHERE id = ?')
+    .bind(id).run();
+  return c.json({ ok: true });
+});
+
+admin.post('/users/:id/unwarn', requireAdmin, async (c) => {
+  const { id } = c.req.param();
+  const user = await c.env.DOLDAM_DB
+    .prepare('SELECT warning_count FROM users WHERE id = ?')
+    .bind(id).first<{ warning_count: number }>();
+  if (!user) return c.json({ error: 'not_found' }, 404);
+  const newCount = Math.max(0, user.warning_count - 1);
+  await c.env.DOLDAM_DB
+    .prepare('UPDATE users SET warning_count = ? WHERE id = ?')
+    .bind(newCount, id).run();
+  return c.json({ ok: true, warningCount: newCount });
+});
+
 admin.post('/poll-eas', requireAdmin, async (c) => {
   await pollEasBuilds(c.env);
   return c.json({ ok: true });

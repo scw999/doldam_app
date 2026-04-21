@@ -31,10 +31,12 @@ function cachePut(key: string, data: unknown) {
   _cache.set(key, { data, ts: Date.now() });
 }
 
-// POST/PATCH/DELETE 후 prefix 일치하는 캐시 무효화
-function invalidate(prefix: string) {
+// POST/PATCH/DELETE 후 첫 번째 경로 세그먼트 기준으로 캐시 무효화
+// 예: /votes/xxx/respond → /votes 로 시작하는 캐시 전부 제거
+function invalidate(path: string) {
+  const seg = '/' + (path.replace(/^\//, '').split('/')[0] ?? '');
   for (const k of _cache.keys()) {
-    if (k.startsWith(prefix)) _cache.delete(k);
+    if (k.startsWith(seg)) _cache.delete(k);
   }
 }
 

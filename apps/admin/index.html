@@ -21,6 +21,7 @@
     button.success{background:#5BAF7B} button.success:hover{background:#3A8F5A}
     button.ghost{background:transparent;color:#8C7B6B;border:1px solid #EDE4DA}
     button.ghost:hover{background:#F5EEE6}
+    button.release{background:#6BAF8C} button.release:hover{background:#4A8F6A}
     button.sm{padding:5px 12px;font-size:12px;border-radius:6px}
     .container{max-width:980px;margin:0 auto;padding:24px 20px}
     .tabs{display:flex;gap:0;border-bottom:2px solid #EDE4DA;margin-bottom:24px}
@@ -618,7 +619,7 @@ async function loadUsers(offset,reset){
         const banBtn=document.createElement('button');
         if(u.banned){
           banBtn.className='success sm';
-          banBtn.textContent='🔓 정지 해제';
+          banBtn.textContent='🔓 영구정지 해제';
           banBtn.addEventListener('click',function(){ userAction(u.id,'unban'); });
         } else {
           banBtn.className='danger sm';
@@ -630,6 +631,29 @@ async function loadUsers(offset,reset){
         acts.appendChild(muteBtn);
         acts.appendChild(mute30Btn);
         acts.appendChild(banBtn);
+
+        // ── 해제 버튼 (조건부) ──────────────────────────
+        const release=document.createElement('div');
+        release.className='action-row';
+        release.style.marginTop='6px';
+
+        if(u.warning_count>0){
+          const unwarnBtn=document.createElement('button');
+          unwarnBtn.className='release sm';
+          unwarnBtn.textContent='⚠️ 경고 해제 (−1회)';
+          unwarnBtn.addEventListener('click',function(){ userAction(u.id,'unwarn'); });
+          release.appendChild(unwarnBtn);
+        }
+
+        if(u.muted_until&&u.muted_until>Date.now()&&!u.banned){
+          const unmuteBtn=document.createElement('button');
+          unmuteBtn.className='release sm';
+          unmuteBtn.textContent='⏩ 임시정지 즉시 해제';
+          unmuteBtn.addEventListener('click',function(){ userAction(u.id,'unmute'); });
+          release.appendChild(unmuteBtn);
+        }
+
+        if(release.children.length>0) card.appendChild(release);
         card.appendChild(acts);
         el.appendChild(card);
       });
@@ -669,7 +693,7 @@ async function userAction(userId,action,body){
     const res=await apiFetch('/admin/users/'+encodeURIComponent(userId)+'/'+action,{
       method:'POST',body:JSON.stringify(payload)
     });
-    const msgs={warn:'경고 발송 (누적 '+(res.warningCount||'')+'회)',mute:'정지 완료',ban:'영구정지 완료',unban:'정지 해제 완료'};
+    const msgs={warn:'경고 발송 (누적 '+(res.warningCount||'')+'회)',mute:'정지 완료',ban:'영구정지 완료',unban:'정지 해제 완료',unmute:'임시정지 해제 완료',unwarn:'경고 해제 (남은 '+(res.warningCount??'0')+'회)'};
     toast(msgs[action]||'완료');
     loadUsers(0,true);
     loadOverview();
