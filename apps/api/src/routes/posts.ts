@@ -185,7 +185,7 @@ posts.delete('/:id', requireAuth, async (c) => {
 posts.post('/:id/like', requireAuth, async (c) => {
   const user = c.get('user');
   const id = c.req.param('id');
-  const { reaction = 0 } = await c.req.json<{ reaction?: number }>().catch(() => ({}));
+  const { reaction = 0 } = await c.req.json<{ reaction?: number }>().catch((): { reaction?: number } => ({}));
 
   const existing = await c.env.DOLDAM_DB
     .prepare('SELECT 1 FROM post_likes WHERE post_id = ? AND user_id = ?')
@@ -294,17 +294,16 @@ posts.post('/:id/comments', requireAuth, moderate, async (c) => {
     .bind(user.id).first<{ nickname: string }>();
   const nick = commenter?.nickname ?? '익명';
 
-  // 게시글 작성자에게 알림
+  // 게시글 작성자에게 알림 (응답 블로킹 없이 백그라운드 전송)
   const author = await c.env.DOLDAM_DB
     .prepare('SELECT user_id FROM posts WHERE id = ?')
     .bind(postId).first<{ user_id: string }>();
+
+  const notifPromises: Promise<void>[] = [];
   if (author && author.user_id !== user.id) {
-    await c.env.DOLDAM_QUEUE.send({
-      type: 'notification',
-      userId: author.user_id,
-      title: '새 댓글이 달렸어요',
-      body: `${nick}: ${content.trim().slice(0, 40)}`,
-    });
+    notifPromises.push(
+      sendPush(c.env, author.user_id, '새 댓글이 달렸어요', `${nick}: ${content.trim().slice(0, 40)}`, { postId })
+    );
   }
 
   // 대댓글인 경우 부모 댓글 작성자에게도 알림
@@ -313,14 +312,13 @@ posts.post('/:id/comments', requireAuth, moderate, async (c) => {
       .prepare('SELECT user_id FROM comments WHERE id = ?')
       .bind(parentId).first<{ user_id: string }>();
     if (parentComment && parentComment.user_id !== user.id && parentComment.user_id !== author?.user_id) {
-      await c.env.DOLDAM_QUEUE.send({
-        type: 'notification',
-        userId: parentComment.user_id,
-        title: '답글이 달렸어요',
-        body: `${nick}: ${content.trim().slice(0, 40)}`,
-      });
+      notifPromises.push(
+        sendPush(c.env, parentComment.user_id, '답글이 달렸어요', `${nick}: ${content.trim().slice(0, 40)}`, { postId })
+      );
     }
   }
+
+  c.executionCtx.waitUntil(Promise.all(notifPromises));
 
   return c.json({ id });
 });

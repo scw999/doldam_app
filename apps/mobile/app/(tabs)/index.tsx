@@ -4,6 +4,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { router, useFocusEffect } from 'expo-router';
 import { colors, radius, spacing, typography, shadow } from '@/theme';
 import { BrandBar } from '@/ui/BrandBar';
+import { useUnreadCount } from '@/hooks/useUnreadCount';
 import { Section, Card, Tag, ReactionRow, Progress } from '@/ui/atoms';
 import { api } from '@/api';
 
@@ -46,6 +47,7 @@ let homeCache: {
 const HOME_CACHE_TTL = 90_000; // 1.5분
 
 export default function HomeScreen() {
+  const hasUnread = useUnreadCount();
   const [me, setMe] = useState<Me | null>(homeCache?.me ?? null);
   const [balance, setBalance] = useState(homeCache?.balance ?? 0);
   const [topVotes, setTopVotes] = useState<Vote[]>(homeCache?.topVotes ?? []);
@@ -91,7 +93,7 @@ export default function HomeScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
-      <BrandBar points={balance} />
+      <BrandBar points={balance} hasNewNotification={hasUnread} />
       <ScrollView
         contentContainerStyle={styles.container}
         refreshControl={

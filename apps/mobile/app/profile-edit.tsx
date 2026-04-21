@@ -4,6 +4,7 @@ import { router } from 'expo-router';
 import { colors, spacing, typography, radius } from '@/theme';
 import { api } from '@/api';
 import { useAuth } from '@/store/auth';
+import { INTERESTS } from '@/utils/interests';
 
 export default function ProfileEdit() {
   const userId = useAuth((s) => s.userId);
@@ -11,7 +12,7 @@ export default function ProfileEdit() {
   const [job, setJob] = useState('');
   const [hasKids, setHasKids] = useState<boolean | null>(null);
   const [intro, setIntro] = useState('');
-  const [interests, setInterests] = useState('');
+  const [interests, setInterests] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -26,16 +27,30 @@ export default function ProfileEdit() {
         if (p.job) setJob(p.job);
         if (p.has_kids !== null) setHasKids(p.has_kids === 1);
         if (p.intro) setIntro(p.intro);
-        if (p.interests) setInterests(p.interests);
+        if (p.interests) setInterests(p.interests.split(',').map((s) => s.trim()).filter(Boolean));
       })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, [userId]);
 
+  function toggleInterest(item: string) {
+    setInterests((prev) =>
+      prev.includes(item)
+        ? prev.filter((i) => i !== item)
+        : prev.length >= 3 ? prev : [...prev, item]
+    );
+  }
+
   async function save() {
     setSaving(true);
     try {
-      await api.patch('/profiles/me', { nickname: nickname.trim() || undefined, job, hasKids, intro, interests });
+      await api.patch('/profiles/me', {
+        nickname: nickname.trim() || undefined,
+        job,
+        hasKids,
+        intro,
+        interests: interests.join(','),
+      });
       Alert.alert('저장 완료');
       router.back();
     } catch (e) {
@@ -70,9 +85,22 @@ export default function ProfileEdit() {
         placeholder="간단한 소개" placeholderTextColor={colors.textSub}
         multiline textAlignVertical="top" />
 
-      <Text style={styles.label}>관심사</Text>
-      <TextInput style={styles.input} value={interests} onChangeText={setInterests}
-        placeholder="예: 캠핑, 영화, 요리 (쉼표 구분)" placeholderTextColor={colors.textSub} />
+      <Text style={styles.label}>
+        관심사 <Text style={{ fontSize: 12, fontWeight: '400', color: colors.textSub }}>
+          (최대 3개 · {interests.length}/3)
+        </Text>
+      </Text>
+      <View style={styles.chipRow}>
+        {INTERESTS.map((item) => (
+          <Pressable
+            key={item}
+            onPress={() => toggleInterest(item)}
+            style={[styles.chip, interests.includes(item) && styles.chipOn]}
+          >
+            <Text style={[styles.chipText, interests.includes(item) && { color: '#fff' }]}>{item}</Text>
+          </Pressable>
+        ))}
+      </View>
 
       <Pressable style={[styles.cta, saving && { opacity: 0.6 }]} onPress={save} disabled={saving}>
         {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.ctaText}>저장</Text>}
@@ -92,6 +120,7 @@ const styles = StyleSheet.create({
   },
   textarea: { minHeight: 100 },
   row: { flexDirection: 'row', gap: spacing.sm },
+  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   chip: {
     paddingHorizontal: spacing.md, paddingVertical: spacing.sm,
     backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, borderRadius: radius.full,

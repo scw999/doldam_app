@@ -357,18 +357,22 @@ async function loadReports(){
         dismissBtn.textContent='기각';
         dismissBtn.addEventListener('click',function(){ resolveReport(r.id,'dismissed'); });
 
-        // 콘텐츠 삭제 버튼
-        const delContentBtn=document.createElement('button');
-        delContentBtn.className='danger sm';
-        delContentBtn.textContent='🗑 '+esc(r.target_type==='post'?'게시글':'댓글')+' 삭제';
-        delContentBtn.addEventListener('click',function(){
-          if(!confirm('해당 '+esc(r.target_type==='post'?'게시글':'댓글')+'을 삭제하고 신고를 처리할까요?')) return;
-          deleteContent(r.target_type,r.target_id,r.id);
-        });
-
         acts.appendChild(resolveBtn);
         acts.appendChild(dismissBtn);
-        acts.appendChild(delContentBtn);
+
+        // 콘텐츠 삭제 버튼 (유저 신고 제외)
+        const deletableTypes=['post','comment','vote'];
+        if(deletableTypes.includes(r.target_type)){
+          const typeLabel=r.target_type==='post'?'게시글':r.target_type==='comment'?'댓글':'투표';
+          const delContentBtn=document.createElement('button');
+          delContentBtn.className='danger sm';
+          delContentBtn.textContent='🗑 '+typeLabel+' 삭제';
+          delContentBtn.addEventListener('click',function(){
+            if(!confirm('해당 '+typeLabel+'을 삭제하고 신고를 처리할까요?')) return;
+            deleteContent(r.target_type,r.target_id,r.id);
+          });
+          acts.appendChild(delContentBtn);
+        }
         card.appendChild(acts);
 
         // 작성자 페널티
@@ -410,8 +414,10 @@ async function resolveReport(id,status){
 }
 
 async function deleteContent(type,targetId,reportId){
+  const path=type==='post'?'posts':type==='comment'?'comments':type==='vote'?'votes':null;
+  if(!path){ toast('삭제 미지원 유형'); return; }
   try{
-    await apiFetch('/admin/'+(type==='post'?'posts':'comments')+'/'+encodeURIComponent(targetId),{method:'DELETE'});
+    await apiFetch('/admin/'+path+'/'+encodeURIComponent(targetId),{method:'DELETE'});
     await apiFetch('/admin/reports/'+encodeURIComponent(reportId),{method:'PATCH',body:JSON.stringify({status:'resolved'})});
     toast('콘텐츠 삭제 및 신고 처리 완료');
     loadReports(); loadOverview();
@@ -419,24 +425,30 @@ async function deleteContent(type,targetId,reportId){
 }
 
 async function issueWarn(userId,reportId){
+  const reason=prompt('경고 사유 (선택):','커뮤니티 규정 위반');
+  if(reason===null) return;
   try{
-    const res=await apiFetch('/admin/users/'+encodeURIComponent(userId)+'/warn',{method:'POST',body:'{}'});
+    const res=await apiFetch('/admin/users/'+encodeURIComponent(userId)+'/warn',{method:'POST',body:JSON.stringify(reason?{reason}:{})});
     await resolveReport(reportId,'resolved');
     toast('경고 발송 (누적 '+res.warningCount+'회)');
   }catch(e){ toast('실패: '+e.message); }
 }
 
 async function issueMute(userId,days,reportId){
+  const reason=prompt(days+'일 정지 사유 (선택):','커뮤니티 규정 위반');
+  if(reason===null) return;
   try{
-    await apiFetch('/admin/users/'+encodeURIComponent(userId)+'/mute',{method:'POST',body:JSON.stringify({days})});
+    await apiFetch('/admin/users/'+encodeURIComponent(userId)+'/mute',{method:'POST',body:JSON.stringify(reason?{days,reason}:{days})});
     await resolveReport(reportId,'resolved');
     toast(days+'일 정지 완료');
   }catch(e){ toast('실패: '+e.message); }
 }
 
 async function issueBan(userId,reportId){
+  const reason=prompt('영구정지 사유 (선택):','반복적 커뮤니티 규정 위반');
+  if(reason===null) return;
   try{
-    await apiFetch('/admin/users/'+encodeURIComponent(userId)+'/ban',{method:'POST',body:'{}'});
+    await apiFetch('/admin/users/'+encodeURIComponent(userId)+'/ban',{method:'POST',body:JSON.stringify(reason?{reason}:{})});
     await resolveReport(reportId,'resolved');
     toast('영구정지 완료');
   }catch(e){ toast('실패: '+e.message); }
@@ -599,9 +611,7 @@ async function loadUsers(offset,reset){
         } else {
           banBtn.className='danger sm';
           banBtn.textContent='🚫 영구정지';
-          banBtn.addEventListener('click',function(){
-            if(confirm(esc(u.nickname)+'을 영구정지할까요?')) userAction(u.id,'ban');
-          });
+          banBtn.addEventListener('click',function(){ userAction(u.id,'ban'); });
         }
 
         acts.appendChild(warnBtn);
@@ -628,9 +638,24 @@ document.getElementById('usersMoreBtn').addEventListener('click',function(){
 });
 
 async function userAction(userId,action,body){
+  let payload=body||{};
+  if(action==='warn'){
+    const reason=prompt('경고 사유 (선택):','커뮤니티 규정 위반');
+    if(reason===null) return;
+    if(reason) payload={...payload,reason};
+  } else if(action==='mute'){
+    const reason=prompt((payload.days||7)+'일 정지 사유 (선택):','커뮤니티 규정 위반');
+    if(reason===null) return;
+    if(reason) payload={...payload,reason};
+  } else if(action==='ban'){
+    if(!confirm('영구정지할까요?')) return;
+    const reason=prompt('영구정지 사유 (선택):','반복적 커뮤니티 규정 위반');
+    if(reason===null) return;
+    if(reason) payload={...payload,reason};
+  }
   try{
     const res=await apiFetch('/admin/users/'+encodeURIComponent(userId)+'/'+action,{
-      method:'POST',body:JSON.stringify(body||{})
+      method:'POST',body:JSON.stringify(payload)
     });
     const msgs={warn:'경고 발송 (누적 '+(res.warningCount||'')+'회)',mute:'정지 완료',ban:'영구정지 완료',unban:'정지 해제 완료'};
     toast(msgs[action]||'완료');

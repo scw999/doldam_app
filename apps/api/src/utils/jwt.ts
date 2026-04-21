@@ -42,7 +42,7 @@ export async function signJwt(
 ): Promise<string> {
   const now = Math.floor(Date.now() / 1000);
   const { ttlSec, ...rest } = payload;
-  const full: JwtPayload = { ...rest, iat: now, exp: now + ttlSec };
+  const full = { ...rest, iat: now, exp: now + ttlSec } as JwtPayload;
 
   const header = { alg: 'HS256', typ: 'JWT' };
   const encHeader = b64url.enc(textEnc(JSON.stringify(header)));

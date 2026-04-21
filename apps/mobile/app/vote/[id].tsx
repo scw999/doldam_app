@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable, SafeAreaView, Alert, ActivityIndicator, Share } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable, SafeAreaView, Alert, ActivityIndicator, Share, Modal, TouchableOpacity } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useFocusEffect, router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -7,11 +7,14 @@ import { colors, radius, spacing, typography } from '@/theme';
 import { Pill } from '@/ui/atoms';
 import { api } from '@/api';
 
+const OPTION_COLORS = ['#5B8FC9', '#6BAF7B', '#D4728C', '#C4956A', '#8C7B6B', '#E85D4A'];
 
 interface VoteDetail {
   id: string;
   question: string;
   description?: string;
+  options?: string[] | null;
+  counts?: Record<string, number>;
   agree: number;
   disagree: number;
   total: number;
@@ -22,8 +25,9 @@ export default function VoteDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const [vote, setVote] = useState<VoteDetail | null>(null);
   const [byGender, setByGender] = useState<{ M?: VoteDetail; F?: VoteDetail }>({});
-  const [selected, setSelected] = useState<'agree' | 'disagree' | null>(null);
+  const [selected, setSelected] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [reportVisible, setReportVisible] = useState(false);
 
   const load = useCallback(async () => {
     const [all, m, f] = await Promise.all([
@@ -33,12 +37,12 @@ export default function VoteDetailScreen() {
     ]);
     setVote(all);
     setByGender({ M: m ?? undefined, F: f ?? undefined });
-    if (all.myChoice) setSelected(all.myChoice as 'agree' | 'disagree');
+    if (all.myChoice) setSelected(all.myChoice);
   }, [id]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
-  async function respond(choice: 'agree' | 'disagree') {
+  async function respond(choice: string) {
     setSubmitting(true);
     try {
       await api.post(`/votes/${id}/respond`, { choice });
@@ -51,33 +55,82 @@ export default function VoteDetailScreen() {
   const insets = useSafeAreaInsets();
   if (!vote) return <ActivityIndicator style={{ marginTop: 40 }} />;
 
+  const isMulti = Array.isArray(vote.options) && vote.options.length > 0;
   const pct = vote.total ? Math.round((vote.agree / vote.total) * 100) : 0;
-
-  async function share() {
-    await Share.share({
-      message: `[돌싱 딜레마] ${vote!.question}\n\n찬성 ${pct}% vs 반대 ${100 - pct}%\n(${vote!.total.toLocaleString()}명 참여)\n\n돌담 앱에서 투표해보세요`,
-    });
-  }
-  const isHot = vote.total >= 500;
   const mPct = byGender.M && byGender.M.total ? Math.round((byGender.M.agree / byGender.M.total) * 100) : 0;
   const fPct = byGender.F && byGender.F.total ? Math.round((byGender.F.agree / byGender.F.total) * 100) : 0;
+  const isHot = vote.total >= 500;
+
+  async function submitReport(reason: string) {
+    try {
+      await api.post('/reports', { targetType: 'vote', targetId: id, reason });
+      Alert.alert('신고 완료', '검토 후 조치하겠습니다');
+    } catch { Alert.alert('오류', '신고에 실패했어요'); }
+  }
+
+  async function share() {
+    if (isMulti && vote!.options) {
+      const top = vote!.options.map((o) => ({ o, n: vote!.counts?.[o] ?? 0 })).sort((a, b) => b.n - a.n)[0];
+      await Share.share({ message: `[돌싱 딜레마] ${vote!.question}\n\n1위: ${top?.o}\n(${vote!.total.toLocaleString()}명 참여)\n\n돌담 앱에서 투표해보세요` });
+    } else {
+      await Share.share({ message: `[돌싱 딜레마] ${vote!.question}\n\n찬성 ${pct}% vs 반대 ${100 - pct}%\n(${vote!.total.toLocaleString()}명 참여)\n\n돌담 앱에서 투표해보세요` });
+    }
+  }
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
-      {/* 헤더 */}
       <View style={[styles.header, { paddingTop: Math.max(insets.top + 8, 20) }]}>
         <Pressable onPress={() => router.back()} style={{ padding: 4 }}>
           <Text style={{ fontSize: 22, color: colors.text }}>←</Text>
         </Pressable>
         <Text style={[typography.h3, { color: colors.text }]}>돌싱 딜레마</Text>
         {vote.myChoice && (
-          <View style={{ marginLeft: 'auto', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, backgroundColor: colors.accent }}>
+          <View style={{ paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, backgroundColor: colors.accent }}>
             <Text style={{ fontSize: 11, fontWeight: '600', color: colors.primaryDark }}>
-              {vote.myChoice === 'agree' ? '⭕ 찬성 참여함' : '❌ 반대 참여함'}
+              {isMulti ? `✓ ${vote.myChoice}` : vote.myChoice === 'agree' ? '⭕ 찬성 참여함' : '❌ 반대 참여함'}
             </Text>
           </View>
         )}
+        <Pressable onPress={() => setReportVisible(true)} style={{ padding: 8, marginLeft: 'auto' }}>
+          <Text style={{ fontSize: 20, color: colors.textSub }}>⋯</Text>
+        </Pressable>
       </View>
+
+      <Modal visible={reportVisible} transparent animationType="fade">
+        <TouchableOpacity
+          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}
+          activeOpacity={1}
+          onPress={() => setReportVisible(false)}
+        >
+          <TouchableOpacity activeOpacity={1}>
+            <View style={{ backgroundColor: colors.card, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, paddingBottom: 36 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 18 }}>
+                <Text style={{ fontSize: 16, fontWeight: '700', color: colors.text, flex: 1 }}>신고 사유 선택</Text>
+                <Pressable onPress={() => setReportVisible(false)} style={{ padding: 4 }}>
+                  <Text style={{ fontSize: 22, color: colors.textSub, lineHeight: 24 }}>✕</Text>
+                </Pressable>
+              </View>
+              {[
+                { label: '🔐 개인정보 포함', reason: '개인정보 포함' },
+                { label: '🤬 욕설 / 혐오 발언', reason: '욕설/혐오 발언' },
+                { label: '📢 스팸 / 홍보', reason: '스팸/홍보' },
+                { label: '🚫 기타', reason: '기타' },
+              ].map((opt) => (
+                <Pressable
+                  key={opt.reason}
+                  onPress={() => { setReportVisible(false); submitReport(opt.reason); }}
+                  style={{ paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: colors.border }}
+                >
+                  <Text style={{ fontSize: 15, color: colors.text }}>{opt.label}</Text>
+                </Pressable>
+              ))}
+              <Pressable onPress={() => setReportVisible(false)} style={{ paddingTop: 16, alignItems: 'center' }}>
+                <Text style={{ fontSize: 14, color: colors.textSub }}>취소</Text>
+              </Pressable>
+            </View>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
 
       <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 20, paddingBottom: 40 }}>
         {isHot && (
@@ -96,38 +149,56 @@ export default function VoteDetailScreen() {
         )}
 
         {selected === null ? (
-          <View style={{ flexDirection: 'row', gap: 10 }}>
-            <Pressable
-              onPress={() => respond('agree')}
-              disabled={submitting}
-              style={[styles.bigBtn, { borderColor: colors.votePro + '40' }]}
-            >
-              <Text style={{ fontSize: 32 }}>⭕</Text>
-              <Text style={{ fontSize: 14, fontWeight: '700', color: colors.votePro, letterSpacing: -0.2 }}>
-                찬성
-              </Text>
-            </Pressable>
-            <Pressable
-              onPress={() => respond('disagree')}
-              disabled={submitting}
-              style={[styles.bigBtn, { borderColor: colors.voteCon + '40' }]}
-            >
-              <Text style={{ fontSize: 32 }}>❌</Text>
-              <Text style={{ fontSize: 14, fontWeight: '700', color: colors.voteCon, letterSpacing: -0.2 }}>
-                반대
-              </Text>
-            </Pressable>
-          </View>
+          <>
+            {/* 투표 버튼 */}
+            {isMulti ? (
+              <View style={{ gap: 10 }}>
+                {vote.options!.map((opt, idx) => (
+                  <Pressable
+                    key={opt}
+                    onPress={() => respond(opt)}
+                    disabled={submitting}
+                    style={[styles.optionBtn, { borderColor: OPTION_COLORS[idx % OPTION_COLORS.length] + '60' }]}
+                  >
+                    <View style={[styles.optionDot, { backgroundColor: OPTION_COLORS[idx % OPTION_COLORS.length] + '22', borderColor: OPTION_COLORS[idx % OPTION_COLORS.length] }]}>
+                      <Text style={{ fontSize: 12, fontWeight: '700', color: OPTION_COLORS[idx % OPTION_COLORS.length] }}>{idx + 1}</Text>
+                    </View>
+                    <Text style={{ flex: 1, fontSize: 14, fontWeight: '600', color: colors.text, letterSpacing: -0.2 }}>
+                      {opt}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            ) : (
+              <View style={{ flexDirection: 'row', gap: 10 }}>
+                <Pressable onPress={() => respond('agree')} disabled={submitting} style={[styles.bigBtn, { borderColor: colors.votePro + '40' }]}>
+                  <Text style={{ fontSize: 32 }}>⭕</Text>
+                  <Text style={{ fontSize: 14, fontWeight: '700', color: colors.votePro, letterSpacing: -0.2 }}>찬성</Text>
+                </Pressable>
+                <Pressable onPress={() => respond('disagree')} disabled={submitting} style={[styles.bigBtn, { borderColor: colors.voteCon + '40' }]}>
+                  <Text style={{ fontSize: 32 }}>❌</Text>
+                  <Text style={{ fontSize: 14, fontWeight: '700', color: colors.voteCon, letterSpacing: -0.2 }}>반대</Text>
+                </Pressable>
+              </View>
+            )}
+
+            {/* 결과 잠금 티저 */}
+            <View style={styles.teaser}>
+              <Text style={{ fontSize: 22 }}>🔒</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text }}>투표 후 결과 공개</Text>
+                <Text style={{ fontSize: 11, color: colors.textSub, marginTop: 2 }}>
+                  {vote.total > 0 ? `${vote.total.toLocaleString()}명이 이미 투표했어요` : '첫 번째로 투표해보세요'}
+                </Text>
+              </View>
+            </View>
+          </>
         ) : (
           <>
             {/* 내 선택 + 변경 */}
-            <View style={{
-              padding: 14, backgroundColor: colors.accent,
-              borderRadius: 12, marginBottom: 16,
-              flexDirection: 'row', alignItems: 'center',
-            }}>
+            <View style={{ padding: 14, backgroundColor: colors.accent, borderRadius: 12, marginBottom: 16, flexDirection: 'row', alignItems: 'center' }}>
               <Text style={{ fontSize: 12, color: colors.primaryDark, fontWeight: '600', flex: 1 }}>
-                내 선택: {selected === 'agree' ? '⭕ 찬성' : '❌ 반대'}
+                내 선택: {isMulti ? selected : selected === 'agree' ? '⭕ 찬성' : '❌ 반대'}
               </Text>
               <Pressable
                 onPress={() => setSelected(null)}
@@ -137,44 +208,62 @@ export default function VoteDetailScreen() {
               </Pressable>
             </View>
 
-            {/* 전체 바 */}
-            <View style={{ flexDirection: 'row', height: 48, borderRadius: 12, overflow: 'hidden', backgroundColor: colors.tag, marginBottom: 18 }}>
-              <View style={{
-                width: `${pct}%`, backgroundColor: colors.votePro,
-                justifyContent: 'center', paddingLeft: 14,
-              }}>
-                <Text style={{ color: '#fff', fontSize: 14, fontWeight: '700' }}>{pct}%</Text>
+            {isMulti ? (
+              /* 선택형 결과 */
+              <View style={{ gap: 10 }}>
+                {vote.options!.map((opt, idx) => {
+                  const count = vote.counts?.[opt] ?? 0;
+                  const barPct = vote.total ? Math.round((count / vote.total) * 100) : 0;
+                  const isMyChoice = selected === opt;
+                  const color = OPTION_COLORS[idx % OPTION_COLORS.length];
+                  return (
+                    <View key={opt} style={{ gap: 4 }}>
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                        <Text style={{ fontSize: 12, fontWeight: isMyChoice ? '700' : '500', color: isMyChoice ? color : colors.text }}>
+                          {isMyChoice ? '✓ ' : ''}{opt}
+                        </Text>
+                        <Text style={{ fontSize: 12, color: colors.textSub }}>{barPct}% ({count}명)</Text>
+                      </View>
+                      <View style={{ height: 10, borderRadius: 8, backgroundColor: colors.tag, overflow: 'hidden' }}>
+                        <View style={{ width: `${barPct}%`, height: '100%', backgroundColor: color, opacity: isMyChoice ? 1 : 0.6 }} />
+                      </View>
+                    </View>
+                  );
+                })}
+                <Text style={{ fontSize: 11, color: colors.textSub, textAlign: 'right', marginTop: 4 }}>
+                  총 {vote.total.toLocaleString()}명 참여
+                </Text>
               </View>
-              <View style={{
-                flex: 1, backgroundColor: colors.voteCon,
-                justifyContent: 'center', alignItems: 'flex-end', paddingRight: 14,
-              }}>
-                <Text style={{ color: '#fff', fontSize: 14, fontWeight: '700' }}>{100 - pct}%</Text>
-              </View>
-            </View>
-
-            {/* 성별 분포 */}
-            <Text style={{ fontSize: 12, fontWeight: '600', color: colors.textSub, marginBottom: 10 }}>
-              성별 분포
-            </Text>
-            {[
-              { label: '남성', pct: mPct, color: colors.male },
-              { label: '여성', pct: fPct, color: colors.female },
-            ].map((g) => (
-              <View key={g.label} style={{ marginBottom: 12 }}>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 5 }}>
-                  <Text style={{ fontSize: 12, color: g.color, fontWeight: '600' }}>● {g.label}</Text>
-                  <Text style={{ fontSize: 12, color: colors.textSub }}>
-                    찬성 {g.pct}% · 반대 {100 - g.pct}%
-                  </Text>
+            ) : (
+              /* 찬반 결과 */
+              <>
+                <View style={{ flexDirection: 'row', height: 48, borderRadius: 12, overflow: 'hidden', backgroundColor: colors.tag, marginBottom: 18 }}>
+                  <View style={{ width: `${pct}%`, backgroundColor: colors.votePro, justifyContent: 'center', paddingLeft: 14 }}>
+                    <Text style={{ color: '#fff', fontSize: 14, fontWeight: '700' }}>{pct}%</Text>
+                  </View>
+                  <View style={{ flex: 1, backgroundColor: colors.voteCon, justifyContent: 'center', alignItems: 'flex-end', paddingRight: 14 }}>
+                    <Text style={{ color: '#fff', fontSize: 14, fontWeight: '700' }}>{100 - pct}%</Text>
+                  </View>
                 </View>
-                <View style={{ height: 8, borderRadius: 8, backgroundColor: colors.tag, overflow: 'hidden' }}>
-                  <View style={{ width: `${g.pct}%`, height: '100%', backgroundColor: g.color }} />
-                </View>
-              </View>
-            ))}
 
-            {/* 테마방 배너 */}
+                <Text style={{ fontSize: 12, fontWeight: '600', color: colors.textSub, marginBottom: 10 }}>성별 분포</Text>
+                {[
+                  { label: '남성', pct: mPct, color: colors.male },
+                  { label: '여성', pct: fPct, color: colors.female },
+                ].map((g) => (
+                  <View key={g.label} style={{ marginBottom: 12 }}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 5 }}>
+                      <Text style={{ fontSize: 12, color: g.color, fontWeight: '600' }}>● {g.label}</Text>
+                      <Text style={{ fontSize: 12, color: colors.textSub }}>찬성 {g.pct}% · 반대 {100 - g.pct}%</Text>
+                    </View>
+                    <View style={{ height: 8, borderRadius: 8, backgroundColor: colors.tag, overflow: 'hidden' }}>
+                      <View style={{ width: `${g.pct}%`, height: '100%', backgroundColor: g.color }} />
+                    </View>
+                  </View>
+                ))}
+              </>
+            )}
+
             {isHot && (
               <LinearGradient
                 colors={[colors.accent, colors.tag]}
@@ -183,40 +272,23 @@ export default function VoteDetailScreen() {
               >
                 <Text style={{ fontSize: 22 }}>🔥</Text>
                 <View style={{ flex: 1 }}>
-                  <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text, letterSpacing: -0.2 }}>
-                    이 주제로 테마방이 열렸어요
-                  </Text>
-                  <Text style={{ fontSize: 11, color: colors.textSub, marginTop: 2 }}>
-                    {vote.total.toLocaleString()}명이 투표 중
-                  </Text>
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text, letterSpacing: -0.2 }}>이 주제로 테마방이 열렸어요</Text>
+                  <Text style={{ fontSize: 11, color: colors.textSub, marginTop: 2 }}>{vote.total.toLocaleString()}명이 투표 중</Text>
                 </View>
                 <Pressable
                   onPress={() => router.push('/(tabs)/chat')}
-                  style={{
-                    backgroundColor: colors.primary,
-                    paddingHorizontal: 14, paddingVertical: 8,
-                    borderRadius: radius.full,
-                  }}
+                  style={{ backgroundColor: colors.primary, paddingHorizontal: 14, paddingVertical: 8, borderRadius: radius.full }}
                 >
                   <Text style={{ color: '#fff', fontSize: 12, fontWeight: '600' }}>입장</Text>
                 </Pressable>
               </LinearGradient>
             )}
 
-            {/* 공유카드 */}
             <Pressable
               onPress={share}
-              style={{
-                marginTop: 16, padding: 14,
-                borderWidth: 1, borderColor: colors.primary,
-                backgroundColor: colors.card,
-                borderRadius: radius.lg,
-                alignItems: 'center',
-              }}
+              style={{ marginTop: 16, padding: 14, borderWidth: 1, borderColor: colors.primary, backgroundColor: colors.card, borderRadius: radius.lg, alignItems: 'center' }}
             >
-              <Text style={{ fontSize: 13, fontWeight: '600', color: colors.primaryDark }}>
-                📤 공유카드 만들기
-              </Text>
+              <Text style={{ fontSize: 13, fontWeight: '600', color: colors.primaryDark }}>📤 공유카드 만들기</Text>
             </Pressable>
           </>
         )}
@@ -237,6 +309,24 @@ const styles = StyleSheet.create({
     backgroundColor: colors.card,
     borderWidth: 2, borderRadius: 18,
     alignItems: 'center', gap: 8,
+  },
+  optionBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    paddingVertical: 16, paddingHorizontal: 16,
+    backgroundColor: colors.card,
+    borderWidth: 1.5, borderRadius: 14,
+  },
+  optionDot: {
+    width: 28, height: 28, borderRadius: 14,
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1.5,
+  },
+  teaser: {
+    marginTop: 20, padding: 16,
+    backgroundColor: colors.card,
+    borderRadius: 14,
+    borderWidth: 1, borderColor: colors.border,
+    flexDirection: 'row', alignItems: 'center', gap: 12,
   },
   themeBanner: {
     marginTop: 20, padding: 14,

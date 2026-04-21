@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TextInput, Pressable,
   Alert, KeyboardAvoidingView, Platform, SafeAreaView, ActivityIndicator,
+  Modal, TouchableOpacity,
 } from 'react-native';
 import { useLocalSearchParams, useFocusEffect, router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -9,17 +10,26 @@ import { colors, radius, spacing, typography } from '@/theme';
 import { Avatar, fmtRemaining } from '@/ui/atoms';
 import { useAuth } from '@/store/auth';
 import { api } from '@/api';
+import { buildWelcomeMessage, buildIcebreakerQuestion } from '@/utils/icebreaker';
 
 const API_BASE = process.env.EXPO_PUBLIC_API_BASE ?? 'http://localhost:8787';
 const RECONNECT_DELAY = 3000;
+
+const REPORT_REASONS = [
+  '욕설/혐오 발언',
+  '성희롱/성적 발언',
+  '개인정보 요구',
+  '스팸/광고',
+  '기타 부적절한 행동',
+];
 
 interface Message {
   id: string; from: string; nickname: string; text: string; ts: number;
 }
 
 interface RoomInfo {
-  id: string; theme: string; kind: string;
-  expires_at: number; status: string;
+  id: string; theme: string; kind: string; gender_mix: string;
+  expires_at: number; status: string; tags?: string | null;
   members: { id: string; nickname: string; gender: 'M' | 'F'; age_range: string }[];
 }
 
@@ -35,10 +45,16 @@ export default function RoomScreen() {
   const [now, setNow] = useState(Date.now());
   const [keepVoting, setKeepVoting] = useState(false);
   const [myVote, setMyVote] = useState<'keep' | 'destroy' | null>(null);
+  const [icebreakerVisible, setIcebreakerVisible] = useState(false);
+  const [icebreakerAnswer, setIcebreakerAnswer] = useState('');
+  const [icebreakerQuestion, setIcebreakerQuestion] = useState('');
+  const [welcomeMessage, setWelcomeMessage] = useState('');
+  const [reportTarget, setReportTarget] = useState<{ userId: string; nickname: string } | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const listRef = useRef<FlatList<Message>>(null);
   const mountedRef = useRef(true);
+  const icebreakerShownRef = useRef(false);
 
   const loadRoom = useCallback(async () => {
     try {
@@ -48,29 +64,36 @@ export default function RoomScreen() {
       ]);
       setRoom(info);
       setMessages(history.items);
+      // 내 메시지가 없으면 아이스브레이커 표시
+      if (!icebreakerShownRef.current) {
+        const myMsgs = history.items.filter((m) => m.from === myUserId);
+        if (myMsgs.length === 0) {
+          icebreakerShownRef.current = true;
+          const ctx = { theme: info.theme, genderMix: info.gender_mix, tags: info.tags };
+          setWelcomeMessage(buildWelcomeMessage(ctx));
+          setIcebreakerQuestion(buildIcebreakerQuestion(ctx));
+          setIcebreakerVisible(true);
+        }
+      }
     } catch (e) {
       Alert.alert('오류', '방 정보를 불러올 수 없어요');
     }
-  }, [id]);
+  }, [id, myUserId]);
 
   useFocusEffect(useCallback(() => { loadRoom(); }, [loadRoom]));
 
-  // 남은시간 매분 갱신
   useEffect(() => {
     const tick = setInterval(() => setNow(Date.now()), 60000);
     return () => clearInterval(tick);
   }, []);
 
-  // WebSocket 연결 (자동 재연결 포함)
   function connect() {
     if (!token || !id || !mountedRef.current) return;
     const wsUrl = `${API_BASE.replace(/^http/, 'ws')}/rooms/${id}/ws?token=${encodeURIComponent(token)}`;
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
 
-    ws.onopen = () => {
-      if (mountedRef.current) setConnected(true);
-    };
+    ws.onopen = () => { if (mountedRef.current) setConnected(true); };
 
     ws.onclose = () => {
       if (!mountedRef.current) return;
@@ -102,11 +125,19 @@ export default function RoomScreen() {
     };
   }, [id, token]);
 
-  function send() {
-    const t = draft.trim();
+  function send(text?: string) {
+    const t = (text ?? draft).trim();
     if (!t || wsRef.current?.readyState !== WebSocket.OPEN) return;
     wsRef.current.send(JSON.stringify({ text: t }));
-    setDraft('');
+    if (!text) setDraft('');
+  }
+
+  function submitIcebreaker() {
+    const t = icebreakerAnswer.trim();
+    if (!t) { setIcebreakerVisible(false); return; }
+    setIcebreakerVisible(false);
+    send(t);
+    setIcebreakerAnswer('');
   }
 
   function confirmKeepVote(keep: boolean) {
@@ -156,6 +187,15 @@ export default function RoomScreen() {
     ]);
   }
 
+  async function reportUser(targetUserId: string, reason: string) {
+    try {
+      await api.post('/reports', { targetId: targetUserId, targetType: 'user', reason });
+      Alert.alert('신고 완료', '신고가 접수되었습니다. 검토 후 조치할게요.');
+    } catch {
+      Alert.alert('신고 실패', '잠시 후 다시 시도해주세요.');
+    }
+  }
+
   const rem = room ? fmtRemaining(room.expires_at) : { label: '...', urgent: false };
   const isThemed = room?.kind === 'themed';
   const isExpired = room?.status === 'expired' || rem.label === '0분';
@@ -202,21 +242,13 @@ export default function RoomScreen() {
               </View>
             ) : (
               <View style={{ flexDirection: 'row', gap: 6 }}>
-                <Pressable
-                  onPress={() => confirmKeepVote(true)}
-                  disabled={keepVoting}
-                  style={styles.keepBtn}
-                >
+                <Pressable onPress={() => confirmKeepVote(true)} disabled={keepVoting} style={styles.keepBtn}>
                   {keepVoting
                     ? <ActivityIndicator size="small" color="#fff" style={{ width: 40 }} />
                     : <Text style={styles.keepBtnText}>✅ 유지</Text>
                   }
                 </Pressable>
-                <Pressable
-                  onPress={() => confirmKeepVote(false)}
-                  disabled={keepVoting}
-                  style={styles.destroyBtn}
-                >
+                <Pressable onPress={() => confirmKeepVote(false)} disabled={keepVoting} style={styles.destroyBtn}>
                   <Text style={styles.destroyBtnText}>💥 폭파</Text>
                 </Pressable>
               </View>
@@ -251,7 +283,13 @@ export default function RoomScreen() {
                 </Text>
               );
             }
-            return <Bubble msg={m} mine={m.from === myUserId} />;
+            return (
+              <Bubble
+                msg={m}
+                mine={m.from === myUserId}
+                onReport={m.from !== myUserId ? () => setReportTarget({ userId: m.from, nickname: m.nickname }) : undefined}
+              />
+            );
           }}
         />
 
@@ -264,12 +302,12 @@ export default function RoomScreen() {
             placeholder={connected ? '메시지 보내기' : '연결 중...'}
             placeholderTextColor={colors.textLight}
             editable={connected && !isExpired}
-            onSubmitEditing={send}
+            onSubmitEditing={() => send()}
             returnKeyType="send"
             blurOnSubmit={false}
           />
           <Pressable
-            onPress={send}
+            onPress={() => send()}
             disabled={!connected || !draft.trim() || isExpired}
             style={{
               width: 40, height: 40, borderRadius: 20,
@@ -281,13 +319,94 @@ export default function RoomScreen() {
           </Pressable>
         </View>
       </KeyboardAvoidingView>
+
+      {/* 아이스브레이커 모달 */}
+      <Modal visible={icebreakerVisible} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={styles.icebreakerSheet}>
+            {welcomeMessage ? (
+              <Text style={{ fontSize: 13, color: colors.primaryDark, marginBottom: 12, lineHeight: 20, fontWeight: '500' }}>
+                {welcomeMessage}
+              </Text>
+            ) : null}
+            <View style={{ height: 1, backgroundColor: colors.border, marginBottom: 16 }} />
+            <Text style={{ fontSize: 12, color: colors.textSub, marginBottom: 6 }}>💬 첫 번째 질문</Text>
+            <Text style={{ fontSize: 15, fontWeight: '700', color: colors.text, marginBottom: 18, lineHeight: 23 }}>
+              {icebreakerQuestion}
+            </Text>
+            <TextInput
+              style={styles.icebreakerInput}
+              value={icebreakerAnswer}
+              onChangeText={setIcebreakerAnswer}
+              placeholder="자유롭게 답해보세요"
+              placeholderTextColor={colors.textLight}
+              multiline
+              maxLength={200}
+            />
+            <View style={{ flexDirection: 'row', gap: 10, marginTop: 16 }}>
+              <Pressable
+                style={[styles.icebreakerBtn, { backgroundColor: colors.tag, flex: 1 }]}
+                onPress={() => setIcebreakerVisible(false)}
+              >
+                <Text style={{ color: colors.textSub, fontWeight: '600' }}>건너뛰기</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.icebreakerBtn, { backgroundColor: colors.primary, flex: 2 }]}
+                onPress={submitIcebreaker}
+              >
+                <Text style={{ color: '#fff', fontWeight: '700' }}>전송하기</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* 유저 신고 모달 */}
+      <Modal visible={!!reportTarget} transparent animationType="slide">
+        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setReportTarget(null)}>
+          <TouchableOpacity activeOpacity={1} style={styles.reportSheet}>
+            <Text style={styles.reportTitle}>{reportTarget?.nickname} 신고</Text>
+            <Text style={{ fontSize: 12, color: colors.textSub, marginBottom: 16, textAlign: 'center' }}>
+              신고 사유를 선택해주세요
+            </Text>
+            {REPORT_REASONS.map((reason) => (
+              <Pressable
+                key={reason}
+                style={styles.reportItem}
+                onPress={() => {
+                  const t = reportTarget;
+                  setReportTarget(null);
+                  if (t) reportUser(t.userId, reason);
+                }}
+              >
+                <Text style={styles.reportItemText}>{reason}</Text>
+              </Pressable>
+            ))}
+            <Pressable style={styles.reportCancel} onPress={() => setReportTarget(null)}>
+              <Text style={{ color: colors.textSub, fontWeight: '600' }}>취소</Text>
+            </Pressable>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
     </SafeAreaView>
   );
 }
 
-function Bubble({ msg, mine }: { msg: Message; mine: boolean }) {
+function Bubble({
+  msg,
+  mine,
+  onReport,
+}: {
+  msg: Message;
+  mine: boolean;
+  onReport?: () => void;
+}) {
   return (
-    <View style={{ flexDirection: mine ? 'row-reverse' : 'row', gap: 8, marginBottom: 12, alignItems: 'flex-end' }}>
+    <Pressable
+      onLongPress={onReport}
+      delayLongPress={500}
+      style={{ flexDirection: mine ? 'row-reverse' : 'row', gap: 8, marginBottom: 12, alignItems: 'flex-end' }}
+    >
       {!mine && <Avatar size={28} />}
       <View style={{ maxWidth: '74%' }}>
         {!mine && (
@@ -311,7 +430,7 @@ function Bubble({ msg, mine }: { msg: Message; mine: boolean }) {
           <Text style={{ fontSize: 10, color: colors.textLight }}>{fmtHhmm(msg.ts)}</Text>
         </View>
       </View>
-    </View>
+    </Pressable>
   );
 }
 
@@ -356,10 +475,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.full, backgroundColor: colors.primary,
   },
   reviveBtnText: { fontSize: 12, fontWeight: '700', color: '#fff' },
-  voteChip: {
-    paddingHorizontal: 12, paddingVertical: 6,
-    borderRadius: radius.full,
-  },
+  voteChip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: radius.full },
   voteChipKeep: { backgroundColor: colors.green + '20' },
   voteChipDestroy: { backgroundColor: '#E85D4A15' },
   voteChipText: { fontSize: 11, fontWeight: '600', color: colors.text },
@@ -373,5 +489,43 @@ const styles = StyleSheet.create({
     flex: 1, paddingHorizontal: 14, paddingVertical: 11,
     borderRadius: radius.full, borderWidth: 1, borderColor: colors.border,
     backgroundColor: colors.bg, fontSize: 13, color: colors.text,
+  },
+  modalOverlay: {
+    flex: 1, backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center', alignItems: 'center',
+  },
+  icebreakerSheet: {
+    backgroundColor: colors.card,
+    borderRadius: 24, padding: 24, margin: 24,
+    width: '90%',
+  },
+  icebreakerInput: {
+    borderWidth: 1, borderColor: colors.border,
+    borderRadius: radius.md, padding: 14,
+    fontSize: 14, color: colors.text,
+    minHeight: 80, textAlignVertical: 'top',
+  },
+  icebreakerBtn: {
+    paddingVertical: 13, borderRadius: radius.md,
+    alignItems: 'center',
+  },
+  reportSheet: {
+    backgroundColor: colors.card,
+    borderTopLeftRadius: 24, borderTopRightRadius: 24,
+    padding: 24, paddingBottom: 40,
+  },
+  reportTitle: {
+    fontSize: 16, fontWeight: '700', color: colors.text,
+    textAlign: 'center', marginBottom: 4,
+  },
+  reportItem: {
+    paddingVertical: 15, paddingHorizontal: 8,
+    borderBottomWidth: 1, borderBottomColor: colors.border,
+  },
+  reportItemText: { fontSize: 15, color: colors.text },
+  reportCancel: {
+    marginTop: 16, paddingVertical: 14,
+    alignItems: 'center', backgroundColor: colors.tag,
+    borderRadius: radius.md,
   },
 });

@@ -10,6 +10,7 @@ import { Avatar, Tag, GenderDot } from '@/ui/atoms';
 import { useAuth } from '@/store/auth';
 import { api } from '@/api';
 import { patchBoardPost } from '../(tabs)/board';
+import { getDivorceTitle } from '@/utils/divorce';
 
 interface Post {
   id: string; title: string; content: string; category: string;
@@ -17,17 +18,6 @@ interface Post {
   divorce_year: number | null; divorce_month: number | null;
   like_count: number; comment_count: number; created_at: number;
   myReaction?: number | null;
-}
-
-function divorceTag(year: number | null, month: number | null): string {
-  if (!year) return '';
-  const now = new Date();
-  const totalMonths = (now.getFullYear() - year) * 12 + (now.getMonth() + 1) - (month ?? 6);
-  if (totalMonths < 1) return '이혼 예정';
-  if (totalMonths < 12) return `이혼 ${totalMonths}개월차`;
-  const y = Math.floor(totalMonths / 12);
-  const m = totalMonths % 12;
-  return m === 0 ? `이혼 ${y}년차` : `이혼 ${y}년 ${m}개월차`;
 }
 
 interface Comment {
@@ -259,7 +249,7 @@ export default function PostDetail() {
                 <GenderDot gender={post.gender} />
               </View>
               <Text style={{ fontSize: 11, color: colors.textSub, marginTop: 2 }}>
-                {divorceTag(post.divorce_year, post.divorce_month) || post.age_range} · {timeAgo(post.created_at)}
+                {[getDivorceTitle(post.divorce_year, post.divorce_month, post.gender), timeAgo(post.created_at)].filter(Boolean).join(' · ')}
               </Text>
             </View>
           </View>
@@ -362,9 +352,12 @@ export default function PostDetail() {
                   ) : (
                     <Text style={{ fontSize: 13.5, color: colors.text, lineHeight: 21 }}>{c.content}</Text>
                   )}
-                  {!isReply && !isEditing && (
+                  {!isEditing && (
                     <Pressable
-                      onPress={() => setReplyTo({ id: c.id, nickname: c.nickname?.split(' ')[0] ?? '익명' })}
+                      onPress={() => setReplyTo({
+                        id: c.parent_id ?? c.id,  // 대댓글이면 부모 id로 → 2단 유지
+                        nickname: c.nickname?.split(' ')[0] ?? '익명',
+                      })}
                       style={{ marginTop: 8, alignSelf: 'flex-start' }}
                     >
                       <Text style={{ fontSize: 11, color: colors.textSub }}>↩ 답글</Text>

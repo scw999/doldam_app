@@ -44,6 +44,24 @@ notifications.get('/', requireAuth, async (c) => {
   return c.json({ items: results });
 });
 
+// ---- 안읽은 수 ----
+notifications.get('/unread', requireAuth, async (c) => {
+  const user = c.get('user');
+  const row = await c.env.DOLDAM_DB
+    .prepare('SELECT COUNT(*) AS n FROM notifications WHERE user_id = ? AND read_at IS NULL')
+    .bind(user.id).first<{ n: number }>();
+  return c.json({ count: row?.n ?? 0 });
+});
+
+// ---- 전체 읽음 처리 ----
+notifications.post('/read-all', requireAuth, async (c) => {
+  const user = c.get('user');
+  await c.env.DOLDAM_DB
+    .prepare('UPDATE notifications SET read_at = ? WHERE user_id = ? AND read_at IS NULL')
+    .bind(Date.now(), user.id).run();
+  return c.json({ ok: true });
+});
+
 // ---- 읽음 처리 ----
 notifications.post('/:id/read', requireAuth, async (c) => {
   const user = c.get('user');

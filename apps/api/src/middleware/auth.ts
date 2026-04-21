@@ -4,7 +4,8 @@ import { verifyJwt, type JwtPayload } from '../utils/jwt';
 
 type Vars = { user: AuthedUser; jwt: JwtPayload };
 
-async function extractJwt(c: Parameters<MiddlewareHandler<{ Bindings: Env }>>[0]): Promise<JwtPayload | null> {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function extractJwt(c: any): Promise<JwtPayload | null> {
   const token = c.req.header('Authorization')?.replace(/^Bearer\s+/i, '');
   if (!token) return null;
   return verifyJwt(token, c.env.JWT_SECRET);

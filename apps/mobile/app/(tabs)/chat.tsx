@@ -4,6 +4,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { router, useFocusEffect } from 'expo-router';
 import { colors, radius, spacing, typography } from '@/theme';
 import { BrandBar } from '@/ui/BrandBar';
+import { useUnreadCount } from '@/hooks/useUnreadCount';
 import { Card, fmtRemaining } from '@/ui/atoms';
 import { api } from '@/api';
 
@@ -15,6 +16,7 @@ interface Room {
 type Tab = 'my' | 'theme' | 'match';
 
 export default function ChatScreen() {
+  const hasUnread = useUnreadCount();
   const [tab, setTab] = useState<Tab>('my');
   const [balance, setBalance] = useState(0);
   const [mine, setMine] = useState<Room[]>([]);
@@ -56,7 +58,7 @@ export default function ChatScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
-      <BrandBar points={balance} />
+      <BrandBar points={balance} hasNewNotification={hasUnread} />
 
       <View style={styles.tabRow}>
         {([

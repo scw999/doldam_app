@@ -14,11 +14,11 @@ type UnlockField = typeof UNLOCKABLE_FIELDS[number];
 // 내 프로필 업데이트 (유료 항목 + 닉네임 포함, 본인이니까 제한 없음)
 const updateMe = async (c: any) => {
   const user = c.get('user');
-  const { job, hasKids, intro, interests, nickname } = await c.req.json<{
+  const { job, hasKids, intro, interests, nickname } = await c.req.json() as {
     job?: string | null; hasKids?: boolean | null;
     intro?: string | null; interests?: string | null;
     nickname?: string | null;
-  }>();
+  };
 
   if (nickname !== undefined && nickname !== null) {
     const trimmed = nickname.trim();

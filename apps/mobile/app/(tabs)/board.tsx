@@ -4,8 +4,10 @@ import { View, Text, StyleSheet, FlatList, ScrollView, Pressable, RefreshControl
 import { router, useFocusEffect } from 'expo-router';
 import { colors, radius, spacing, typography } from '@/theme';
 import { BrandBar } from '@/ui/BrandBar';
+import { useUnreadCount } from '@/hooks/useUnreadCount';
 import { Card, Tag, CatChip, GenderDot, ReactionRow } from '@/ui/atoms';
 import { api } from '@/api';
+import { getDivorceTitle } from '@/utils/divorce';
 
 interface Post {
   id: string; title: string; content: string; category: string;
@@ -28,17 +30,6 @@ async function getMyGender(): Promise<'M' | 'F' | null> {
     myGenderCache = null;
   }
   return myGenderCache;
-}
-
-function divorceTag(year: number | null, month: number | null): string {
-  if (!year) return '';
-  const now = new Date();
-  const totalMonths = (now.getFullYear() - year) * 12 + (now.getMonth() + 1) - (month ?? 6);
-  if (totalMonths < 1) return '이혼 예정';
-  if (totalMonths < 12) return `이혼 ${totalMonths}개월차`;
-  const y = Math.floor(totalMonths / 12);
-  const m = totalMonths % 12;
-  return m === 0 ? `이혼 ${y}년차` : `이혼 ${y}년 ${m}개월차`;
 }
 
 const CATEGORIES = [
@@ -77,6 +68,7 @@ export function patchBoardPost(postId: string, patch: { like_count?: number }) {
 }
 
 export default function BoardScreen() {
+  const hasUnread = useUnreadCount();
   const [cat, setCat] = useState('free');
   const [balance, setBalance] = useState(0);
   const [items, setItems] = useState<Post[]>([]);
@@ -124,7 +116,7 @@ export default function BoardScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
-      <BrandBar points={balance} />
+      <BrandBar points={balance} hasNewNotification={hasUnread} />
 
       <ScrollView
         horizontal
@@ -192,7 +184,7 @@ export default function BoardScreen() {
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                 <GenderDot gender={p.gender} />
                 <Text style={{ fontSize: 11, color: colors.textSub }}>
-                  {p.nickname}{divorceTag(p.divorce_year, p.divorce_month) ? ` · ${divorceTag(p.divorce_year, p.divorce_month)}` : ` · ${p.age_range}`}
+                  {p.nickname}{getDivorceTitle(p.divorce_year, p.divorce_month, p.gender) ? ` · ${getDivorceTitle(p.divorce_year, p.divorce_month, p.gender)}` : ''}
                 </Text>
                 <View style={{ flex: 1 }} />
                 <ReactionRow reactions={{ '💛': p.like_count }} compact />

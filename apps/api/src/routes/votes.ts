@@ -13,16 +13,25 @@ const votes = new Hono<{ Bindings: Env; Variables: Vars }>();
 // ---- 목록 ----
 votes.get('/', async (c) => {
   const limit = Math.min(Number(c.req.query('limit') ?? 30), 50);
-  const { results } = await c.env.DOLDAM_DB
-    .prepare(
-      `SELECT v.id, v.question, v.description, v.created_at, v.expires_at,
+  const gender = c.req.query('gender') as 'M' | 'F' | undefined;
+
+  const sql = gender
+    ? `SELECT v.id, v.question, v.description, v.options, v.created_at, v.expires_at,
+              u.nickname,
+              (SELECT COUNT(*) FROM vote_responses WHERE vote_id = v.id AND gender = '${gender}') AS total,
+              (SELECT COUNT(*) FROM vote_responses WHERE vote_id = v.id AND choice = 'agree' AND gender = '${gender}') AS agree,
+              (SELECT COUNT(*) FROM vote_responses WHERE vote_id = v.id AND choice = 'disagree' AND gender = '${gender}') AS disagree
+       FROM votes v JOIN users u ON u.id = v.user_id
+       ORDER BY total DESC, v.created_at DESC LIMIT ?`
+    : `SELECT v.id, v.question, v.description, v.options, v.created_at, v.expires_at,
               u.nickname,
               (SELECT COUNT(*) FROM vote_responses WHERE vote_id = v.id) AS total,
               (SELECT COUNT(*) FROM vote_responses WHERE vote_id = v.id AND choice = 'agree') AS agree,
               (SELECT COUNT(*) FROM vote_responses WHERE vote_id = v.id AND choice = 'disagree') AS disagree
        FROM votes v JOIN users u ON u.id = v.user_id
-       ORDER BY v.created_at DESC LIMIT ?`
-    ).bind(limit).all();
+       ORDER BY total DESC, v.created_at DESC LIMIT ?`;
+
+  const { results } = await c.env.DOLDAM_DB.prepare(sql).bind(limit).all();
   c.header('Cache-Control', 'public, max-age=20, stale-while-revalidate=40');
   return c.json({ items: results });
 });
@@ -33,8 +42,10 @@ votes.get('/:id', async (c) => {
   const genderFilter = c.req.query('gender') as Gender | null;
 
   const vote = await c.env.DOLDAM_DB
-    .prepare('SELECT * FROM votes WHERE id = ?').bind(id).first();
+    .prepare('SELECT * FROM votes WHERE id = ?').bind(id).first<Record<string, unknown>>();
   if (!vote) return c.json({ error: 'not_found' }, 404);
+
+  const options: string[] | null = vote.options ? JSON.parse(vote.options as string) : null;
 
   const agg = genderFilter
     ? await c.env.DOLDAM_DB
@@ -50,8 +61,14 @@ votes.get('/:id', async (c) => {
         )
         .bind(id).all<{ choice: string; n: number }>();
 
-  const agree = agg.results.find((r) => r.choice === 'agree')?.n ?? 0;
-  const disagree = agg.results.find((r) => r.choice === 'disagree')?.n ?? 0;
+  const counts: Record<string, number> = {};
+  let total = 0;
+  for (const row of agg.results) {
+    counts[row.choice] = row.n;
+    total += row.n;
+  }
+  const agree = counts['agree'] ?? 0;
+  const disagree = counts['disagree'] ?? 0;
 
   let myChoice: string | null = null;
   if (!genderFilter) {
@@ -65,24 +82,31 @@ votes.get('/:id', async (c) => {
     }
   }
 
-  return c.json({ ...vote, agree, disagree, total: agree + disagree, myChoice });
+  return c.json({ ...vote, options, counts, agree, disagree, total, myChoice });
 });
 
 // ---- 생성 ----
 votes.post('/', requireAuth, moderate, async (c) => {
   const user = c.get('user');
-  const { question, description, expiresAt } = await c.req.json<{
-    question: string; description?: string; expiresAt?: number;
+  const { question, description, expiresAt, options } = await c.req.json<{
+    question: string; description?: string; expiresAt?: number; options?: string[];
   }>();
   if (!question?.trim()) return c.json({ error: 'empty_question' }, 400);
+
+  let optionsJson: string | null = null;
+  if (Array.isArray(options) && options.length > 0) {
+    const clean = options.map((o) => String(o).trim()).filter(Boolean);
+    if (clean.length < 2 || clean.length > 6) return c.json({ error: 'invalid_options' }, 400);
+    optionsJson = JSON.stringify(clean);
+  }
 
   const id = crypto.randomUUID();
   await c.env.DOLDAM_DB
     .prepare(
-      `INSERT INTO votes (id, user_id, question, description, created_at, expires_at)
-       VALUES (?, ?, ?, ?, ?, ?)`
+      `INSERT INTO votes (id, user_id, question, description, options, created_at, expires_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`
     )
-    .bind(id, user.id, question.trim(), description?.trim() ?? null, Date.now(), expiresAt ?? null)
+    .bind(id, user.id, question.trim(), description?.trim() ?? null, optionsJson, Date.now(), expiresAt ?? null)
     .run();
 
   return c.json({ id });
@@ -92,8 +116,18 @@ votes.post('/', requireAuth, moderate, async (c) => {
 votes.post('/:id/respond', requireAuth, async (c) => {
   const id = c.req.param('id');
   const user = c.get('user');
-  const { choice } = await c.req.json<{ choice: 'agree' | 'disagree' }>();
-  if (!['agree', 'disagree'].includes(choice)) return c.json({ error: 'invalid_choice' }, 400);
+  const { choice } = await c.req.json<{ choice: string }>();
+
+  const vote = await c.env.DOLDAM_DB
+    .prepare('SELECT options FROM votes WHERE id = ?').bind(id).first<{ options: string | null }>();
+  if (!vote) return c.json({ error: 'not_found' }, 404);
+
+  if (vote.options) {
+    const opts: string[] = JSON.parse(vote.options);
+    if (!opts.includes(choice)) return c.json({ error: 'invalid_choice' }, 400);
+  } else {
+    if (!['agree', 'disagree'].includes(choice)) return c.json({ error: 'invalid_choice' }, 400);
+  }
 
   const existing = await c.env.DOLDAM_DB
     .prepare('SELECT choice FROM vote_responses WHERE vote_id = ? AND user_id = ?')

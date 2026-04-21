@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, ScrollView, Pressable, Alert, ActivityIndicator
 import { useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { colors, spacing, typography, radius } from '@/theme';
 import { api } from '@/api';
+import { getDivorceTitle } from '@/utils/divorce';
 
 interface Profile {
   id: string;
@@ -17,17 +18,6 @@ interface Profile {
   intro: string | null;
   interests: string | null;
   unlocked: string[];
-}
-
-function divorceTag(year: number | null, month: number | null): string | null {
-  if (!year) return null;
-  const now = new Date();
-  const totalMonths = (now.getFullYear() - year) * 12 + (now.getMonth() + 1) - (month ?? 6);
-  if (totalMonths < 1) return '이혼 예정';
-  if (totalMonths < 12) return `이혼 ${totalMonths}개월차`;
-  const y = Math.floor(totalMonths / 12);
-  const m = totalMonths % 12;
-  return m === 0 ? `이혼 ${y}년차` : `이혼 ${y}년 ${m}개월차`;
 }
 
 type Field = 'job' | 'has_kids' | 'intro' | 'interests';
@@ -91,11 +81,11 @@ export default function UserProfile() {
       <View style={styles.hero}>
         <Text style={styles.nick}>{profile.nickname}</Text>
         <Text style={styles.meta}>
-          {profile.gender === 'M' ? '남성' : '여성'} · {profile.age_range} · {profile.region}
+          {profile.gender === 'M' ? '남성' : '여성'} · {profile.region}
         </Text>
-        {divorceTag(profile.divorce_year, profile.divorce_month) && (
+        {getDivorceTitle(profile.divorce_year, profile.divorce_month, profile.gender) && (
           <View style={styles.divorceBadge}>
-            <Text style={styles.divorceBadgeText}>{divorceTag(profile.divorce_year, profile.divorce_month)}</Text>
+            <Text style={styles.divorceBadgeText}>{getDivorceTitle(profile.divorce_year, profile.divorce_month, profile.gender)}</Text>
           </View>
         )}
       </View>

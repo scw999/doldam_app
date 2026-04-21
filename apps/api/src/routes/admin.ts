@@ -36,15 +36,17 @@ admin.get('/reports', requireAdmin, async (c) => {
     .prepare(
       `SELECT r.*,
               u.nickname  AS reporter_nickname,
-              COALESCE(p.user_id, cm.user_id) AS target_user_id,
+              COALESCE(p.user_id, cm.user_id, v.user_id, CASE WHEN r.target_type='user' THEN r.target_id END) AS target_user_id,
               tu.nickname AS target_user_nickname,
               p.title     AS post_title,
-              COALESCE(p.content, cm.content) AS target_content
+              COALESCE(p.content, cm.content, v.question, CASE WHEN r.target_type='user' THEN tu2.nickname END) AS target_content
        FROM reports r
-       LEFT JOIN users u  ON u.id = r.reporter_id
-       LEFT JOIN posts p  ON p.id = r.target_id AND r.target_type = 'post'
+       LEFT JOIN users u   ON u.id = r.reporter_id
+       LEFT JOIN posts p   ON p.id = r.target_id AND r.target_type = 'post'
        LEFT JOIN comments cm ON cm.id = r.target_id AND r.target_type = 'comment'
-       LEFT JOIN users tu ON tu.id = COALESCE(p.user_id, cm.user_id)
+       LEFT JOIN votes v   ON v.id = r.target_id AND r.target_type = 'vote'
+       LEFT JOIN users tu  ON tu.id = COALESCE(p.user_id, cm.user_id, v.user_id)
+       LEFT JOIN users tu2 ON tu2.id = r.target_id AND r.target_type = 'user'
        WHERE r.status = ?
        ORDER BY r.created_at DESC
        LIMIT ? OFFSET ?`
@@ -73,6 +75,14 @@ admin.delete('/posts/:id', requireAdmin, async (c) => {
   await c.env.DOLDAM_DB
     .prepare('UPDATE posts SET deleted_at = ? WHERE id = ?')
     .bind(Date.now(), id).run();
+  return c.json({ ok: true });
+});
+
+admin.delete('/votes/:id', requireAdmin, async (c) => {
+  const { id } = c.req.param();
+  await c.env.DOLDAM_DB
+    .prepare('DELETE FROM votes WHERE id = ?')
+    .bind(id).run();
   return c.json({ ok: true });
 });
 
@@ -131,7 +141,7 @@ admin.post('/certificates/:phoneHash/approve', requireAdmin, async (c) => {
 
 admin.post('/certificates/:phoneHash/reject', requireAdmin, async (c) => {
   const { phoneHash } = c.req.param();
-  const { reason = '검증 실패' } = await c.req.json<{ reason?: string }>().catch(() => ({}));
+  const { reason = '검증 실패' } = await c.req.json<{ reason?: string }>().catch((): { reason?: string } => ({}));
   const raw = await c.env.DOLDAM_KV.get(`cert:${phoneHash}`);
   if (!raw) return c.json({ error: 'not_found' }, 404);
   const data = JSON.parse(raw);
@@ -178,6 +188,7 @@ admin.get('/users', requireAdmin, async (c) => {
 // ---- 유저 페널티 ----
 admin.post('/users/:id/warn', requireAdmin, async (c) => {
   const { id } = c.req.param();
+  const { reason } = await c.req.json<{ reason?: string }>().catch((): { reason?: string } => ({}));
   const user = await c.env.DOLDAM_DB
     .prepare('SELECT warning_count FROM users WHERE id = ?')
     .bind(id).first<{ warning_count: number }>();
@@ -185,24 +196,44 @@ admin.post('/users/:id/warn', requireAdmin, async (c) => {
   await c.env.DOLDAM_DB
     .prepare('UPDATE users SET warning_count = warning_count + 1 WHERE id = ?')
     .bind(id).run();
-  return c.json({ ok: true, warningCount: user.warning_count + 1 });
+  const newCount = user.warning_count + 1;
+  const body = reason
+    ? `${reason} (누적 ${newCount}회 경고)`
+    : `커뮤니티 규정 위반으로 경고가 발급되었습니다. (누적 ${newCount}회)`;
+  c.executionCtx.waitUntil(
+    sendPush(c.env, id, '⚠️ 경고 알림', body, { type: 'admin_warn', count: newCount })
+  );
+  return c.json({ ok: true, warningCount: newCount });
 });
 
 admin.post('/users/:id/mute', requireAdmin, async (c) => {
   const { id } = c.req.param();
-  const { days = 7 } = await c.req.json<{ days?: number }>().catch(() => ({}));
+  const { days = 7, reason } = await c.req.json<{ days?: number; reason?: string }>().catch((): { days?: number; reason?: string } => ({}));
   const mutedUntil = Date.now() + days * 24 * 60 * 60 * 1000;
   await c.env.DOLDAM_DB
     .prepare('UPDATE users SET muted_until = ? WHERE id = ?')
     .bind(mutedUntil, id).run();
+  const body = reason
+    ? `${reason} — ${days}일간 서비스 이용이 정지되었습니다.`
+    : `커뮤니티 규정 위반으로 ${days}일간 서비스 이용이 정지되었습니다.`;
+  c.executionCtx.waitUntil(
+    sendPush(c.env, id, '🚫 이용 정지 알림', body, { type: 'admin_mute', days, mutedUntil })
+  );
   return c.json({ ok: true, mutedUntil });
 });
 
 admin.post('/users/:id/ban', requireAdmin, async (c) => {
   const { id } = c.req.param();
+  const { reason } = await c.req.json<{ reason?: string }>().catch((): { reason?: string } => ({}));
   await c.env.DOLDAM_DB
     .prepare('UPDATE users SET banned = 1 WHERE id = ?')
     .bind(id).run();
+  const body = reason
+    ? `${reason} — 계정이 영구 정지되었습니다.`
+    : '커뮤니티 규정 위반으로 계정이 영구 정지되었습니다.';
+  c.executionCtx.waitUntil(
+    sendPush(c.env, id, '🔴 영구 정지 알림', body, { type: 'admin_ban' })
+  );
   return c.json({ ok: true });
 });
 

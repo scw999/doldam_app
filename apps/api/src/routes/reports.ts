@@ -5,7 +5,7 @@ import { requireAuth } from '../middleware/auth';
 type Vars = { user: AuthedUser };
 const reports = new Hono<{ Bindings: Env; Variables: Vars }>();
 
-type Target = 'post' | 'comment' | 'user' | 'message';
+type Target = 'post' | 'comment' | 'user' | 'message' | 'vote';
 
 const REPORT_HIDE_THRESHOLD = 5;
 
@@ -16,7 +16,7 @@ reports.post('/', requireAuth, async (c) => {
     targetId: string;
     reason: string;
   }>();
-  if (!['post', 'comment', 'user', 'message'].includes(targetType)) {
+  if (!['post', 'comment', 'user', 'message', 'vote'].includes(targetType)) {
     return c.json({ error: 'invalid_target_type' }, 400);
   }
   if (!reason?.trim()) return c.json({ error: 'reason_required' }, 400);

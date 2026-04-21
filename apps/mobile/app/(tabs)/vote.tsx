@@ -3,11 +3,13 @@ import { View, Text, StyleSheet, FlatList, Pressable, RefreshControl, ActivityIn
 import { router, useFocusEffect } from 'expo-router';
 import { colors, radius, spacing, typography } from '@/theme';
 import { BrandBar } from '@/ui/BrandBar';
+import { useUnreadCount } from '@/hooks/useUnreadCount';
 import { Card, Pill } from '@/ui/atoms';
 import { api } from '@/api';
 
 interface Vote {
   id: string; question: string; description?: string;
+  options?: string | null;
   total: number; agree: number; disagree: number;
   created_at: number;
 }
@@ -15,6 +17,7 @@ interface Vote {
 type GenderFilter = 'all' | 'M' | 'F';
 
 export default function VoteScreen() {
+  const hasUnread = useUnreadCount();
   const [filter, setFilter] = useState<GenderFilter>('all');
   const [items, setItems] = useState<Vote[]>([]);
   const [loading, setLoading] = useState(false);
@@ -24,8 +27,9 @@ export default function VoteScreen() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
+      const genderParam = filter !== 'all' ? `?gender=${filter}` : '';
       const [votes, pts] = await Promise.all([
-        api.get<{ items: Vote[] }>('/votes'),
+        api.get<{ items: Vote[] }>(`/votes${genderParam}`),
         api.get<{ balance: number }>('/points/balance'),
       ]);
       setItems(votes.items);
@@ -37,7 +41,7 @@ export default function VoteScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
-      <BrandBar points={balance} />
+      <BrandBar points={balance} hasNewNotification={hasUnread} />
 
       <View style={styles.filterRow}>
         {([
@@ -81,39 +85,49 @@ export default function VoteScreen() {
             : <Text style={styles.empty}>첫 질문을 던져보세요</Text>
         }
         renderItem={({ item: v }) => {
-          const total = v.total || v.agree + v.disagree;
-          const pct = total ? Math.round((v.agree / total) * 100) : 0;
+          const total = v.total;
           const isHot = total >= 500;
+          const isMulti = !!v.options;
+          const pct = total && !isMulti ? Math.round((v.agree / total) * 100) : 0;
           return (
             <Card onPress={() => router.push(`/vote/${v.id}`)} style={{ padding: 16 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 }}>
                 {isHot && <Pill bg="#E85D4A18" color="#E85D4A" icon="🔥">HOT</Pill>}
+                {isMulti && <Pill bg={colors.primary + '18'} color={colors.primary} icon="📋">선택형</Pill>}
                 <Text style={{ fontSize: 11, color: colors.textSub }}>
-                  {total.toLocaleString()}명
+                  {total > 0 ? `${total.toLocaleString()}명 참여` : '첫 참여자 기다리는 중'}
                 </Text>
               </View>
               <Text style={[typography.h2, { color: colors.text, marginBottom: 14, lineHeight: 23 }]} numberOfLines={3}>
                 {v.question}
               </Text>
 
-              <View style={{ flexDirection: 'row', height: 38, borderRadius: 10, overflow: 'hidden', backgroundColor: colors.tag }}>
-                <View style={{
-                  width: `${pct}%`, backgroundColor: colors.votePro + '35',
-                  justifyContent: 'center', paddingLeft: 12,
-                }}>
-                  <Text style={{ fontSize: 12, fontWeight: '600', color: colors.votePro }} numberOfLines={1}>⭕ 찬성</Text>
+              {isMulti ? (
+                <View style={{ paddingVertical: 8, paddingHorizontal: 12, backgroundColor: colors.tag, borderRadius: 10 }}>
+                  <Text style={{ fontSize: 12, color: colors.textSub }}>
+                    {total > 0 ? `🔒 투표 후 결과 공개 · ${total}명 참여` : '📋 선택지 투표 · 탭해서 참여하기'}
+                  </Text>
                 </View>
-                <View style={{
-                  flex: 1, justifyContent: 'center', alignItems: 'flex-end',
-                  paddingRight: 12, backgroundColor: colors.voteCon + '20',
-                }}>
-                  <Text style={{ fontSize: 12, fontWeight: '600', color: colors.voteCon }} numberOfLines={1}>반대 ❌</Text>
+              ) : total > 0 ? (
+                <>
+                  <View style={{ flexDirection: 'row', height: 38, borderRadius: 10, overflow: 'hidden', backgroundColor: colors.tag }}>
+                    <View style={{ width: `${pct}%`, backgroundColor: colors.votePro + '35', justifyContent: 'center', paddingLeft: 12 }}>
+                      <Text style={{ fontSize: 12, fontWeight: '600', color: colors.votePro }} numberOfLines={1}>⭕ 찬성</Text>
+                    </View>
+                    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'flex-end', paddingRight: 12, backgroundColor: colors.voteCon + '20' }}>
+                      <Text style={{ fontSize: 12, fontWeight: '600', color: colors.voteCon }} numberOfLines={1}>반대 ❌</Text>
+                    </View>
+                  </View>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 }}>
+                    <Text style={{ fontSize: 11, color: colors.votePro, fontWeight: '700' }}>{pct}%</Text>
+                    <Text style={{ fontSize: 11, color: colors.voteCon, fontWeight: '700' }}>{100 - pct}%</Text>
+                  </View>
+                </>
+              ) : (
+                <View style={{ paddingVertical: 8, paddingHorizontal: 12, backgroundColor: colors.tag, borderRadius: 10 }}>
+                  <Text style={{ fontSize: 12, color: colors.textSub }}>🔒 투표 후 결과 공개 · 첫 번째로 참여해보세요</Text>
                 </View>
-              </View>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 }}>
-                <Text style={{ fontSize: 11, color: colors.votePro, fontWeight: '700' }}>{pct}%</Text>
-                <Text style={{ fontSize: 11, color: colors.voteCon, fontWeight: '700' }}>{100 - pct}%</Text>
-              </View>
+              )}
             </Card>
           );
         }}

@@ -1,36 +1,31 @@
 import { useCallback, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable, Alert, Modal, TouchableOpacity } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useFocusEffect } from 'expo-router';
 import { colors, radius, spacing, typography, shadow } from '@/theme';
 import { BrandBar } from '@/ui/BrandBar';
+import { useUnreadCount } from '@/hooks/useUnreadCount';
 import { Card, VerifiedBadge, Stat } from '@/ui/atoms';
 import { useAuth } from '@/store/auth';
 import { api } from '@/api';
+import { getDivorceTitle, DIVORCE_TIERS } from '@/utils/divorce';
 
 interface Me {
   id: string; nickname: string;
   gender: 'M' | 'F'; age_range: string; region: string;
   divorce_year: number | null; divorce_month: number | null;
   verified: number; created_at: number;
-}
-
-function divorceTag(year: number | null, month: number | null): string | null {
-  if (!year) return null;
-  const now = new Date();
-  const total = (now.getFullYear() - year) * 12 + (now.getMonth() + 1) - (month ?? 6);
-  if (total < 1) return '이혼 예정';
-  if (total < 12) return `이혼 ${total}개월차`;
-  const y = Math.floor(total / 12), m = total % 12;
-  return m === 0 ? `이혼 ${y}년차` : `이혼 ${y}년 ${m}개월차`;
+  warning_count: number; muted_until: number | null; banned: number;
 }
 
 export default function MyScreen() {
+  const hasUnread = useUnreadCount();
   const clear = useAuth((s) => s.clear);
   const [me, setMe] = useState<Me | null>(null);
   const [balance, setBalance] = useState(0);
   const [postCount, setPostCount] = useState<number>(0);
   const [badgeCount, setBadgeCount] = useState(1);
+  const [tierModalVisible, setTierModalVisible] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -100,7 +95,7 @@ export default function MyScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
-      <BrandBar points={balance} />
+      <BrandBar points={balance} hasNewNotification={hasUnread} />
 
       <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 40 }}>
         {/* 프로필 카드 */}
@@ -134,15 +129,36 @@ export default function MyScreen() {
                       가입 {daysJoined}일차
                     </Text>
                   </View>
-                  {divorceTag(me.divorce_year, me.divorce_month) && (
-                    <View style={{
-                      backgroundColor: colors.primary + '22',
-                      paddingHorizontal: 10, paddingVertical: 3,
-                      borderRadius: radius.full,
-                    }}>
+                  {getDivorceTitle(me.divorce_year, me.divorce_month, me.gender) && (
+                    <Pressable
+                      onPress={() => setTierModalVisible(true)}
+                      style={{
+                        backgroundColor: colors.primary + '22',
+                        paddingHorizontal: 10, paddingVertical: 3,
+                        borderRadius: radius.full,
+                        borderWidth: 1, borderColor: colors.primary + '44',
+                      }}
+                    >
                       <Text style={{ fontSize: 11, fontWeight: '600', color: colors.primary }}>
-                        {divorceTag(me.divorce_year, me.divorce_month)}
+                        {getDivorceTitle(me.divorce_year, me.divorce_month, me.gender)} ›
                       </Text>
+                    </Pressable>
+                  )}
+                  {me.banned === 1 && (
+                    <View style={{ backgroundColor: '#E85D4A22', paddingHorizontal: 10, paddingVertical: 3, borderRadius: radius.full, borderWidth: 1, borderColor: '#E85D4A55' }}>
+                      <Text style={{ fontSize: 11, fontWeight: '700', color: '#E85D4A' }}>🔴 영구 정지</Text>
+                    </View>
+                  )}
+                  {me.banned !== 1 && me.muted_until && me.muted_until > Date.now() && (
+                    <View style={{ backgroundColor: '#F5A62322', paddingHorizontal: 10, paddingVertical: 3, borderRadius: radius.full, borderWidth: 1, borderColor: '#F5A62355' }}>
+                      <Text style={{ fontSize: 11, fontWeight: '600', color: '#F5A623' }}>
+                        🚫 {Math.ceil((me.muted_until - Date.now()) / 86400000)}일 정지
+                      </Text>
+                    </View>
+                  )}
+                  {me.warning_count > 0 && (
+                    <View style={{ backgroundColor: '#FFD70022', paddingHorizontal: 10, paddingVertical: 3, borderRadius: radius.full }}>
+                      <Text style={{ fontSize: 11, color: '#C8A000' }}>⚠️ 경고 {me.warning_count}회</Text>
                     </View>
                   )}
                 </View>
@@ -209,6 +225,55 @@ export default function MyScreen() {
           </Pressable>
         </View>
       </ScrollView>
+
+      <Modal visible={tierModalVisible} transparent animationType="fade">
+        <TouchableOpacity
+          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}
+          activeOpacity={1}
+          onPress={() => setTierModalVisible(false)}
+        >
+          <TouchableOpacity activeOpacity={1}>
+            <View style={{ backgroundColor: colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 40 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 20 }}>
+                <Text style={{ fontSize: 17, fontWeight: '700', color: colors.text, flex: 1 }}>돌싱 등급 안내</Text>
+                <Pressable onPress={() => setTierModalVisible(false)} style={{ padding: 4 }}>
+                  <Text style={{ fontSize: 20, color: colors.textSub }}>✕</Text>
+                </Pressable>
+              </View>
+              {DIVORCE_TIERS.map((tier) => {
+                const displayName = me?.gender === 'F' && tier.femaleName ? tier.femaleName : tier.name;
+                const isMyTier = getDivorceTitle(me?.divorce_year ?? null, me?.divorce_month ?? null, me?.gender) === `${tier.emoji} ${displayName}`;
+                return (
+                  <View key={tier.name} style={{
+                    flexDirection: 'row', alignItems: 'center', gap: 12,
+                    paddingVertical: 12,
+                    borderBottomWidth: 1, borderBottomColor: colors.border,
+                    backgroundColor: isMyTier ? colors.primary + '10' : 'transparent',
+                    borderRadius: isMyTier ? 10 : 0,
+                    paddingHorizontal: isMyTier ? 8 : 0,
+                  }}>
+                    <Text style={{ fontSize: 22, width: 28, textAlign: 'center' }}>{tier.emoji}</Text>
+                    <View style={{ flex: 1 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <Text style={{ fontSize: 14, fontWeight: '700', color: isMyTier ? colors.primary : colors.text }}>
+                          {displayName}
+                        </Text>
+                        {isMyTier && (
+                          <View style={{ backgroundColor: colors.primary, borderRadius: 8, paddingHorizontal: 6, paddingVertical: 2 }}>
+                            <Text style={{ fontSize: 9, fontWeight: '700', color: '#fff' }}>나</Text>
+                          </View>
+                        )}
+                      </View>
+                      <Text style={{ fontSize: 11, color: colors.textSub, marginTop: 2 }}>{tier.period}</Text>
+                    </View>
+                    <Text style={{ fontSize: 11, color: colors.textLight, maxWidth: 120, textAlign: 'right' }}>{tier.description}</Text>
+                  </View>
+                );
+              })}
+            </View>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
     </View>
   );
 }

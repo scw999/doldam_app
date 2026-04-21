@@ -104,7 +104,7 @@ export default function RootLayout() {
         <Stack.Screen name="profile-edit" options={{ title: '프로필 편집' }} />
         <Stack.Screen name="my-posts" options={{ title: '내가 쓴 글' }} />
         <Stack.Screen name="points" options={{ title: '포인트 내역' }} />
-        <Stack.Screen name="notifications" options={{ title: '알림' }} />
+        <Stack.Screen name="notifications" options={{ headerShown: false }} />
       </Stack>
     </SafeAreaProvider>
   );
