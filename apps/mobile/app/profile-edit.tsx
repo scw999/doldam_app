@@ -27,7 +27,10 @@ export default function ProfileEdit() {
         if (p.job) setJob(p.job);
         if (p.has_kids !== null) setHasKids(p.has_kids === 1);
         if (p.intro) setIntro(p.intro);
-        if (p.interests) setInterests(p.interests.split(',').map((s) => s.trim()).filter(Boolean));
+        if (p.interests) {
+          const valid = new Set<string>(INTERESTS);
+          setInterests(p.interests.split(',').map((s) => s.trim()).filter((i) => valid.has(i)));
+        }
       })
       .catch(() => {})
       .finally(() => setLoading(false));

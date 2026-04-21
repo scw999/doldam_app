@@ -575,8 +575,20 @@ async function loadUsers(offset,reset){
           '<span class="field">지역</span><span class="val">'+esc(u.region||'-')+'</span>'+
           '<span class="field">이혼</span><span class="val">'+esc(divorceTag(u.divorce_year,u.divorce_month))+'</span>'+
           '<span class="field">가입일</span><span class="val">'+fmt(u.created_at)+'</span>'+
-          '<span class="field">정지 만료</span><span class="val">'+(u.muted_until&&u.muted_until>Date.now()?fmt(u.muted_until):'-')+'</span>';
+          '<span class="field">정지 만료</span><span class="val">'+(u.muted_until&&u.muted_until>Date.now()?fmt(u.muted_until):'-')+'</span>'+
+          '<span class="field">직업</span><span class="val">'+esc(u.job||'-')+'</span>'+
+          '<span class="field">자녀</span><span class="val">'+(u.has_kids===1?'있음':u.has_kids===0?'없음':'-')+'</span>'+
+          '<span class="field">관심사</span><span class="val">'+esc(u.interests||'-')+'</span>';
         card.appendChild(grid);
+
+        // 자기소개
+        if(u.intro){
+          const introEl=document.createElement('div');
+          introEl.className='meta';
+          introEl.style.cssText='margin-bottom:8px;padding:8px 10px;background:#f5f5f0;border-radius:8px;font-size:12px;color:#555;line-height:1.5';
+          introEl.textContent='💬 '+u.intro;
+          card.appendChild(introEl);
+        }
 
         const idEl=document.createElement('div');
         idEl.className='meta';

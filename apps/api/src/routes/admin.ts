@@ -158,13 +158,12 @@ admin.get('/users', requireAdmin, async (c) => {
   const q = c.req.query('q') ?? '';
   const { limit = '50', offset = '0' } = c.req.query();
 
+  const COLS = `id, nickname, gender, age_range, region, divorce_year, divorce_month, verified, banned,
+                warning_count, muted_until, created_at, job, has_kids, intro, interests`;
+
   if (q) {
     const { results } = await c.env.DOLDAM_DB
-      .prepare(
-        `SELECT id, nickname, gender, age_range, region, divorce_year, divorce_month, verified, banned,
-                warning_count, muted_until, created_at
-         FROM users WHERE nickname LIKE ? AND deleted_at IS NULL LIMIT 20`
-      )
+      .prepare(`SELECT ${COLS} FROM users WHERE nickname LIKE ? AND deleted_at IS NULL LIMIT 20`)
       .bind(`%${q}%`).all();
     return c.json({ results, total: results.length });
   }
@@ -172,9 +171,7 @@ admin.get('/users', requireAdmin, async (c) => {
   const [{ results }, totalRow] = await Promise.all([
     c.env.DOLDAM_DB
       .prepare(
-        `SELECT id, nickname, gender, age_range, region, divorce_year, divorce_month, verified, banned,
-                warning_count, muted_until, created_at
-         FROM users WHERE deleted_at IS NULL
+        `SELECT ${COLS} FROM users WHERE deleted_at IS NULL
          ORDER BY created_at DESC LIMIT ? OFFSET ?`
       )
       .bind(Number(limit), Number(offset)).all(),
