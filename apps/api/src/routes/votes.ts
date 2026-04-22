@@ -19,6 +19,7 @@ votes.get('/', async (c) => {
   const gender = c.req.query('gender') as 'M' | 'F' | undefined;
 
   // JOIN + GROUP BY 로 N+1 서브쿼리 제거 (30개 조회 시 90쿼리 → 1쿼리)
+  // 방 전용 투표(room_id IS NOT NULL)는 해당 채팅방에서만 보이므로 전역 목록에서 제외
   const sql = gender
     ? `SELECT v.id, v.question, v.description, v.options, v.created_at, v.expires_at,
               u.nickname,
@@ -27,6 +28,7 @@ votes.get('/', async (c) => {
               COALESCE(SUM(CASE WHEN vr.choice = 'disagree' THEN 1 ELSE 0 END), 0) AS disagree
        FROM votes v JOIN users u ON u.id = v.user_id
        LEFT JOIN vote_responses vr ON vr.vote_id = v.id AND vr.gender = ?
+       WHERE v.room_id IS NULL
        GROUP BY v.id, v.question, v.description, v.options, v.created_at, v.expires_at, u.nickname
        ORDER BY v.created_at DESC LIMIT ?`
     : `SELECT v.id, v.question, v.description, v.options, v.created_at, v.expires_at,
@@ -36,6 +38,7 @@ votes.get('/', async (c) => {
               COALESCE(SUM(CASE WHEN vr.choice = 'disagree' THEN 1 ELSE 0 END), 0) AS disagree
        FROM votes v JOIN users u ON u.id = v.user_id
        LEFT JOIN vote_responses vr ON vr.vote_id = v.id
+       WHERE v.room_id IS NULL
        GROUP BY v.id, v.question, v.description, v.options, v.created_at, v.expires_at, u.nickname
        ORDER BY v.created_at DESC LIMIT ?`;
 
@@ -117,14 +120,18 @@ votes.post('/', requireAuth, moderate, async (c) => {
 
   const voteKind = kind === 'peer_poll' ? 'peer_poll' : 'normal';
 
-  // 피어 폴: 방 멤버 검증, options는 멤버 user_id여야 함
-  if (voteKind === 'peer_poll') {
-    if (!roomId) return c.json({ error: 'room_required' }, 400);
-    if (!Array.isArray(options) || options.length < 2) return c.json({ error: 'invalid_options' }, 400);
+  // roomId 지정 시 방 멤버 여부 검증 (kind 무관)
+  if (roomId) {
     const member = await c.env.DOLDAM_DB
       .prepare('SELECT 1 FROM room_members WHERE room_id = ? AND user_id = ?')
       .bind(roomId, user.id).first();
     if (!member) return c.json({ error: 'not_a_member' }, 403);
+  }
+
+  // 피어 폴: roomId 필수 + options는 방 멤버 user_id여야 함
+  if (voteKind === 'peer_poll') {
+    if (!roomId) return c.json({ error: 'room_required' }, 400);
+    if (!Array.isArray(options) || options.length < 2) return c.json({ error: 'invalid_options' }, 400);
     const placeholders = options.map(() => '?').join(',');
     const valid = await c.env.DOLDAM_DB
       .prepare(`SELECT user_id FROM room_members WHERE room_id = ? AND user_id IN (${placeholders})`)

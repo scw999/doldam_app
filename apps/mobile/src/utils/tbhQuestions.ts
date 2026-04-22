@@ -1,4 +1,4 @@
-// 채팅방 내 TBH 스타일 피어 폴 프리셋
+// 채팅방 내 서로의 느낌 투표 (피어 폴) 프리셋
 // 선택지는 자동으로 채팅방 멤버 닉네임으로 채워짐
 export const TBH_QUESTIONS: { emoji: string; text: string }[] = [
   { emoji: '😎', text: '가장 잘생겼/예뻤을 것 같은 사람은?' },

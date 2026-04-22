@@ -164,7 +164,7 @@ export default function RoomScreen() {
     if (opts.length === 1) { Alert.alert('선택지는 0개(찬반) 또는 2개 이상(선택형)이어야 해요'); return; }
     setCreatingVote(true);
     try {
-      const body: { question: string; options?: string[] } = { question: q };
+      const body: { question: string; options?: string[]; roomId: string } = { question: q, roomId: id };
       if (useMulti) body.options = opts;
       const { id: newVoteId } = await api.post<{ id: string }>('/votes', body);
       send(`🗳️ ${q}`, newVoteId);
@@ -419,7 +419,7 @@ export default function RoomScreen() {
               {/* 모드 탭 */}
               <View style={{ flexDirection: 'row', gap: 6, marginBottom: 14 }}>
                 {([
-                  { id: 'tbh' as const, label: '💘 멤버 투표', hint: 'TBH' },
+                  { id: 'tbh' as const, label: '💘 멤버 투표', hint: '서로의 느낌' },
                   { id: 'custom' as const, label: '✍️ 직접 만들기', hint: '찬/반 · 선택형' },
                 ]).map((t) => (
                   <Pressable
