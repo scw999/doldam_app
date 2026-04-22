@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import type { Env, AuthedUser } from '../types';
 import { requireAuth } from '../middleware/auth';
 import { spendPoints } from '../services/points';
-import { enqueueForMatch, cancelMatch } from '../services/matching';
+import { enqueueForMatch, cancelMatch, matchQueueStatus } from '../services/matching';
 import { POINTS, ROOM } from '../utils/constants';
 
 type Vars = { user: AuthedUser };
@@ -65,7 +65,7 @@ rooms.post('/themed/:id/join', requireAuth, async (c) => {
   if ((count?.n ?? 0) >= ROOM.MAX_MEMBERS) return c.json({ error: 'room_full' }, 400);
 
   await c.env.DOLDAM_DB
-    .prepare(`INSERT INTO room_members (room_id, user_id, joined_at) VALUES (?, ?, ?)`)
+    .prepare(`INSERT OR IGNORE INTO room_members (room_id, user_id, joined_at) VALUES (?, ?, ?)`)
     .bind(id, user.id, Date.now()).run();
 
   return c.json({ ok: true });
@@ -93,6 +93,13 @@ rooms.get('/:id', requireAuth, async (c) => {
     .bind(id).all();
 
   return c.json({ ...room, members });
+});
+
+// ---- 매칭 대기 상태 ----
+rooms.get('/match/status', requireAuth, async (c) => {
+  const user = c.get('user');
+  const status = await matchQueueStatus(c.env, user.id);
+  return c.json(status);
 });
 
 // ---- 매칭 신청 ----

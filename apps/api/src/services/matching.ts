@@ -131,6 +131,17 @@ export async function tryMatch(env: Env, userId: string): Promise<string | null>
   return roomId;
 }
 
+export async function matchQueueStatus(env: Env, userId: string): Promise<{ queued: boolean; queueSize: number }> {
+  const user = await env.DOLDAM_DB
+    .prepare('SELECT gender FROM users WHERE id = ?')
+    .bind(userId)
+    .first<{ gender: string }>();
+  if (!user) return { queued: false, queueSize: 0 };
+  const key = queueKey(user.gender);
+  const list = await readQueue(env, key);
+  return { queued: list.includes(userId), queueSize: list.length };
+}
+
 export async function cancelMatch(env: Env, userId: string): Promise<void> {
   const user = await env.DOLDAM_DB
     .prepare('SELECT gender FROM users WHERE id = ?')

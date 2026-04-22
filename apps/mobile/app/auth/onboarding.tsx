@@ -33,6 +33,8 @@ export default function OnboardingScreen() {
   const [city, setCity] = useState<string | null>(null);
   const [divorceYear, setDivorceYear] = useState<number | null>(null);
   const [divorceMonth, setDivorceMonth] = useState<number | null>(null);
+  const [hasKids, setHasKids] = useState<boolean | null>(null);
+  const [custody, setCustody] = useState<string | null>(null);
   const [interests, setInterests] = useState<string[]>([]);
   const [provinceModal, setProvinceModal] = useState(false);
   const [cityModal, setCityModal] = useState(false);
@@ -71,7 +73,7 @@ export default function OnboardingScreen() {
       const region = formatRegion(province, city);
       const resp = await api.post<{ userId: string; nickname: string; token: string }>(
         '/auth/signup',
-        { gender, ageRange, region, divorceYear, divorceMonth, interests },
+        { gender, ageRange, region, divorceYear, divorceMonth, interests, hasKids, custody: hasKids ? custody : null },
         { auth: 'temp' }
       );
       await setUser(resp.token, resp.userId);
@@ -180,6 +182,30 @@ export default function OnboardingScreen() {
             </Text>
           </Text>
         </View>
+      )}
+
+      <Text style={[styles.label, { marginTop: 20 }]}>자녀 유무</Text>
+      <View style={styles.row}>
+        {[{ v: true, l: '있음' }, { v: false, l: '없음' }].map(({ v, l }) => (
+          <Pressable key={l} onPress={() => { setHasKids(v); if (!v) setCustody(null); }}
+            style={[styles.chip, hasKids === v && styles.chipOn]}>
+            <Text style={[styles.chipText, hasKids === v && styles.chipTextOn]}>{l}</Text>
+          </Pressable>
+        ))}
+      </View>
+
+      {hasKids === true && (
+        <>
+          <Text style={[styles.label, { marginTop: 12 }]}>양육 여부</Text>
+          <View style={styles.row}>
+            {[{ v: 'custody', l: '양육 중' }, { v: 'non_custody', l: '비양육' }].map(({ v, l }) => (
+              <Pressable key={v} onPress={() => setCustody(v)}
+                style={[styles.chip, custody === v && styles.chipOn]}>
+                <Text style={[styles.chipText, custody === v && styles.chipTextOn]}>{l}</Text>
+              </Pressable>
+            ))}
+          </View>
+        </>
       )}
 
       <Text style={[styles.label, { marginTop: 20 }]}>

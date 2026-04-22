@@ -63,15 +63,19 @@ export default function PostDetail() {
   const [editCommentSaving, setEditCommentSaving] = useState(false);
 
   const [reportTarget, setReportTarget] = useState<{ type: string; id: string } | null>(null);
+  const [meProfile, setMeProfile] = useState<{ nickname: string; gender: 'M' | 'F' } | null>(null);
+  const [expandedParents, setExpandedParents] = useState<Set<string>>(new Set());
 
   const load = useCallback(async () => {
-    const [p, c] = await Promise.all([
+    const [p, c, me] = await Promise.all([
       api.get<Post>(`/posts/${id}`),
       api.get<{ items: Comment[] }>(`/posts/${id}/comments`),
+      api.get<{ nickname: string; gender: 'M' | 'F' }>('/auth/me').catch(() => null),
     ]);
     setPost(p);
     setComments(c.items);
     setMyReact(p.myReaction ?? null);
+    if (me) setMeProfile({ nickname: me.nickname, gender: me.gender });
   }, [id]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
@@ -152,15 +156,32 @@ export default function PostDetail() {
   async function submitComment() {
     if (!draft.trim()) return;
     setSending(true);
+    const content = draft;
+    const parentId = replyTo?.id ?? null;
+    setDraft('');
+    setReplyTo(null);
+    let tempId: string | null = null;
+    if (meProfile) {
+      const tid = `temp-${Date.now()}`;
+      tempId = tid;
+      setComments(prev => [...prev, {
+        id: tid, content, parent_id: parentId,
+        nickname: meProfile.nickname, gender: meProfile.gender,
+        created_at: Date.now(), user_id: myUserId ?? undefined,
+      }]);
+      if (parentId) setExpandedParents(prev => new Set([...prev, parentId]));
+    }
     try {
       await api.post(`/posts/${id}/comments`, {
-        content: draft,
-        ...(replyTo ? { parentId: replyTo.id } : {}),
+        content,
+        ...(parentId ? { parentId } : {}),
       });
-      setDraft('');
-      setReplyTo(null);
       load();
-    } catch (e) { Alert.alert('댓글 실패', (e as Error).message); }
+    } catch (e) {
+      if (tempId) setComments(prev => prev.filter(c => c.id !== tempId));
+      setDraft(content);
+      Alert.alert('댓글 실패', (e as Error).message);
+    }
     finally { setSending(false); }
   }
 
@@ -289,84 +310,162 @@ export default function PostDetail() {
         {/* 댓글 */}
         <View style={{ padding: 14, paddingHorizontal: 20 }}>
           <Text style={{ fontSize: 12, fontWeight: '700', color: colors.textSub, letterSpacing: -0.1 }}>
-            댓글 {comments.length}개
+            댓글 {comments.filter(c => !c.parent_id).length}개
           </Text>
         </View>
 
-        <View style={{ paddingHorizontal: 16, paddingBottom: 24, gap: 8 }}>
-          {comments.map((c) => {
-            const mine = c.user_id === myUserId;
-            const isReply = !!c.parent_id;
-            const isEditing = editingComment?.id === c.id;
-            return (
-              <View key={c.id} style={isReply ? { marginLeft: 28 } : undefined}>
-                <View
-                  style={{
+        <View style={{ paddingHorizontal: 16, paddingBottom: 24, gap: 10 }}>
+          {(() => {
+            const topLevel = comments.filter(c => !c.parent_id);
+            const byParent: Record<string, Comment[]> = {};
+            for (const c of comments) {
+              if (c.parent_id) (byParent[c.parent_id] ??= []).push(c);
+            }
+            const PREVIEW = 2;
+
+            return topLevel.map(parent => {
+              const replies = byParent[parent.id] ?? [];
+              const isExpanded = expandedParents.has(parent.id);
+              const visible = replies.length > PREVIEW && !isExpanded ? replies.slice(0, PREVIEW) : replies;
+              const hiddenCount = replies.length - visible.length;
+              const pMine = parent.user_id === myUserId;
+              const isOP = parent.user_id === post!.user_id;
+              const pEditing = editingComment?.id === parent.id;
+
+              return (
+                <View key={parent.id}>
+                  {/* 부모 댓글 */}
+                  <View style={{
                     padding: 14,
-                    backgroundColor: isReply ? colors.bg : mine ? colors.accent + '66' : colors.card,
+                    backgroundColor: pMine ? colors.accent + '66' : colors.card,
                     borderWidth: 1,
-                    borderColor: isReply ? colors.border : mine ? colors.primary + '33' : colors.border,
+                    borderColor: pMine ? colors.primary + '33' : colors.border,
                     borderRadius: 14,
-                  }}
-                >
-                  {isReply && (
-                    <Text style={{ fontSize: 10, color: colors.textLight, marginBottom: 4 }}>↳ 답글</Text>
-                  )}
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-                    <Avatar gender={c.gender} size={24} />
-                    <Text style={{ fontSize: 11.5, fontWeight: '600', color: colors.text }}>
-                      {c.nickname?.split(' ')[0] ?? ''}
-                      {mine && <Text style={{ color: colors.primaryDark, fontWeight: '700' }}> (나)</Text>}
-                    </Text>
-                    <GenderDot gender={c.gender} />
-                    <View style={{ flex: 1 }} />
-                    <Text style={{ fontSize: 10, color: colors.textLight }}>{timeAgo(c.created_at)}</Text>
-                    <Pressable onPress={() => openCommentMenu(c)} style={{ padding: 4, marginLeft: 2 }}>
-                      <Text style={{ fontSize: 16, color: colors.textSub }}>⋯</Text>
-                    </Pressable>
+                  }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+                      <Avatar gender={parent.gender} size={24} />
+                      <Text style={{ fontSize: 11.5, fontWeight: '600', color: colors.text }}>
+                        {parent.nickname?.split(' ')[0] ?? ''}
+                      </Text>
+                      {pMine && <Text style={{ fontSize: 10, color: colors.primaryDark, fontWeight: '700' }}>(나)</Text>}
+                      {isOP && (
+                        <View style={{ paddingHorizontal: 5, paddingVertical: 1, backgroundColor: colors.primary + '22', borderRadius: 5 }}>
+                          <Text style={{ fontSize: 9, color: colors.primary, fontWeight: '700' }}>작성자</Text>
+                        </View>
+                      )}
+                      <GenderDot gender={parent.gender} />
+                      <View style={{ flex: 1 }} />
+                      <Text style={{ fontSize: 10, color: colors.textLight }}>{timeAgo(parent.created_at)}</Text>
+                      <Pressable onPress={() => openCommentMenu(parent)} style={{ padding: 4, marginLeft: 2 }}>
+                        <Text style={{ fontSize: 16, color: colors.textSub }}>⋯</Text>
+                      </Pressable>
+                    </View>
+                    {pEditing ? (
+                      <View>
+                        <TextInput style={[styles.input, { marginBottom: 8 }]}
+                          value={editCommentContent} onChangeText={setEditCommentContent}
+                          multiline autoFocus />
+                        <View style={{ flexDirection: 'row', gap: 8, justifyContent: 'flex-end' }}>
+                          <Pressable onPress={() => setEditingComment(null)} style={{ padding: 8 }}>
+                            <Text style={{ fontSize: 13, color: colors.textSub }}>취소</Text>
+                          </Pressable>
+                          <Pressable onPress={saveCommentEdit} disabled={editCommentSaving}
+                            style={{ padding: 8, backgroundColor: colors.primary, borderRadius: 8 }}>
+                            <Text style={{ fontSize: 13, color: '#fff', fontWeight: '700' }}>
+                              {editCommentSaving ? '저장 중...' : '저장'}
+                            </Text>
+                          </Pressable>
+                        </View>
+                      </View>
+                    ) : (
+                      <Text style={{ fontSize: 13.5, color: colors.text, lineHeight: 21 }}>{parent.content}</Text>
+                    )}
+                    {!pEditing && (
+                      <Pressable onPress={() => setReplyTo({ id: parent.id, nickname: parent.nickname?.split(' ')[0] ?? '익명' })}
+                        style={{ marginTop: 8, alignSelf: 'flex-start' }}>
+                        <Text style={{ fontSize: 11, color: colors.textSub }}>↩ 답글</Text>
+                      </Pressable>
+                    )}
                   </View>
-                  {isEditing ? (
-                    <View>
-                      <TextInput
-                        style={[styles.input, { marginBottom: 8 }]}
-                        value={editCommentContent}
-                        onChangeText={setEditCommentContent}
-                        multiline
-                        autoFocus
-                      />
-                      <View style={{ flexDirection: 'row', gap: 8, justifyContent: 'flex-end' }}>
-                        <Pressable onPress={() => setEditingComment(null)} style={{ padding: 8 }}>
-                          <Text style={{ fontSize: 13, color: colors.textSub }}>취소</Text>
-                        </Pressable>
+
+                  {/* 대댓글 묶음 */}
+                  {(visible.length > 0 || hiddenCount > 0) && (
+                    <View style={{ marginLeft: 20, marginTop: 4, gap: 4 }}>
+                      {visible.map(reply => {
+                        const rMine = reply.user_id === myUserId;
+                        const rIsOP = reply.user_id === post!.user_id;
+                        const rEditing = editingComment?.id === reply.id;
+                        return (
+                          <View key={reply.id} style={{
+                            padding: 12,
+                            backgroundColor: colors.bg,
+                            borderWidth: 1, borderColor: colors.border,
+                            borderLeftWidth: 3, borderLeftColor: colors.primary + '50',
+                            borderRadius: 12,
+                          }}>
+                            <Text style={{ fontSize: 9, color: colors.textLight, marginBottom: 4 }}>↳ 답글</Text>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 5 }}>
+                              <Avatar gender={reply.gender} size={20} />
+                              <Text style={{ fontSize: 11, fontWeight: '600', color: colors.text }}>
+                                {reply.nickname?.split(' ')[0] ?? ''}
+                              </Text>
+                              {rMine && <Text style={{ fontSize: 10, color: colors.primaryDark, fontWeight: '700' }}>(나)</Text>}
+                              {rIsOP && (
+                                <View style={{ paddingHorizontal: 5, paddingVertical: 1, backgroundColor: colors.primary + '22', borderRadius: 5 }}>
+                                  <Text style={{ fontSize: 9, color: colors.primary, fontWeight: '700' }}>작성자</Text>
+                                </View>
+                              )}
+                              <GenderDot gender={reply.gender} />
+                              <View style={{ flex: 1 }} />
+                              <Text style={{ fontSize: 10, color: colors.textLight }}>{timeAgo(reply.created_at)}</Text>
+                              <Pressable onPress={() => openCommentMenu(reply)} style={{ padding: 4 }}>
+                                <Text style={{ fontSize: 15, color: colors.textSub }}>⋯</Text>
+                              </Pressable>
+                            </View>
+                            {rEditing ? (
+                              <View>
+                                <TextInput style={[styles.input, { marginBottom: 8 }]}
+                                  value={editCommentContent} onChangeText={setEditCommentContent}
+                                  multiline autoFocus />
+                                <View style={{ flexDirection: 'row', gap: 8, justifyContent: 'flex-end' }}>
+                                  <Pressable onPress={() => setEditingComment(null)} style={{ padding: 8 }}>
+                                    <Text style={{ fontSize: 13, color: colors.textSub }}>취소</Text>
+                                  </Pressable>
+                                  <Pressable onPress={saveCommentEdit} disabled={editCommentSaving}
+                                    style={{ padding: 8, backgroundColor: colors.primary, borderRadius: 8 }}>
+                                    <Text style={{ fontSize: 13, color: '#fff', fontWeight: '700' }}>
+                                      {editCommentSaving ? '저장 중...' : '저장'}
+                                    </Text>
+                                  </Pressable>
+                                </View>
+                              </View>
+                            ) : (
+                              <Text style={{ fontSize: 13, color: colors.text, lineHeight: 20 }}>{reply.content}</Text>
+                            )}
+                            {!rEditing && (
+                              <Pressable onPress={() => setReplyTo({ id: parent.id, nickname: parent.nickname?.split(' ')[0] ?? '익명' })}
+                                style={{ marginTop: 6, alignSelf: 'flex-start' }}>
+                                <Text style={{ fontSize: 11, color: colors.textSub }}>↩ 답글</Text>
+                              </Pressable>
+                            )}
+                          </View>
+                        );
+                      })}
+                      {hiddenCount > 0 && (
                         <Pressable
-                          onPress={saveCommentEdit}
-                          disabled={editCommentSaving}
-                          style={{ padding: 8, backgroundColor: colors.primary, borderRadius: 8 }}
-                        >
-                          <Text style={{ fontSize: 13, color: '#fff', fontWeight: '700' }}>
-                            {editCommentSaving ? '저장 중...' : '저장'}
+                          onPress={() => setExpandedParents(prev => new Set([...prev, parent.id]))}
+                          style={{ padding: 10, alignItems: 'center', backgroundColor: colors.tag, borderRadius: 10 }}>
+                          <Text style={{ fontSize: 12, color: colors.primary, fontWeight: '600' }}>
+                            ↓ 대댓글 {hiddenCount}개 더 보기
                           </Text>
                         </Pressable>
-                      </View>
+                      )}
                     </View>
-                  ) : (
-                    <Text style={{ fontSize: 13.5, color: colors.text, lineHeight: 21 }}>{c.content}</Text>
-                  )}
-                  {!isEditing && (
-                    <Pressable
-                      onPress={() => setReplyTo({
-                        id: c.parent_id ?? c.id,  // 대댓글이면 부모 id로 → 2단 유지
-                        nickname: c.nickname?.split(' ')[0] ?? '익명',
-                      })}
-                      style={{ marginTop: 8, alignSelf: 'flex-start' }}
-                    >
-                      <Text style={{ fontSize: 11, color: colors.textSub }}>↩ 답글</Text>
-                    </Pressable>
                   )}
                 </View>
-              </View>
-            );
-          })}
+              );
+            });
+          })()}
         </View>
       </ScrollView>
 

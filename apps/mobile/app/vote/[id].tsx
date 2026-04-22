@@ -31,9 +31,9 @@ export default function VoteDetailScreen() {
 
   const load = useCallback(async () => {
     const [all, m, f] = await Promise.all([
-      api.get<VoteDetail>(`/votes/${id}`),
-      api.get<VoteDetail>(`/votes/${id}?gender=M`).catch(() => null),
-      api.get<VoteDetail>(`/votes/${id}?gender=F`).catch(() => null),
+      api.get<VoteDetail>(`/votes/${id}`, { cacheTtl: 0 }),
+      api.get<VoteDetail>(`/votes/${id}?gender=M`, { cacheTtl: 0 }).catch(() => null),
+      api.get<VoteDetail>(`/votes/${id}?gender=F`, { cacheTtl: 0 }).catch(() => null),
     ]);
     setVote(all);
     setByGender({ M: m ?? undefined, F: f ?? undefined });
@@ -43,12 +43,37 @@ export default function VoteDetailScreen() {
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
   async function respond(choice: string) {
+    const prevVote = vote;
+    const isChange = !!(prevVote?.myChoice); // user is changing an existing vote
     setSubmitting(true);
+    setSelected(choice);
+    setVote(prev => {
+      if (!prev) return prev;
+      const multi = Array.isArray(prev.options) && prev.options.length > 0;
+      if (multi) {
+        const counts = { ...(prev.counts ?? {}) };
+        if (isChange && prev.myChoice) {
+          counts[prev.myChoice] = Math.max(0, (counts[prev.myChoice] ?? 1) - 1);
+        }
+        counts[choice] = (counts[choice] ?? 0) + 1;
+        return { ...prev, counts, total: isChange ? prev.total : prev.total + 1, myChoice: choice };
+      }
+      return {
+        ...prev,
+        agree: prev.agree + (choice === 'agree' ? 1 : 0) - (isChange && prev.myChoice === 'agree' ? 1 : 0),
+        disagree: prev.disagree + (choice === 'disagree' ? 1 : 0) - (isChange && prev.myChoice === 'disagree' ? 1 : 0),
+        total: isChange ? prev.total : prev.total + 1,
+        myChoice: choice,
+      };
+    });
     try {
       await api.post(`/votes/${id}/respond`, { choice });
-      setSelected(choice);
+    } catch (e) {
+      setSelected(prevVote?.myChoice ?? null);
+      setVote(prevVote);
       load();
-    } catch (e) { Alert.alert('실패', (e as Error).message); }
+      Alert.alert('실패', (e as Error).message);
+    }
     finally { setSubmitting(false); }
   }
 
@@ -57,8 +82,7 @@ export default function VoteDetailScreen() {
 
   const isMulti = Array.isArray(vote.options) && vote.options.length > 0;
   const pct = vote.total ? Math.round((vote.agree / vote.total) * 100) : 0;
-  const mPct = byGender.M && byGender.M.total ? Math.round((byGender.M.agree / byGender.M.total) * 100) : 0;
-  const fPct = byGender.F && byGender.F.total ? Math.round((byGender.F.agree / byGender.F.total) * 100) : 0;
+
   const isHot = vote.total >= 500;
 
   async function submitReport(reason: string) {
@@ -248,19 +272,34 @@ export default function VoteDetailScreen() {
 
                 <Text style={{ fontSize: 12, fontWeight: '600', color: colors.textSub, marginBottom: 10 }}>성별 분포</Text>
                 {[
-                  { label: '남성', pct: mPct, color: colors.male },
-                  { label: '여성', pct: fPct, color: colors.female },
-                ].map((g) => (
-                  <View key={g.label} style={{ marginBottom: 12 }}>
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 5 }}>
-                      <Text style={{ fontSize: 12, color: g.color, fontWeight: '600' }}>● {g.label}</Text>
-                      <Text style={{ fontSize: 12, color: colors.textSub }}>찬성 {g.pct}% · 반대 {100 - g.pct}%</Text>
+                  { label: '남성', data: byGender.M, color: colors.male },
+                  { label: '여성', data: byGender.F, color: colors.female },
+                ].map((g) => {
+                  const gTotal = g.data?.total ?? 0;
+                  const gAgree = g.data?.agree ?? 0;
+                  const participationPct = vote.total > 0 ? Math.round((gTotal / vote.total) * 100) : 0;
+                  const agreePct = gTotal > 0 ? Math.round((gAgree / gTotal) * 100) : 0;
+                  return (
+                    <View key={g.label} style={{ marginBottom: 14 }}>
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 5 }}>
+                        <Text style={{ fontSize: 12, color: g.color, fontWeight: '600' }}>
+                          ● {g.label} {gTotal > 0 ? `${gTotal}명 (${participationPct}%)` : '참여 없음'}
+                        </Text>
+                        {gTotal > 0 && (
+                          <Text style={{ fontSize: 12, color: colors.textSub }}>찬성 {agreePct}% · 반대 {100 - agreePct}%</Text>
+                        )}
+                      </View>
+                      <View style={{ height: 8, borderRadius: 8, overflow: 'hidden', flexDirection: 'row', backgroundColor: colors.tag }}>
+                        {gTotal > 0 && (
+                          <>
+                            <View style={{ width: `${agreePct}%`, height: '100%', backgroundColor: colors.votePro }} />
+                            <View style={{ flex: 1, height: '100%', backgroundColor: colors.voteCon + '50' }} />
+                          </>
+                        )}
+                      </View>
                     </View>
-                    <View style={{ height: 8, borderRadius: 8, backgroundColor: colors.tag, overflow: 'hidden' }}>
-                      <View style={{ width: `${g.pct}%`, height: '100%', backgroundColor: g.color }} />
-                    </View>
-                  </View>
-                ))}
+                  );
+                })}
               </>
             )}
 

@@ -116,13 +116,15 @@ auth.post('/signup', requireTempPhone, async (c) => {
   const cert = JSON.parse(certRaw) as { status: string };
   if (cert.status !== 'verified') return c.json({ error: 'certificate_not_verified' }, 400);
 
-  const { gender, ageRange, region, divorceYear, divorceMonth, interests } = await c.req.json<{
+  const { gender, ageRange, region, divorceYear, divorceMonth, interests, hasKids, custody } = await c.req.json<{
     gender: 'M' | 'F';
     ageRange: string;
     region: string;
     divorceYear?: number;
     divorceMonth?: number;
     interests?: string[];
+    hasKids?: boolean | null;
+    custody?: string | null;
   }>();
   if (!['M', 'F'].includes(gender)) return c.json({ error: 'invalid_gender' }, 400);
 
@@ -135,10 +137,10 @@ auth.post('/signup', requireTempPhone, async (c) => {
 
   await c.env.DOLDAM_DB
     .prepare(
-      `INSERT INTO users (id, phone_hash, nickname, gender, age_range, region, divorce_year, divorce_month, interests, verified, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)`
+      `INSERT INTO users (id, phone_hash, nickname, gender, age_range, region, divorce_year, divorce_month, interests, has_kids, custody, verified, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)`
     )
-    .bind(id, phoneHash, nickname, gender, ageRange, region, divorceYear ?? null, divorceMonth ?? null, interestsStr, now)
+    .bind(id, phoneHash, nickname, gender, ageRange, region, divorceYear ?? null, divorceMonth ?? null, interestsStr, hasKids === true ? 1 : hasKids === false ? 0 : null, custody ?? null, now)
     .run();
 
   await c.env.DOLDAM_DB
@@ -164,7 +166,7 @@ auth.get('/me', requireAuth, async (c) => {
   const row = await c.env.DOLDAM_DB
     .prepare(
       `SELECT id, nickname, gender, age_range, region, divorce_year, divorce_month,
-              interests, verified, created_at,
+              interests, has_kids, custody, job, intro, verified, created_at,
               warning_count, muted_until, banned
        FROM users WHERE id = ?`
     )

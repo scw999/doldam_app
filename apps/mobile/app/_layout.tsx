@@ -50,26 +50,40 @@ export default function RootLayout() {
   useEffect(() => {
     if (!token) return;
     (async () => {
-      const { status } = await Notifications.requestPermissionsAsync();
+      const { status: existing } = await Notifications.getPermissionsAsync();
+      const { status } = existing === 'granted'
+        ? { status: existing }
+        : await Notifications.requestPermissionsAsync();
       if (status !== 'granted') return;
       try {
         const pushToken = await Notifications.getExpoPushTokenAsync({
           projectId: 'e319fb49-251c-4449-b120-d58ddb2ddc8d',
         });
-        await api.post('/notifications/token', {
-          token: pushToken.data,
-          platform: Platform.OS,
-        }).catch(() => {});
+        if (pushToken.data) {
+          await api.post('/notifications/token', {
+            token: pushToken.data,
+            platform: Platform.OS,
+          }).catch(() => {});
+        }
       } catch (e) {
         console.warn('[push] token error', e);
       }
     })();
   }, [token]);
 
-  // 알림 탭 시 알림 화면으로 이동
+  // 알림 탭 시 딥링크 처리
   useEffect(() => {
-    const sub = Notifications.addNotificationResponseReceivedListener(() => {
-      router.push('/notifications' as any);
+    const sub = Notifications.addNotificationResponseReceivedListener((response) => {
+      const data = response.notification.request.content.data as Record<string, string> | undefined;
+      if (data?.roomId) {
+        router.push(`/room/${data.roomId}` as any);
+      } else if (data?.postId) {
+        router.push(`/post/${data.postId}` as any);
+      } else if (data?.voteId) {
+        router.push(`/vote/${data.voteId}` as any);
+      } else {
+        router.push('/notifications' as any);
+      }
     });
     return () => sub.remove();
   }, []);
@@ -105,6 +119,7 @@ export default function RootLayout() {
         <Stack.Screen name="my-posts" options={{ title: '내가 쓴 글' }} />
         <Stack.Screen name="points" options={{ title: '포인트 내역' }} />
         <Stack.Screen name="notifications" options={{ headerShown: false }} />
+        <Stack.Screen name="notification-settings" options={{ headerShown: false }} />
       </Stack>
     </SafeAreaProvider>
   );

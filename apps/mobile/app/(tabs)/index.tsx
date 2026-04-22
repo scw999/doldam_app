@@ -57,27 +57,35 @@ export default function HomeScreen() {
   const [refreshing, setRefreshing] = useState(false);
 
   const load = useCallback(async () => {
-    if (homeCache) {
-      setMe(homeCache.me); setBalance(homeCache.balance);
-      setTopVotes(homeCache.topVotes); setPosts(homeCache.posts);
-      setTodayMoodKey(homeCache.todayMoodKey);
+    const isFresh = homeCache && Date.now() - homeCache.ts < HOME_CACHE_TTL;
+    if (isFresh) {
+      setMe(homeCache!.me); setBalance(homeCache!.balance);
+      setTopVotes(homeCache!.topVotes); setPosts(homeCache!.posts);
+      setTodayMoodKey(homeCache!.todayMoodKey);
     }
-    try {
-      const [meRes, pts, votes, board, moodRes] = await Promise.all([
-        api.get<Me>('/auth/me'),
-        api.get<{ balance: number }>('/points/balance'),
-        api.get<{ items: Vote[] }>('/votes?limit=3'),
-        api.get<{ items: Post[] }>('/posts?category=all&limit=3'),
-        api.get<{ items: { created_at: number; mood: string }[] }>('/moods/feed?limit=1&mine=true').catch(() => ({ items: [] })),
-      ]);
-      const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
-      const todayItem = moodRes.items[0];
-      const newMoodKey = todayItem?.created_at >= todayStart.getTime() ? todayItem.mood : null;
-      setMe(meRes); setBalance(pts.balance);
-      setTopVotes(votes.items); setPosts(board.items);
-      setTodayMoodKey(newMoodKey);
-      homeCache = { me: meRes, balance: pts.balance, topVotes: votes.items, posts: board.items, todayMoodKey: newMoodKey, ts: Date.now() };
-    } catch (e) { console.warn('home load', e); }
+    const [meRes, pts, votes, board, moodRes] = await Promise.all([
+      api.get<Me>('/auth/me', { cacheTtl: 0 }).catch(() => null),
+      api.get<{ balance: number }>('/points/balance', { cacheTtl: 0 }).catch(() => null),
+      api.get<{ items: Vote[] }>('/votes?limit=3', { cacheTtl: 0 }).catch(() => null),
+      api.get<{ items: Post[] }>('/posts?category=all&limit=3', { cacheTtl: 0 }).catch(() => null),
+      api.get<{ items: { created_at: number; mood: string }[] }>('/moods/feed?limit=1&mine=true', { cacheTtl: 0 }).catch(() => null),
+    ]);
+    const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+    const todayItem = moodRes?.items[0];
+    const newMoodKey = todayItem?.created_at >= todayStart.getTime() ? todayItem.mood : null;
+    if (meRes) setMe(meRes);
+    if (pts) setBalance(pts.balance);
+    if (votes) setTopVotes(votes.items);
+    if (board) setPosts(board.items);
+    setTodayMoodKey(newMoodKey ?? null);
+    homeCache = {
+      me: meRes ?? homeCache?.me ?? null,
+      balance: pts?.balance ?? homeCache?.balance ?? 0,
+      topVotes: votes?.items ?? homeCache?.topVotes ?? [],
+      posts: board?.items ?? homeCache?.posts ?? [],
+      todayMoodKey: newMoodKey ?? null,
+      ts: Date.now(),
+    };
   }, []);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));

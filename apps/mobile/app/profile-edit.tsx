@@ -11,6 +11,7 @@ export default function ProfileEdit() {
   const [nickname, setNickname] = useState('');
   const [job, setJob] = useState('');
   const [hasKids, setHasKids] = useState<boolean | null>(null);
+  const [custody, setCustody] = useState<string | null>(null);
   const [intro, setIntro] = useState('');
   const [interests, setInterests] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
@@ -20,12 +21,13 @@ export default function ProfileEdit() {
     if (!userId) return;
     api.get<{
       nickname: string; job: string | null; has_kids: number | null;
-      intro: string | null; interests: string | null;
+      custody: string | null; intro: string | null; interests: string | null;
     }>(`/profiles/${userId}`)
       .then((p) => {
         if (p.nickname) setNickname(p.nickname);
         if (p.job) setJob(p.job);
         if (p.has_kids !== null) setHasKids(p.has_kids === 1);
+        if (p.custody) setCustody(p.custody);
         if (p.intro) setIntro(p.intro);
         if (p.interests) {
           const valid = new Set<string>(INTERESTS);
@@ -51,6 +53,7 @@ export default function ProfileEdit() {
         nickname: nickname.trim() || undefined,
         job,
         hasKids,
+        custody: hasKids ? custody : null,
         intro,
         interests: interests.join(','),
       });
@@ -76,12 +79,26 @@ export default function ProfileEdit() {
       <Text style={styles.label}>자녀 유무</Text>
       <View style={styles.row}>
         {[{ v: true, l: '있음' }, { v: false, l: '없음' }].map(({ v, l }) => (
-          <Pressable key={l} onPress={() => setHasKids(v)}
+          <Pressable key={l} onPress={() => { setHasKids(v); if (!v) setCustody(null); }}
             style={[styles.chip, hasKids === v && styles.chipOn]}>
             <Text style={[styles.chipText, hasKids === v && { color: '#fff' }]}>{l}</Text>
           </Pressable>
         ))}
       </View>
+
+      {hasKids === true && (
+        <>
+          <Text style={styles.label}>양육 여부</Text>
+          <View style={styles.row}>
+            {[{ v: 'custody', l: '양육 중' }, { v: 'non_custody', l: '비양육' }].map(({ v, l }) => (
+              <Pressable key={v} onPress={() => setCustody(v)}
+                style={[styles.chip, custody === v && styles.chipOn]}>
+                <Text style={[styles.chipText, custody === v && { color: '#fff' }]}>{l}</Text>
+              </Pressable>
+            ))}
+          </View>
+        </>
+      )}
 
       <Text style={styles.label}>자기소개</Text>
       <TextInput style={[styles.input, styles.textarea]} value={intro} onChangeText={setIntro}

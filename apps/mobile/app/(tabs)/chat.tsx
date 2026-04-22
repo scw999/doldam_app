@@ -23,16 +23,18 @@ export default function ChatScreen() {
   const [themed, setThemed] = useState<Room[]>([]);
   const [loading, setLoading] = useState(false);
   const [matching, setMatching] = useState(false);
+  const [queueStatus, setQueueStatus] = useState<{ queued: boolean; queueSize: number } | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [m, t, pts] = await Promise.all([
-        api.get<{ items: Room[] }>('/rooms/mine'),
-        api.get<{ items: Room[] }>('/rooms/themed'),
-        api.get<{ balance: number }>('/points/balance'),
+      const [m, t, pts, qs] = await Promise.all([
+        api.get<{ items: Room[] }>('/rooms/mine', { cacheTtl: 0 }),
+        api.get<{ items: Room[] }>('/rooms/themed', { cacheTtl: 0 }),
+        api.get<{ balance: number }>('/points/balance', { cacheTtl: 0 }),
+        api.get<{ queued: boolean; queueSize: number }>('/rooms/match/status', { cacheTtl: 0 }),
       ]);
-      setMine(m.items); setThemed(t.items); setBalance(pts.balance);
+      setMine(m.items); setThemed(t.items); setBalance(pts.balance); setQueueStatus(qs);
     } finally { setLoading(false); }
   }, []);
 
@@ -43,8 +45,17 @@ export default function ChatScreen() {
     try {
       await api.post('/rooms/match', {});
       await load();
-      setTab('my');
-      Alert.alert('매칭 대기', '6명이 모이면 방이 열려요');
+      Alert.alert('매칭 대기 중', '6명이 모이면 자동으로 방이 열려요');
+    } catch (e) { Alert.alert('실패', (e as Error).message); }
+    finally { setMatching(false); }
+  }
+
+  async function cancelMatchRequest() {
+    setMatching(true);
+    try {
+      await api.post('/rooms/match/cancel', {});
+      setQueueStatus({ queued: false, queueSize: 0 });
+      Alert.alert('취소 완료', '매칭 대기를 취소했어요');
     } catch (e) { Alert.alert('실패', (e as Error).message); }
     finally { setMatching(false); }
   }
@@ -121,7 +132,31 @@ export default function ChatScreen() {
       )}
 
       {tab === 'match' && (
-        <View style={{ padding: 20 }}>
+        <View style={{ padding: 20, gap: 16 }}>
+          {queueStatus?.queued && (
+            <View style={{
+              padding: 16, borderRadius: 14,
+              backgroundColor: colors.accent,
+              borderWidth: 1, borderColor: colors.primary + '30',
+              flexDirection: 'row', alignItems: 'center', gap: 12,
+            }}>
+              <ActivityIndicator color={colors.primary} />
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 14, fontWeight: '700', color: colors.primaryDark }}>매칭 대기 중...</Text>
+                <Text style={{ fontSize: 12, color: colors.textSub, marginTop: 3 }}>
+                  현재 {queueStatus.queueSize}명 대기 · 6명이 모이면 자동 시작
+                </Text>
+              </View>
+              <Pressable
+                onPress={cancelMatchRequest}
+                disabled={matching}
+                style={{ paddingHorizontal: 12, paddingVertical: 7, borderRadius: 10, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card }}
+              >
+                <Text style={{ fontSize: 12, color: colors.textSub }}>취소</Text>
+              </Pressable>
+            </View>
+          )}
+
           <LinearGradient
             colors={[colors.primaryDark, colors.primary]}
             start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
@@ -140,7 +175,7 @@ export default function ChatScreen() {
               유지 투표로 이어가거나, 200P로 부활도 가능.
             </Text>
             <Pressable
-              onPress={requestMatch}
+              onPress={queueStatus?.queued ? cancelMatchRequest : requestMatch}
               disabled={matching}
               style={{
                 backgroundColor: '#fff', padding: 14,
@@ -150,7 +185,9 @@ export default function ChatScreen() {
             >
               {matching
                 ? <ActivityIndicator color={colors.primaryDark} />
-                : <Text style={{ fontSize: 14, fontWeight: '700', color: colors.primaryDark }}>지금 매칭 시작</Text>}
+                : <Text style={{ fontSize: 14, fontWeight: '700', color: colors.primaryDark }}>
+                    {queueStatus?.queued ? '매칭 취소' : '지금 매칭 시작'}
+                  </Text>}
             </Pressable>
           </LinearGradient>
         </View>

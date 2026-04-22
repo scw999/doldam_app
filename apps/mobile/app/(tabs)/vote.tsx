@@ -16,6 +16,9 @@ interface Vote {
 
 type GenderFilter = 'all' | 'M' | 'F';
 
+const voteCache: Record<string, { items: Vote[]; hot3Count: number; ts: number }> = {};
+const VOTE_CACHE_TTL = 60_000;
+
 export default function VoteScreen() {
   const hasUnread = useUnreadCount();
   const [filter, setFilter] = useState<GenderFilter>('all');
@@ -23,16 +26,29 @@ export default function VoteScreen() {
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [balance, setBalance] = useState(0);
+  const [hot3Count, setHot3Count] = useState(0);
 
   const load = useCallback(async () => {
-    setLoading(true);
+    const cached = voteCache[filter];
+    const isFresh = cached && Date.now() - cached.ts < VOTE_CACHE_TTL;
+    if (isFresh) { setItems(cached.items); setHot3Count(cached.hot3Count); } else { setLoading(true); }
     try {
       const genderParam = filter !== 'all' ? `?gender=${filter}` : '';
       const [votes, pts] = await Promise.all([
-        api.get<{ items: Vote[] }>(`/votes${genderParam}`),
-        api.get<{ balance: number }>('/points/balance'),
+        api.get<{ items: Vote[] }>(`/votes${genderParam}`, { cacheTtl: 0 }),
+        api.get<{ balance: number }>('/points/balance', { cacheTtl: 0 }),
       ]);
-      setItems(votes.items);
+      const all = votes.items;
+      // Pin top 3 most-voted at top, rest in latest order (API returns latest first)
+      const byTotal = [...all].sort((a, b) => b.total - a.total);
+      const hot3 = byTotal.filter(v => v.total > 0).slice(0, 3);
+      const h3Count = hot3.length;
+      const hot3Ids = new Set(hot3.map(v => v.id));
+      const rest = all.filter(v => !hot3Ids.has(v.id)); // already in date order from API
+      const finalList = [...hot3, ...rest];
+      voteCache[filter] = { items: finalList, hot3Count: h3Count, ts: Date.now() };
+      setItems(finalList);
+      setHot3Count(h3Count);
       setBalance(pts.balance);
     } finally { setLoading(false); }
   }, [filter]);
@@ -84,16 +100,15 @@ export default function VoteScreen() {
             ? <ActivityIndicator style={{ marginTop: spacing.xxl }} />
             : <Text style={styles.empty}>첫 질문을 던져보세요</Text>
         }
-        renderItem={({ item: v }) => {
-          const total = v.total;
-          const isHot = total >= 500;
+        renderItem={({ item: v, index }) => {
+          const isHotPinned = index < hot3Count && v.total > 0;
           const isMulti = !!v.options;
+          const total = v.total;
           const pct = total && !isMulti ? Math.round((v.agree / total) * 100) : 0;
           return (
             <Card onPress={() => router.push(`/vote/${v.id}`)} style={{ padding: 16 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-                {isHot && <Pill bg="#E85D4A18" color="#E85D4A" icon="🔥">HOT</Pill>}
-                {isMulti && <Pill bg={colors.primary + '18'} color={colors.primary} icon="📋">선택형</Pill>}
+                {isHotPinned && <Pill bg="#E85D4A18" color="#E85D4A" icon="🔥">HOT</Pill>}
                 <Text style={{ fontSize: 11, color: colors.textSub }}>
                   {total > 0 ? `${total.toLocaleString()}명 참여` : '첫 참여자 기다리는 중'}
                 </Text>

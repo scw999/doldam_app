@@ -8,7 +8,8 @@ import { api } from '@/api';
 import { clearUnreadBadge } from '@/hooks/useUnreadCount';
 
 interface Notif {
-  id: string; title: string; body: string; read_at: number | null; created_at: number;
+  id: string; title: string; body: string;
+  data?: string | null; read_at: number | null; created_at: number;
 }
 
 function timeAgo(ts: number) {
@@ -20,6 +21,16 @@ function timeAgo(ts: number) {
   return `${Math.floor(h / 24)}일 전`;
 }
 
+function navigateByData(dataStr?: string | null) {
+  if (!dataStr) return;
+  try {
+    const data = JSON.parse(dataStr) as Record<string, string>;
+    if (data.roomId) { router.push(`/room/${data.roomId}` as any); return; }
+    if (data.postId) { router.push(`/post/${data.postId}` as any); return; }
+    if (data.voteId) { router.push(`/vote/${data.voteId}` as any); return; }
+  } catch {}
+}
+
 export default function NotificationsScreen() {
   const insets = useSafeAreaInsets();
   const [items, setItems] = useState<Notif[]>([]);
@@ -28,9 +39,8 @@ export default function NotificationsScreen() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await api.get<{ items: Notif[] }>('/notifications');
+      const res = await api.get<{ items: Notif[] }>('/notifications', { cacheTtl: 0 });
       setItems(res.items);
-      // 화면 진입 시 전체 읽음 처리
       api.post('/notifications/read-all', {}).catch(() => {});
     } finally {
       setLoading(false);
@@ -42,9 +52,12 @@ export default function NotificationsScreen() {
     return () => clearUnreadBadge();
   }, [load]));
 
-  async function markRead(id: string) {
-    await api.post(`/notifications/${id}/read`, {}).catch(() => {});
-    setItems((prev) => prev.map((n) => n.id === id ? { ...n, read_at: Date.now() } : n));
+  function handleTap(n: Notif) {
+    if (!n.read_at) {
+      api.post(`/notifications/${n.id}/read`, {}).catch(() => {});
+      setItems((prev) => prev.map((x) => x.id === n.id ? { ...x, read_at: Date.now() } : x));
+    }
+    navigateByData(n.data);
   }
 
   return (
@@ -71,7 +84,7 @@ export default function NotificationsScreen() {
               </Text>
         }
         renderItem={({ item: n }) => (
-          <Pressable onPress={() => markRead(n.id)}>
+          <Pressable onPress={() => handleTap(n)}>
             <Card style={{
               padding: 14,
               backgroundColor: n.read_at ? colors.card : colors.accent + '40',
@@ -89,9 +102,10 @@ export default function NotificationsScreen() {
                     {n.title}
                   </Text>
                   <Text style={{ fontSize: 13, color: colors.textSub, lineHeight: 20 }}>{n.body}</Text>
-                  <Text style={{ fontSize: 11, color: colors.textLight, marginTop: 6 }}>
-                    {timeAgo(n.created_at)}
-                  </Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 6 }}>
+                    <Text style={{ fontSize: 11, color: colors.textLight }}>{timeAgo(n.created_at)}</Text>
+                    {n.data && <Text style={{ fontSize: 11, color: colors.primary }}>탭하여 이동 ›</Text>}
+                  </View>
                 </View>
               </View>
             </Card>

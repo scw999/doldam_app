@@ -72,4 +72,73 @@ notifications.post('/:id/read', requireAuth, async (c) => {
   return c.json({ ok: true });
 });
 
+// ---- 알림 설정 조회 ----
+notifications.get('/preferences', requireAuth, async (c) => {
+  const user = c.get('user');
+  const row = await c.env.DOLDAM_DB
+    .prepare('SELECT comment, reply, hot_vote, chat FROM notification_preferences WHERE user_id = ?')
+    .bind(user.id).first<{ comment: number; reply: number; hot_vote: number; chat: number }>();
+  return c.json({
+    comment:  row ? row.comment  !== 0 : true,
+    reply:    row ? row.reply    !== 0 : true,
+    hot_vote: row ? row.hot_vote !== 0 : true,
+    chat:     row ? row.chat     !== 0 : true,
+  });
+});
+
+// ---- 알림 설정 업데이트 ----
+notifications.patch('/preferences', requireAuth, async (c) => {
+  const user = c.get('user');
+  const body = await c.req.json<{
+    comment?: boolean; reply?: boolean; hot_vote?: boolean; chat?: boolean;
+  }>();
+  const now = Date.now();
+  // 없으면 기본값 ON(1)으로 행 생성
+  await c.env.DOLDAM_DB
+    .prepare(`INSERT OR IGNORE INTO notification_preferences (user_id, comment, reply, hot_vote, chat, updated_at)
+              VALUES (?, 1, 1, 1, 1, ?)`)
+    .bind(user.id, now).run();
+  // 전달된 필드만 업데이트
+  const sets: string[] = ['updated_at = ?'];
+  const vals: unknown[] = [now];
+  if (body.comment  !== undefined) { sets.push('comment = ?');  vals.push(body.comment  ? 1 : 0); }
+  if (body.reply    !== undefined) { sets.push('reply = ?');    vals.push(body.reply    ? 1 : 0); }
+  if (body.hot_vote !== undefined) { sets.push('hot_vote = ?'); vals.push(body.hot_vote ? 1 : 0); }
+  if (body.chat     !== undefined) { sets.push('chat = ?');     vals.push(body.chat     ? 1 : 0); }
+  vals.push(user.id);
+  await c.env.DOLDAM_DB
+    .prepare(`UPDATE notification_preferences SET ${sets.join(', ')} WHERE user_id = ?`)
+    .bind(...vals).run();
+  return c.json({ ok: true });
+});
+
+// ---- 채팅방 알림 음소거 ----
+notifications.post('/rooms/:roomId/mute', requireAuth, async (c) => {
+  const user = c.get('user');
+  const roomId = c.req.param('roomId');
+  await c.env.DOLDAM_DB
+    .prepare('INSERT OR IGNORE INTO room_notification_mutes (user_id, room_id) VALUES (?, ?)')
+    .bind(user.id, roomId).run();
+  return c.json({ ok: true });
+});
+
+notifications.delete('/rooms/:roomId/mute', requireAuth, async (c) => {
+  const user = c.get('user');
+  const roomId = c.req.param('roomId');
+  await c.env.DOLDAM_DB
+    .prepare('DELETE FROM room_notification_mutes WHERE user_id = ? AND room_id = ?')
+    .bind(user.id, roomId).run();
+  return c.json({ ok: true });
+});
+
+// ---- 채팅방 알림 음소거 상태 조회 ----
+notifications.get('/rooms/:roomId/mute', requireAuth, async (c) => {
+  const user = c.get('user');
+  const roomId = c.req.param('roomId');
+  const row = await c.env.DOLDAM_DB
+    .prepare('SELECT 1 FROM room_notification_mutes WHERE user_id = ? AND room_id = ?')
+    .bind(user.id, roomId).first();
+  return c.json({ muted: !!row });
+});
+
 export default notifications;

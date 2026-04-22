@@ -93,6 +93,8 @@
       <div class="tab" data-tab="certs">📄 증명서 <span id="certBadge" style="color:#C4956A;font-weight:800"></span></div>
       <div class="tab" data-tab="reports">🚨 신고 <span id="pendingBadge" style="color:#E07B6B;font-weight:800"></span></div>
       <div class="tab" data-tab="users">👤 유저</div>
+      <div class="tab" data-tab="rooms">🏠 채팅방</div>
+      <div class="tab" data-tab="tools">🛠 도구</div>
     </div>
 
     <!-- 개요 -->
@@ -133,6 +135,46 @@
         <button id="refreshReports">새로고침</button>
       </div>
       <div id="reportsList"><div class="empty">로딩 중…</div></div>
+    </div>
+
+    <!-- 채팅방 -->
+    <div id="tab-rooms" class="section">
+      <div class="filter-row">
+        <select id="roomStatus">
+          <option value="active">활성</option>
+          <option value="expired">만료됨</option>
+          <option value="waiting">대기중</option>
+        </select>
+        <button id="refreshRooms" class="ghost">새로고침</button>
+      </div>
+      <div id="roomsList"><div class="empty">로딩 중…</div></div>
+    </div>
+
+    <!-- 도구 -->
+    <div id="tab-tools" class="section">
+      <div class="card">
+        <p class="section-title">📢 전체 공지 발송</p>
+        <div class="tip">모든 활성 회원에게 푸시 알림을 전송합니다. 신중하게 사용하세요.</div>
+        <div style="display:flex;gap:8px;margin-bottom:10px">
+          <select id="broadcastGender" style="width:auto;flex:0 0 auto;margin-bottom:0">
+            <option value="">전체 대상</option>
+            <option value="M">남성만</option>
+            <option value="F">여성만</option>
+          </select>
+        </div>
+        <input id="broadcastTitle" placeholder="알림 제목 (예: 🎉 이벤트 안내)" />
+        <textarea id="broadcastBody" placeholder="알림 내용을 입력하세요" rows="3" style="width:100%;padding:10px 12px;border:1px solid #EDE4DA;border-radius:8px;font-size:14px;color:#2C2420;background:#FAF6F1;margin-bottom:10px;resize:vertical;font-family:inherit"></textarea>
+        <button id="broadcastBtn">📢 공지 발송</button>
+        <div id="broadcastResult" style="font-size:12px;color:#5BAF7B;margin-top:8px"></div>
+      </div>
+      <div class="card" style="margin-top:16px">
+        <p class="section-title">🔔 푸시 알림 테스트</p>
+        <div class="tip">특정 유저에게 테스트 푸시를 발송합니다. 유저 ID는 유저 탭에서 확인하세요.</div>
+        <input id="pushTestUserId" placeholder="유저 ID" />
+        <input id="pushTestTitle" placeholder="알림 제목" value="테스트 알림" />
+        <input id="pushTestBody" placeholder="알림 내용" value="돌담 푸시 알림 테스트입니다!" />
+        <button id="pushTestBtn" class="ghost" style="margin-top:6px">🔔 테스트 발송</button>
+      </div>
     </div>
 
     <!-- 유저 -->
@@ -227,6 +269,7 @@ document.querySelectorAll('.tab').forEach(function(tab){
     if(name==='certs') loadCerts();
     if(name==='overview') loadOverview();
     if(name==='users') loadUsers(0,true);
+    if(name==='rooms') loadRooms();
   });
 });
 
@@ -235,6 +278,10 @@ document.getElementById('refreshUsers').addEventListener('click',function(){ loa
 document.getElementById('reportStatus').addEventListener('change',loadReports);
 document.getElementById('refreshCerts').addEventListener('click',loadCerts);
 document.getElementById('certStatus').addEventListener('change',loadCerts);
+document.getElementById('refreshRooms').addEventListener('click',loadRooms);
+document.getElementById('roomStatus').addEventListener('change',loadRooms);
+document.getElementById('broadcastBtn').addEventListener('click',sendBroadcast);
+document.getElementById('pushTestBtn').addEventListener('click',sendPushTest);
 
 // ---- 이미지 모달 ----
 document.getElementById('imgModalClose').addEventListener('click',function(){
@@ -259,13 +306,16 @@ async function loadOverview(){
     const s=await apiFetch('/admin/stats');
     const u=s.users||{};
     const p=s.posts||{};
+    const r=s.rooms||{};
     const cells=[
-      {num:u.total??'-',lbl:'전체 회원',sub:''},
-      {num:u.verified??'-',lbl:'인증 완료',sub:''},
-      {num:u.banned??'-',lbl:'영구정지',sub:''},
-      {num:u.muted??'-',lbl:'임시정지 중',sub:''},
-      {num:p.active??'-',lbl:'활성 게시글',sub:''},
-      {num:s.pendingReports??'-',lbl:'미처리 신고',sub:''},
+      {num:u.total??'-',lbl:'전체 회원'},
+      {num:u.verified??'-',lbl:'인증 완료'},
+      {num:u.banned??'-',lbl:'영구정지'},
+      {num:u.muted??'-',lbl:'임시정지 중'},
+      {num:p.active??'-',lbl:'활성 게시글'},
+      {num:s.pendingReports??'-',lbl:'미처리 신고'},
+      {num:r.active??'-',lbl:'활성 채팅방'},
+      {num:r.total??'-',lbl:'누적 채팅방'},
     ];
     const grid=document.getElementById('statsGrid');
     grid.innerHTML='';
@@ -579,6 +629,7 @@ async function loadUsers(offset,reset){
           '<span class="field">정지 만료</span><span class="val">'+(u.muted_until&&u.muted_until>Date.now()?fmt(u.muted_until):'-')+'</span>'+
           '<span class="field">직업</span><span class="val">'+esc(u.job||'-')+'</span>'+
           '<span class="field">자녀</span><span class="val">'+(u.has_kids===1?'있음':u.has_kids===0?'없음':'-')+'</span>'+
+          '<span class="field">양육</span><span class="val">'+(u.custody==='custody'?'양육 중':u.custody==='non_custody'?'비양육':'-')+'</span>'+
           '<span class="field">관심사</span><span class="val">'+esc(u.interests||'-')+'</span>';
         card.appendChild(grid);
 
@@ -700,7 +751,86 @@ async function userAction(userId,action,body){
   }catch(e){ toast('실패: '+e.message); }
 }
 
-// 로그인 후 유저 탭도 초기 로드 (users tab 열 때)
+// ---- 채팅방 ----
+async function loadRooms(){
+  const status=document.getElementById('roomStatus').value;
+  const el=document.getElementById('roomsList');
+  el.innerHTML='<div class="empty">로딩 중…</div>';
+  try{
+    const data=await apiFetch('/admin/rooms?status='+encodeURIComponent(status));
+    const arr=data.results||[];
+    el.innerHTML='';
+    if(!arr.length){ el.innerHTML='<div class="empty">없음</div>'; return; }
+    arr.forEach(function(r){
+      const card=document.createElement('div');
+      card.className='card';
+      const gLabel=r.gender_mix==='mixed'?'남녀':r.gender_mix==='men_only'?'남성':r.gender_mix==='women_only'?'여성':'?';
+      const expiredIn=r.expires_at?Math.max(0,Math.round((r.expires_at-Date.now())/3600000)):null;
+      card.innerHTML=
+        '<div class="row" style="margin-bottom:8px">'+
+          '<b style="font-size:14px">'+esc(r.name||'채팅방')+'</b>'+
+          '<span class="badge '+(r.status==='active'?'badge-resolved':'badge-dismissed')+'">'+esc(r.status==='active'?'활성':'만료')+'</span>'+
+          '<span class="meta">'+gLabel+' · '+esc(r.member_count)+'명</span>'+
+          '<span style="flex:1"></span>'+
+          '<span class="meta">'+fmt(r.created_at)+'</span>'+
+        '</div>'+
+        '<div class="meta" style="margin-bottom:6px">'+
+          (r.tags?'관심사: '+esc(r.tags)+' · ':'')+'ID: '+esc(r.id.slice(0,12))+'…'+
+          (expiredIn!==null?' · 만료: '+(expiredIn>0?expiredIn+'시간 후':'만료됨'):'')+'</div>';
+      if(r.status==='active'){
+        const btn=document.createElement('button');
+        btn.className='danger sm';
+        btn.textContent='🚫 방 강제 만료';
+        btn.addEventListener('click',function(){
+          if(!confirm('이 방을 강제 만료 처리하면 복구 불가합니다. 진행할까요?')) return;
+          apiFetch('/admin/rooms/'+encodeURIComponent(r.id)+'/expire',{method:'POST',body:'{}'})
+            .then(function(){ toast('방 만료 처리 완료'); loadRooms(); loadOverview(); })
+            .catch(function(e){ toast('실패: '+e.message); });
+        });
+        card.appendChild(btn);
+      }
+      el.appendChild(card);
+    });
+  }catch(e){
+    el.innerHTML='<div class="empty">오류: '+esc(e.message)+'</div>';
+  }
+}
+
+// ---- 전체 공지 ----
+async function sendBroadcast(){
+  const title=document.getElementById('broadcastTitle').value.trim();
+  const body=document.getElementById('broadcastBody').value.trim();
+  const gender=document.getElementById('broadcastGender').value;
+  const resultEl=document.getElementById('broadcastResult');
+  if(!title||!body){ toast('제목과 내용을 입력하세요'); return; }
+  const target=gender?'('+(gender==='M'?'남성':'여성')+'만)':'(전체)';
+  if(!confirm('공지 발송 '+target+'\n\n제목: '+title+'\n내용: '+body+'\n\n발송하시겠습니까?')) return;
+  resultEl.textContent='발송 중…'; resultEl.style.color='#C4956A';
+  try{
+    const payload={title,body};
+    if(gender) payload.targetGender=gender;
+    const res=await apiFetch('/admin/broadcast',{method:'POST',body:JSON.stringify(payload)});
+    resultEl.textContent='✓ '+res.sent+'명에게 발송 완료';
+    resultEl.style.color='#5BAF7B';
+    toast('공지 발송 완료 ('+res.sent+'명)');
+  }catch(e){
+    resultEl.textContent='실패: '+e.message;
+    resultEl.style.color='#E07B6B';
+    toast('실패: '+e.message);
+  }
+}
+
+// ---- 푸시 테스트 ----
+async function sendPushTest(){
+  const userId=document.getElementById('pushTestUserId').value.trim();
+  const title=document.getElementById('pushTestTitle').value.trim()||'테스트 알림';
+  const body=document.getElementById('pushTestBody').value.trim()||'돌담 푸시 알림 테스트입니다!';
+  if(!userId){ toast('유저 ID를 입력하세요'); return; }
+  try{
+    await apiFetch('/admin/push-test',{method:'POST',body:JSON.stringify({userId,title,body})});
+    toast('✓ 테스트 푸시 발송 완료');
+  }catch(e){ toast('실패: '+e.message+' (유저 ID 확인 필요)'); }
+}
 </script>
 </body>
 </html>

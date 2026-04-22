@@ -45,6 +45,7 @@ export default function CertificateScreen() {
   }
 
   function startPolling() {
+    if (pollRef.current) clearInterval(pollRef.current);
     pollRef.current = setInterval(async () => {
       try {
         const s = await api.get<{ status: Status; reason?: string }>(

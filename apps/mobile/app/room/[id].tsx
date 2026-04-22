@@ -50,6 +50,7 @@ export default function RoomScreen() {
   const [icebreakerQuestion, setIcebreakerQuestion] = useState('');
   const [welcomeMessage, setWelcomeMessage] = useState('');
   const [reportTarget, setReportTarget] = useState<{ userId: string; nickname: string } | null>(null);
+  const [muted, setMuted] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const listRef = useRef<FlatList<Message>>(null);
@@ -58,10 +59,12 @@ export default function RoomScreen() {
 
   const loadRoom = useCallback(async () => {
     try {
-      const [info, history] = await Promise.all([
+      const [info, history, muteRes] = await Promise.all([
         api.get<RoomInfo>(`/rooms/${id}`),
         api.get<{ items: Message[] }>(`/rooms/${id}/history`),
+        api.get<{ muted: boolean }>(`/notifications/rooms/${id}/mute`, { cacheTtl: 0 }).catch(() => ({ muted: false })),
       ]);
+      setMuted(muteRes.muted);
       setRoom(info);
       setMessages(history.items);
       // 내 메시지가 없으면 아이스브레이커 표시
@@ -101,7 +104,10 @@ export default function RoomScreen() {
       reconnectRef.current = setTimeout(() => connect(), RECONNECT_DELAY);
     };
 
-    ws.onerror = () => {};
+    ws.onerror = () => {
+      console.warn('[ws] error in room', id);
+      if (mountedRef.current) setConnected(false);
+    };
 
     ws.onmessage = (evt) => {
       try {
@@ -222,6 +228,20 @@ export default function RoomScreen() {
                 </Text>
               </View>
             </View>
+            <Pressable
+              onPress={async () => {
+                const next = !muted;
+                setMuted(next);
+                if (next) {
+                  await api.post(`/notifications/rooms/${id}/mute`, {}).catch(() => setMuted(false));
+                } else {
+                  await api.delete(`/notifications/rooms/${id}/mute`).catch(() => setMuted(true));
+                }
+              }}
+              style={{ padding: 8 }}
+            >
+              <Text style={{ fontSize: 20 }}>{muted ? '🔕' : '🔔'}</Text>
+            </Pressable>
           </View>
 
           {/* 남은시간 + 유지/폭파 투표 */}

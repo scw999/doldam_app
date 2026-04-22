@@ -5,33 +5,43 @@ import { verifyJwt } from '../utils/jwt';
 import { moderate } from '../middleware/moderation';
 import { awardPoints } from '../services/points';
 import { buildVoteCardSvg } from '../services/shareCard';
+import { sendPush } from '../services/push';
 import { POINTS } from '../utils/constants';
+
+const HOT_VOTE_THRESHOLD = 10;
 
 type Vars = { user: AuthedUser };
 const votes = new Hono<{ Bindings: Env; Variables: Vars }>();
 
 // ---- 목록 ----
 votes.get('/', async (c) => {
-  const limit = Math.min(Number(c.req.query('limit') ?? 30), 50);
+  const limit = Math.min(Number(c.req.query('limit') ?? 50), 100);
   const gender = c.req.query('gender') as 'M' | 'F' | undefined;
 
+  // JOIN + GROUP BY 로 N+1 서브쿼리 제거 (30개 조회 시 90쿼리 → 1쿼리)
   const sql = gender
     ? `SELECT v.id, v.question, v.description, v.options, v.created_at, v.expires_at,
               u.nickname,
-              (SELECT COUNT(*) FROM vote_responses WHERE vote_id = v.id AND gender = '${gender}') AS total,
-              (SELECT COUNT(*) FROM vote_responses WHERE vote_id = v.id AND choice = 'agree' AND gender = '${gender}') AS agree,
-              (SELECT COUNT(*) FROM vote_responses WHERE vote_id = v.id AND choice = 'disagree' AND gender = '${gender}') AS disagree
+              COUNT(vr.vote_id) AS total,
+              COALESCE(SUM(CASE WHEN vr.choice = 'agree' THEN 1 ELSE 0 END), 0) AS agree,
+              COALESCE(SUM(CASE WHEN vr.choice = 'disagree' THEN 1 ELSE 0 END), 0) AS disagree
        FROM votes v JOIN users u ON u.id = v.user_id
-       ORDER BY total DESC, v.created_at DESC LIMIT ?`
+       LEFT JOIN vote_responses vr ON vr.vote_id = v.id AND vr.gender = ?
+       GROUP BY v.id, v.question, v.description, v.options, v.created_at, v.expires_at, u.nickname
+       ORDER BY v.created_at DESC LIMIT ?`
     : `SELECT v.id, v.question, v.description, v.options, v.created_at, v.expires_at,
               u.nickname,
-              (SELECT COUNT(*) FROM vote_responses WHERE vote_id = v.id) AS total,
-              (SELECT COUNT(*) FROM vote_responses WHERE vote_id = v.id AND choice = 'agree') AS agree,
-              (SELECT COUNT(*) FROM vote_responses WHERE vote_id = v.id AND choice = 'disagree') AS disagree
+              COUNT(vr.vote_id) AS total,
+              COALESCE(SUM(CASE WHEN vr.choice = 'agree' THEN 1 ELSE 0 END), 0) AS agree,
+              COALESCE(SUM(CASE WHEN vr.choice = 'disagree' THEN 1 ELSE 0 END), 0) AS disagree
        FROM votes v JOIN users u ON u.id = v.user_id
-       ORDER BY total DESC, v.created_at DESC LIMIT ?`;
+       LEFT JOIN vote_responses vr ON vr.vote_id = v.id
+       GROUP BY v.id, v.question, v.description, v.options, v.created_at, v.expires_at, u.nickname
+       ORDER BY v.created_at DESC LIMIT ?`;
 
-  const { results } = await c.env.DOLDAM_DB.prepare(sql).bind(limit).all();
+  const { results } = gender
+    ? await c.env.DOLDAM_DB.prepare(sql).bind(gender, limit).all()
+    : await c.env.DOLDAM_DB.prepare(sql).bind(limit).all();
   c.header('Cache-Control', 'public, max-age=20, stale-while-revalidate=40');
   return c.json({ items: results });
 });
@@ -140,9 +150,26 @@ votes.post('/:id/respond', requireAuth, async (c) => {
     )
     .bind(id, user.id, choice, user.gender, Date.now()).run();
 
-  // 첫 참여만 포인트 적립
+  // 첫 참여만 포인트 적립 + 핫 투표 알림
   if (!existing) {
     await awardPoints(c.env, user.id, POINTS.REWARD_VOTE_CAST, 'vote_cast');
+
+    // 정확히 threshold번째 참여 시 투표 작성자에게 핫 알림
+    const countRow = await c.env.DOLDAM_DB
+      .prepare('SELECT COUNT(*) AS n FROM vote_responses WHERE vote_id = ?')
+      .bind(id).first<{ n: number }>();
+    if (countRow?.n === HOT_VOTE_THRESHOLD) {
+      const voteRow = await c.env.DOLDAM_DB
+        .prepare('SELECT user_id, question FROM votes WHERE id = ?')
+        .bind(id).first<{ user_id: string; question: string }>();
+      if (voteRow && voteRow.user_id !== user.id) {
+        c.executionCtx.waitUntil(
+          sendPush(c.env, voteRow.user_id, '🔥 내 투표가 핫해요!',
+            `"${voteRow.question.slice(0, 40)}" 참여자 ${HOT_VOTE_THRESHOLD}명 돌파!`,
+            { voteId: id }, 'hot_vote')
+        );
+      }
+    }
   }
   return c.json({ ok: true });
 });

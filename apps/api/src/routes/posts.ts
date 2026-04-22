@@ -80,6 +80,8 @@ posts.post('/', requireAuth, moderate, async (c) => {
   if (category === 'men_only' && user.gender !== 'M') return c.json({ error: 'forbidden_category' }, 403);
   if (category === 'women_only' && user.gender !== 'F') return c.json({ error: 'forbidden_category' }, 403);
   if (!title?.trim() || !content?.trim()) return c.json({ error: 'empty_content' }, 400);
+  if (title.trim().length > 200) return c.json({ error: 'title_too_long' }, 400);
+  if (content.trim().length > 5000) return c.json({ error: 'content_too_long' }, 400);
 
   const muteRow = await c.env.DOLDAM_DB
     .prepare('SELECT muted_until FROM users WHERE id = ?')
@@ -302,7 +304,7 @@ posts.post('/:id/comments', requireAuth, moderate, async (c) => {
   const notifPromises: Promise<void>[] = [];
   if (author && author.user_id !== user.id) {
     notifPromises.push(
-      sendPush(c.env, author.user_id, '새 댓글이 달렸어요', `${nick}: ${content.trim().slice(0, 40)}`, { postId })
+      sendPush(c.env, author.user_id, '새 댓글이 달렸어요', `${nick}: ${content.trim().slice(0, 40)}`, { postId }, 'comment')
     );
   }
 
@@ -313,7 +315,7 @@ posts.post('/:id/comments', requireAuth, moderate, async (c) => {
       .bind(parentId).first<{ user_id: string }>();
     if (parentComment && parentComment.user_id !== user.id && parentComment.user_id !== author?.user_id) {
       notifPromises.push(
-        sendPush(c.env, parentComment.user_id, '답글이 달렸어요', `${nick}: ${content.trim().slice(0, 40)}`, { postId })
+        sendPush(c.env, parentComment.user_id, '답글이 달렸어요', `${nick}: ${content.trim().slice(0, 40)}`, { postId }, 'reply')
       );
     }
   }

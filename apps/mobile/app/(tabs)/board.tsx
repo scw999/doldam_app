@@ -77,17 +77,17 @@ export default function BoardScreen() {
 
   const load = useCallback(async (c: string) => {
     const cached = postCache[c];
-    if (cached) {
-      setItems(cached.items); // 캐시 즉시 표시
-      setLoading(false);
+    const isFresh = cached && Date.now() - cached.ts < CACHE_TTL;
+    if (isFresh) {
+      setItems(cached.items); // 신선한 캐시만 즉시 표시
     } else {
       setLoading(true);
     }
-    // 항상 백그라운드 리프레시 (좋아요 카운트 등 최신 반영)
+    // 항상 최신 데이터로 갱신
     try {
       const [posts, pts] = await Promise.all([
-        api.get<{ items: Post[] }>(`/posts?category=${c}`),
-        api.get<{ balance: number }>('/points/balance'),
+        api.get<{ items: Post[] }>(`/posts?category=${c}`, { cacheTtl: 0 }),
+        api.get<{ balance: number }>('/points/balance', { cacheTtl: 0 }),
       ]);
       postCache[c] = { items: posts.items, ts: Date.now() };
       setItems(posts.items);

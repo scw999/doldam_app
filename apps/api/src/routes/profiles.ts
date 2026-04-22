@@ -14,10 +14,10 @@ type UnlockField = typeof UNLOCKABLE_FIELDS[number];
 // 내 프로필 업데이트 (유료 항목 + 닉네임 포함, 본인이니까 제한 없음)
 const updateMe = async (c: any) => {
   const user = c.get('user');
-  const { job, hasKids, intro, interests, nickname } = await c.req.json() as {
+  const { job, hasKids, intro, interests, nickname, custody } = await c.req.json() as {
     job?: string | null; hasKids?: boolean | null;
     intro?: string | null; interests?: string | null;
-    nickname?: string | null;
+    nickname?: string | null; custody?: string | null;
   };
 
   if (nickname !== undefined && nickname !== null) {
@@ -38,7 +38,8 @@ const updateMe = async (c: any) => {
          job = COALESCE(?, job),
          has_kids = COALESCE(?, has_kids),
          intro = COALESCE(?, intro),
-         interests = COALESCE(?, interests)
+         interests = COALESCE(?, interests),
+         custody = COALESCE(?, custody)
        WHERE id = ?`
     )
     .bind(
@@ -46,6 +47,7 @@ const updateMe = async (c: any) => {
       hasKids === undefined ? null : hasKids ? 1 : 0,
       intro ?? null,
       interests ?? null,
+      custody ?? null,
       user.id
     )
     .run();
@@ -61,14 +63,14 @@ profiles.get('/:id', requireAuth, async (c) => {
 
   const target = await c.env.DOLDAM_DB
     .prepare(
-      `SELECT id, nickname, gender, age_range, region, divorce_year, divorce_month, job, has_kids, intro, interests
+      `SELECT id, nickname, gender, age_range, region, divorce_year, divorce_month, job, has_kids, custody, intro, interests
        FROM users WHERE id = ? AND deleted_at IS NULL`
     )
     .bind(targetId)
     .first<{
       id: string; nickname: string; gender: 'M' | 'F'; age_range: string; region: string;
       divorce_year: number | null; divorce_month: number | null;
-      job: string | null; has_kids: number | null; intro: string | null; interests: string | null;
+      job: string | null; has_kids: number | null; custody: string | null; intro: string | null; interests: string | null;
     }>();
   if (!target) return c.json({ error: 'not_found' }, 404);
 

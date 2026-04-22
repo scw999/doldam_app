@@ -30,9 +30,9 @@ export default function MyScreen() {
   const load = useCallback(async () => {
     try {
       const [meRes, pts, myPosts] = await Promise.all([
-        api.get<Me>('/auth/me'),
-        api.get<{ balance: number }>('/points/balance'),
-        api.get<{ items: unknown[] }>('/posts/mine').catch(() => ({ items: [] })),
+        api.get<Me>('/auth/me', { cacheTtl: 0 }),
+        api.get<{ balance: number }>('/points/balance', { cacheTtl: 0 }),
+        api.get<{ items: unknown[] }>('/posts/mine', { cacheTtl: 0 }).catch(() => ({ items: [] })),
       ]);
       setMe(meRes);
       setBalance(pts.balance);
@@ -89,7 +89,8 @@ export default function MyScreen() {
     { icon: '🎨', label: '감정 타임라인', count: '기록하기', color: colors.green, onPress: () => router.push('/mood' as any) },
     { icon: '📖', label: 'Q&A 미션', count: '진행중', color: colors.primaryDark, onPress: () => router.push('/mission' as any) },
     { icon: '💎', label: '포인트 내역', count: `${balance}P`, color: colors.primary, onPress: () => router.push('/points' as any) },
-    { icon: '🔔', label: '알림', onPress: () => router.push('/notifications' as any) },
+    { icon: '🔔', label: '알림 내역', onPress: () => router.push('/notifications' as any) },
+    { icon: '🔕', label: '알림 설정', onPress: () => router.push('/notification-settings' as any) },
     { icon: '✏️', label: '프로필 편집', onPress: () => router.push('/profile-edit' as any) },
   ];
 

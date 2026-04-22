@@ -1,4 +1,4 @@
-import { useAuth } from './store/auth';
+import { useAuth, onAuthClear } from './store/auth';
 
 const API_BASE = process.env.EXPO_PUBLIC_API_BASE ?? 'http://localhost:8787';
 
@@ -73,14 +73,20 @@ async function cachedGet<T>(path: string, opts: CallOpts = {}): Promise<T> {
     if (existing) return existing as Promise<T>;
   }
 
-  const req = call<T>(path, { method: 'GET' }, opts).then((data) => {
-    if (ttl > 0) cachePut(path, data);
-    return data;
-  }).finally(() => { _inflight.delete(path); });
+  const req = call<T>(path, { method: 'GET' }, opts)
+    .then((data) => {
+      if (ttl > 0) cachePut(path, data);
+      return data;
+    })
+    .finally(() => {
+      if (_inflight.get(path) === req) _inflight.delete(path);
+    });
 
   if (ttl > 0) _inflight.set(path, req);
   return req;
 }
+
+onAuthClear(() => _cache.clear());
 
 export const api = {
   get: <T>(path: string, opts?: CallOpts) => cachedGet<T>(path, opts),

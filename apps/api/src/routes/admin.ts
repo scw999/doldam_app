@@ -9,7 +9,7 @@ const admin = new Hono<{ Bindings: Env; Variables: Vars }>();
 
 // ---- 통계 ----
 admin.get('/stats', requireAdmin, async (c) => {
-  const [users, posts, pendingReports] = await Promise.all([
+  const [users, posts, pendingReports, rooms] = await Promise.all([
     c.env.DOLDAM_DB.prepare(
       `SELECT COUNT(*) AS total,
               SUM(CASE WHEN verified=1 THEN 1 ELSE 0 END) AS verified,
@@ -25,8 +25,12 @@ admin.get('/stats', requireAdmin, async (c) => {
     c.env.DOLDAM_DB.prepare(
       `SELECT COUNT(*) AS pending FROM reports WHERE status='pending'`
     ).first<{ pending: number }>(),
+    c.env.DOLDAM_DB.prepare(
+      `SELECT SUM(CASE WHEN status='active' THEN 1 ELSE 0 END) AS active,
+              COUNT(*) AS total FROM rooms`
+    ).first<{ active: number; total: number }>(),
   ]);
-  return c.json({ users, posts, pendingReports: pendingReports?.pending ?? 0 });
+  return c.json({ users, posts, pendingReports: pendingReports?.pending ?? 0, rooms });
 });
 
 // ---- 신고 목록 (target 내용 포함) ----
@@ -159,7 +163,7 @@ admin.get('/users', requireAdmin, async (c) => {
   const { limit = '50', offset = '0' } = c.req.query();
 
   const COLS = `id, nickname, gender, age_range, region, divorce_year, divorce_month, verified, banned,
-                warning_count, muted_until, created_at, job, has_kids, intro, interests`;
+                warning_count, muted_until, created_at, job, has_kids, custody, intro, interests`;
 
   if (q) {
     const { results } = await c.env.DOLDAM_DB
@@ -261,6 +265,81 @@ admin.post('/users/:id/unwarn', requireAdmin, async (c) => {
     .prepare('UPDATE users SET warning_count = ? WHERE id = ?')
     .bind(newCount, id).run();
   return c.json({ ok: true, warningCount: newCount });
+});
+
+// ---- 활성 채팅방 목록 ----
+admin.get('/rooms', requireAdmin, async (c) => {
+  const { status = 'active', limit = '30', offset = '0' } = c.req.query();
+  const { results } = await c.env.DOLDAM_DB
+    .prepare(
+      `SELECT r.id, r.name, r.status, r.gender_mix, r.tags,
+              r.created_at, r.expires_at,
+              COUNT(rm.user_id) AS member_count
+       FROM rooms r LEFT JOIN room_members rm ON rm.room_id = r.id
+       WHERE r.status = ?
+       GROUP BY r.id ORDER BY r.created_at DESC LIMIT ? OFFSET ?`
+    )
+    .bind(status, Number(limit), Number(offset)).all();
+  const tot = await c.env.DOLDAM_DB
+    .prepare('SELECT COUNT(*) AS n FROM rooms WHERE status = ?')
+    .bind(status).first<{ n: number }>();
+  return c.json({ results, total: tot?.n ?? 0 });
+});
+
+// ---- 방 강제 만료 ----
+admin.post('/rooms/:id/expire', requireAdmin, async (c) => {
+  const { id } = c.req.param();
+  await c.env.DOLDAM_DB
+    .prepare("UPDATE rooms SET status = 'expired', expires_at = ? WHERE id = ?")
+    .bind(Date.now(), id).run();
+  return c.json({ ok: true });
+});
+
+// ---- 전체 공지 발송 ----
+admin.post('/broadcast', requireAdmin, async (c) => {
+  const { title, body, targetGender } = await c.req.json<{
+    title: string; body: string; targetGender?: 'M' | 'F';
+  }>();
+  if (!title?.trim() || !body?.trim()) return c.json({ error: 'empty_content' }, 400);
+
+  const sql = targetGender
+    ? `SELECT pt.user_id, pt.token FROM push_tokens pt
+       JOIN users u ON u.id = pt.user_id
+       WHERE u.deleted_at IS NULL AND u.banned = 0 AND u.gender = ?`
+    : `SELECT pt.user_id, pt.token FROM push_tokens pt
+       JOIN users u ON u.id = pt.user_id
+       WHERE u.deleted_at IS NULL AND u.banned = 0`;
+
+  const { results } = await c.env.DOLDAM_DB
+    .prepare(sql)
+    .bind(...(targetGender ? [targetGender] : []))
+    .all<{ user_id: string; token: string }>();
+
+  if (results.length === 0) return c.json({ ok: true, sent: 0 });
+
+  // 알림 히스토리 저장
+  const now = Date.now();
+  const uniqueUsers = [...new Set(results.map((r) => r.user_id))];
+  for (const uid of uniqueUsers) {
+    await c.env.DOLDAM_DB
+      .prepare('INSERT INTO notifications (id, user_id, title, body, created_at) VALUES (?, ?, ?, ?, ?)')
+      .bind(crypto.randomUUID(), uid, title.trim(), body.trim(), now).run().catch(() => {});
+  }
+
+  // Expo 배치 발송 (100개씩)
+  const messages = results.map((r) => ({
+    to: r.token, title: title.trim(), body: body.trim(),
+    data: { type: 'admin_broadcast' },
+  }));
+  for (let i = 0; i < messages.length; i += 100) {
+    await fetch('https://exp.host/--/api/v2/push/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify(messages.slice(i, i + 100)),
+    }).catch(() => {});
+  }
+
+  return c.json({ ok: true, sent: uniqueUsers.length });
 });
 
 admin.post('/poll-eas', requireAdmin, async (c) => {

@@ -18,6 +18,9 @@ const KEYS = {
   USER: 'user_id',
 } as const;
 
+const onClearCallbacks: (() => void)[] = [];
+export function onAuthClear(cb: () => void) { onClearCallbacks.push(cb); }
+
 export const useAuth = create<AuthState>((set) => ({
   token: null,
   tempToken: null,
@@ -46,6 +49,7 @@ export const useAuth = create<AuthState>((set) => ({
 
   clear: async () => {
     await AsyncStorage.multiRemove([KEYS.TOKEN, KEYS.TEMP, KEYS.USER]);
+    onClearCallbacks.forEach((cb) => cb());
     set({ token: null, tempToken: null, userId: null });
   },
 }));

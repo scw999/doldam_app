@@ -1,6 +1,7 @@
 import type { Env } from '../types';
 import { verifyJwt } from '../utils/jwt';
 import { runKeywordFilter } from '../middleware/moderation';
+import { sendPush } from '../services/push';
 
 interface ChatMessage {
   id: string;
@@ -15,6 +16,30 @@ interface Session {
   nickname: string;
 }
 
+const ICEBREAKER_QUESTIONS = [
+  '오늘 하루 어떠셨어요? 한 문장으로 표현한다면?',
+  '요즘 가장 빠져 있는 취미가 있다면?',
+  '최근에 새롭게 시작한 게 있나요?',
+  '주말에 주로 뭐 하세요?',
+  '돌싱 생활에서 가장 좋아진 점이 있다면?',
+  '오늘 뭐 드셨어요? 요즘 자주 해먹는 메뉴 있어요?',
+  '요즘 스트레스 받을 때 어떻게 풀어요?',
+  '돌싱 이후 달라진 일상 습관이 있나요?',
+  '지금 이 순간 가장 하고 싶은 한 가지는?',
+  '이 방에서 어떤 얘기 가장 하고 싶어요?',
+  '혼자 사는 게 오히려 좋아진 점 있나요?',
+  '요즘 인상 깊었던 책이나 영화 있어요?',
+  '자신 있는 요리가 뭐예요?',
+  '가장 기억에 남는 여행지는?',
+  '최근에 스스로 칭찬해준 일이 있나요?',
+  '이혼 후 가장 크게 달라진 게 뭐예요?',
+  '혼자서 새로 배운 것이 있나요?',
+  '요즘 가장 기분 좋았던 순간이 언제예요?',
+];
+
+const Q_FIRST_DELAY = 5 * 60 * 1000;  // 첫 질문: 5분 후
+const Q_INTERVAL    = 60 * 60 * 1000; // 이후: 60분마다
+
 export class ChatRoom {
   private state: DurableObjectState;
   private env: Env;
@@ -25,10 +50,29 @@ export class ChatRoom {
     this.env = env;
   }
 
+  // DO 알람 핸들러 — 주기적 아이스브레이커 질문 전송
+  async alarm(): Promise<void> {
+    const now = Date.now();
+    const q = ICEBREAKER_QUESTIONS[Math.floor(Math.random() * ICEBREAKER_QUESTIONS.length)];
+    const msg: ChatMessage = {
+      id: crypto.randomUUID(),
+      from: 'system',
+      nickname: '돌담',
+      text: `💬 오늘의 질문: ${q}`,
+      ts: now,
+    };
+    // 히스토리에 저장 (나중에 입장해도 볼 수 있도록)
+    await this.state.storage.put(`msg:${now}:${msg.id}`, msg);
+    await this.state.storage.put('lastQuestionTs', now);
+    // 현재 연결된 세션에 즉시 전송
+    if (this.sessions.size > 0) this.broadcast(msg);
+    // 다음 질문 예약
+    await this.state.storage.setAlarm(Date.now() + Q_INTERVAL);
+  }
+
   async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url);
 
-    // 최근 메시지 조회 (REST)
     if (url.pathname.endsWith('/history')) {
       return this.getHistory();
     }
@@ -44,7 +88,6 @@ export class ChatRoom {
     const jwt = await verifyJwt(token, this.env.JWT_SECRET);
     if (!jwt || jwt.scope !== 'user') return new Response('unauthorized', { status: 401 });
 
-    // 방 멤버십 확인
     const member = await this.env.DOLDAM_DB
       .prepare('SELECT 1 FROM room_members WHERE room_id = ? AND user_id = ?')
       .bind(roomId, jwt.sub)
@@ -57,13 +100,32 @@ export class ChatRoom {
       .first<{ nickname: string }>();
     if (!user) return new Response('user_not_found', { status: 404 });
 
+    // 만료된 방 차단
+    const room = await this.env.DOLDAM_DB
+      .prepare("SELECT status FROM rooms WHERE id = ?")
+      .bind(roomId).first<{ status: string }>();
+    if (room?.status === 'expired') return new Response('room_expired', { status: 410 });
+
     const pair = new WebSocketPair();
     const [client, server] = Object.values(pair);
 
     server.accept();
+
+    // 같은 유저의 기존 연결 닫기 (다중 연결 방지)
+    for (const [ws, s] of this.sessions.entries()) {
+      if (s.userId === jwt.sub) {
+        try { ws.close(1001, 'replaced'); } catch {}
+        this.sessions.delete(ws);
+      }
+    }
     this.sessions.set(server, { userId: jwt.sub, nickname: user.nickname });
 
-    // 입장 알림
+    // 첫 번째 WebSocket 연결 시 알람 예약
+    const existingAlarm = await this.state.storage.getAlarm();
+    if (existingAlarm === null) {
+      await this.state.storage.setAlarm(Date.now() + Q_FIRST_DELAY);
+    }
+
     this.broadcast({
       id: crypto.randomUUID(),
       from: 'system',
@@ -77,6 +139,10 @@ export class ChatRoom {
         const data = JSON.parse(evt.data as string);
         const text = String(data.text ?? '').trim();
         if (!text) return;
+        if (text.length > 1000) {
+          server.send(JSON.stringify({ type: 'error', error: 'message_too_long' }));
+          return;
+        }
 
         const filter = await runKeywordFilter(text);
         if (!filter.ok) {
@@ -99,14 +165,13 @@ export class ChatRoom {
         const { results: members } = await this.env.DOLDAM_DB
           .prepare('SELECT user_id FROM room_members WHERE room_id = ?')
           .bind(roomId).all<{ user_id: string }>();
+        const { results: mutedRows } = await this.env.DOLDAM_DB
+          .prepare('SELECT user_id FROM room_notification_mutes WHERE room_id = ?')
+          .bind(roomId).all<{ user_id: string }>();
+        const mutedSet = new Set(mutedRows.map((r) => r.user_id));
         for (const m of members) {
-          if (!onlineIds.has(m.user_id) && m.user_id !== jwt.sub) {
-            await this.env.DOLDAM_QUEUE.send({
-              type: 'notification',
-              userId: m.user_id,
-              title: `💬 ${user.nickname}`,
-              body: text.slice(0, 60),
-            }).catch(() => {});
+          if (!onlineIds.has(m.user_id) && m.user_id !== jwt.sub && !mutedSet.has(m.user_id)) {
+            sendPush(this.env, m.user_id, `💬 ${user.nickname}`, text.slice(0, 60), { roomId }, 'chat').catch(() => {});
           }
         }
       } catch {
