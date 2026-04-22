@@ -29,30 +29,34 @@ posts.get('/', async (c) => {
   if (!all && !CATEGORIES.includes(categoryParam as Category)) return c.json({ error: 'invalid_category' }, 400);
   const limit = Math.min(Number(c.req.query('limit') ?? 20), 50);
   const cursor = Number(c.req.query('cursor') ?? Date.now());
+  const hot = c.req.query('sort') === 'hot';
 
-  const { results } = all
+  const SEL = `SELECT p.id, p.title, p.content, p.category, p.view_count, p.like_count,
+                      p.comment_count, p.created_at, u.nickname, u.gender, u.age_range, u.divorce_year, u.divorce_month
+               FROM posts p JOIN users u ON u.id = p.user_id`;
+  const ORDER = hot
+    ? 'ORDER BY (p.like_count + p.comment_count) DESC, p.created_at DESC'
+    : 'ORDER BY p.created_at DESC';
+
+  const { results } = hot
     ? await c.env.DOLDAM_DB
         .prepare(
-          `SELECT p.id, p.title, p.content, p.category, p.view_count, p.like_count,
-                  p.comment_count, p.created_at, u.nickname, u.gender, u.age_range, u.divorce_year, u.divorce_month
-           FROM posts p JOIN users u ON u.id = p.user_id
-           WHERE p.deleted_at IS NULL AND p.created_at < ? AND p.report_count < ?
-           ORDER BY p.created_at DESC LIMIT ?`
+          `${SEL} WHERE ${all ? '' : 'p.category = ? AND '}p.deleted_at IS NULL AND p.report_count < ?
+           ${ORDER} LIMIT ?`
         )
+        .bind(...(all ? [REPORT_HIDE_THRESHOLD, limit] : [categoryParam, REPORT_HIDE_THRESHOLD, limit]))
+        .all<{ created_at: number }>()
+    : all
+    ? await c.env.DOLDAM_DB
+        .prepare(`${SEL} WHERE p.deleted_at IS NULL AND p.created_at < ? AND p.report_count < ? ${ORDER} LIMIT ?`)
         .bind(cursor, REPORT_HIDE_THRESHOLD, limit)
         .all<{ created_at: number }>()
     : await c.env.DOLDAM_DB
-        .prepare(
-          `SELECT p.id, p.title, p.content, p.category, p.view_count, p.like_count,
-                  p.comment_count, p.created_at, u.nickname, u.gender, u.age_range, u.divorce_year, u.divorce_month
-           FROM posts p JOIN users u ON u.id = p.user_id
-           WHERE p.category = ? AND p.deleted_at IS NULL AND p.created_at < ? AND p.report_count < ?
-           ORDER BY p.created_at DESC LIMIT ?`
-        )
+        .prepare(`${SEL} WHERE p.category = ? AND p.deleted_at IS NULL AND p.created_at < ? AND p.report_count < ? ${ORDER} LIMIT ?`)
         .bind(categoryParam, cursor, REPORT_HIDE_THRESHOLD, limit)
         .all<{ created_at: number }>();
 
-  const nextCursor = results.length === limit ? results[results.length - 1].created_at : null;
+  const nextCursor = (!hot && results.length === limit) ? results[results.length - 1].created_at : null;
   return c.json({ items: results, nextCursor });
 });
 

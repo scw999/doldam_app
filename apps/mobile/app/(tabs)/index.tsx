@@ -44,7 +44,7 @@ let homeCache: {
   me: Me | null; balance: number; topVotes: Vote[]; posts: Post[];
   todayMoodKey: string | null; ts: number;
 } | null = null;
-const HOME_CACHE_TTL = 90_000; // 1.5분
+const HOME_CACHE_TTL = 30_000; // 30초
 
 export default function HomeScreen() {
   const hasUnread = useUnreadCount();
@@ -67,7 +67,7 @@ export default function HomeScreen() {
       api.get<Me>('/auth/me', { cacheTtl: 0 }).catch(() => null),
       api.get<{ balance: number }>('/points/balance', { cacheTtl: 0 }).catch(() => null),
       api.get<{ items: Vote[] }>('/votes?limit=3', { cacheTtl: 0 }).catch(() => null),
-      api.get<{ items: Post[] }>('/posts?category=all&limit=3', { cacheTtl: 0 }).catch(() => null),
+      api.get<{ items: Post[] }>('/posts?category=all&limit=3&sort=hot', { cacheTtl: 0 }).catch(() => null),
       api.get<{ items: { created_at: number; mood: string }[] }>('/moods/feed?limit=1&mine=true', { cacheTtl: 0 }).catch(() => null),
     ]);
     const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
@@ -202,7 +202,7 @@ export default function HomeScreen() {
         </Section>
 
         {/* 지금 나누고 있는 이야기 */}
-        <Section title="💬 지금 나누고 있는 이야기" hint="더보기" onHintPress={() => router.push('/(tabs)/board')}>
+        <Section title="💬 지금 가장 많이 나누는 이야기" hint="더보기" onHintPress={() => router.push('/(tabs)/board')}>
           <View style={{ gap: 10 }}>
             {posts.map((p) => {
               const cat = CATEGORY_COLORS[p.category] ?? { label: p.category, color: colors.textSub };
