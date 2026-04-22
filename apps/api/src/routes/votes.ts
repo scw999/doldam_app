@@ -57,6 +57,17 @@ votes.get('/:id', async (c) => {
 
   const options: string[] | null = vote.options ? JSON.parse(vote.options as string) : null;
 
+  // 피어 폴: options에 담긴 user_id를 닉네임으로 매핑해 반환
+  let memberInfo: Record<string, { nickname: string; gender: string | null }> | null = null;
+  if (vote.kind === 'peer_poll' && options && options.length > 0) {
+    const placeholders = options.map(() => '?').join(',');
+    const rows = await c.env.DOLDAM_DB
+      .prepare(`SELECT id, nickname, gender FROM users WHERE id IN (${placeholders})`)
+      .bind(...options).all<{ id: string; nickname: string; gender: string | null }>();
+    memberInfo = {};
+    for (const r of rows.results) memberInfo[r.id] = { nickname: r.nickname, gender: r.gender };
+  }
+
   const agg = genderFilter
     ? await c.env.DOLDAM_DB
         .prepare(
@@ -92,31 +103,49 @@ votes.get('/:id', async (c) => {
     }
   }
 
-  return c.json({ ...vote, options, counts, agree, disagree, total, myChoice });
+  return c.json({ ...vote, options, counts, agree, disagree, total, myChoice, memberInfo });
 });
 
 // ---- 생성 ----
 votes.post('/', requireAuth, moderate, async (c) => {
   const user = c.get('user');
-  const { question, description, expiresAt, options } = await c.req.json<{
-    question: string; description?: string; expiresAt?: number; options?: string[];
+  const { question, description, expiresAt, options, kind, roomId } = await c.req.json<{
+    question: string; description?: string; expiresAt?: number;
+    options?: string[]; kind?: 'normal' | 'peer_poll'; roomId?: string;
   }>();
   if (!question?.trim()) return c.json({ error: 'empty_question' }, 400);
+
+  const voteKind = kind === 'peer_poll' ? 'peer_poll' : 'normal';
+
+  // 피어 폴: 방 멤버 검증, options는 멤버 user_id여야 함
+  if (voteKind === 'peer_poll') {
+    if (!roomId) return c.json({ error: 'room_required' }, 400);
+    if (!Array.isArray(options) || options.length < 2) return c.json({ error: 'invalid_options' }, 400);
+    const member = await c.env.DOLDAM_DB
+      .prepare('SELECT 1 FROM room_members WHERE room_id = ? AND user_id = ?')
+      .bind(roomId, user.id).first();
+    if (!member) return c.json({ error: 'not_a_member' }, 403);
+    const placeholders = options.map(() => '?').join(',');
+    const valid = await c.env.DOLDAM_DB
+      .prepare(`SELECT user_id FROM room_members WHERE room_id = ? AND user_id IN (${placeholders})`)
+      .bind(roomId, ...options).all<{ user_id: string }>();
+    if (valid.results.length !== options.length) return c.json({ error: 'invalid_members' }, 400);
+  }
 
   let optionsJson: string | null = null;
   if (Array.isArray(options) && options.length > 0) {
     const clean = options.map((o) => String(o).trim()).filter(Boolean);
-    if (clean.length < 2 || clean.length > 6) return c.json({ error: 'invalid_options' }, 400);
+    if (clean.length < 2 || clean.length > 8) return c.json({ error: 'invalid_options' }, 400);
     optionsJson = JSON.stringify(clean);
   }
 
   const id = crypto.randomUUID();
   await c.env.DOLDAM_DB
     .prepare(
-      `INSERT INTO votes (id, user_id, question, description, options, created_at, expires_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO votes (id, user_id, question, description, options, kind, room_id, created_at, expires_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
-    .bind(id, user.id, question.trim(), description?.trim() ?? null, optionsJson, Date.now(), expiresAt ?? null)
+    .bind(id, user.id, question.trim(), description?.trim() ?? null, optionsJson, voteKind, roomId ?? null, Date.now(), expiresAt ?? null)
     .run();
 
   return c.json({ id });

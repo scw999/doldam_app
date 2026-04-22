@@ -19,6 +19,14 @@ interface VoteDetail {
   disagree: number;
   total: number;
   myChoice?: string | null;
+  kind?: 'normal' | 'peer_poll';
+  room_id?: string | null;
+  memberInfo?: Record<string, { nickname: string; gender: string | null }> | null;
+}
+
+function labelForOption(opt: string, memberInfo?: VoteDetail['memberInfo']): string {
+  if (memberInfo && memberInfo[opt]) return memberInfo[opt].nickname;
+  return opt;
 }
 
 export default function VoteDetailScreen() {
@@ -107,11 +115,11 @@ export default function VoteDetailScreen() {
         <Pressable onPress={() => router.back()} style={{ padding: 4 }}>
           <Text style={{ fontSize: 22, color: colors.text }}>←</Text>
         </Pressable>
-        <Text style={[typography.h3, { color: colors.text }]}>돌싱 딜레마</Text>
+        <Text style={[typography.h3, { color: colors.text }]}>{vote.kind === 'peer_poll' ? '멤버 투표' : '돌싱 딜레마'}</Text>
         {vote.myChoice && (
           <View style={{ paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, backgroundColor: colors.accent }}>
             <Text style={{ fontSize: 11, fontWeight: '600', color: colors.primaryDark }}>
-              {isMulti ? `✓ ${vote.myChoice}` : vote.myChoice === 'agree' ? '⭕ 찬성 참여함' : '❌ 반대 참여함'}
+              {isMulti ? `✓ ${labelForOption(vote.myChoice, vote.memberInfo)}` : vote.myChoice === 'agree' ? '⭕ 찬성 참여함' : '❌ 반대 참여함'}
             </Text>
           </View>
         )}
@@ -188,7 +196,7 @@ export default function VoteDetailScreen() {
                       <Text style={{ fontSize: 12, fontWeight: '700', color: OPTION_COLORS[idx % OPTION_COLORS.length] }}>{idx + 1}</Text>
                     </View>
                     <Text style={{ flex: 1, fontSize: 14, fontWeight: '600', color: colors.text, letterSpacing: -0.2 }}>
-                      {opt}
+                      {labelForOption(opt, vote.memberInfo)}
                     </Text>
                   </Pressable>
                 ))}
@@ -222,7 +230,7 @@ export default function VoteDetailScreen() {
             {/* 내 선택 + 변경 */}
             <View style={{ padding: 14, backgroundColor: colors.accent, borderRadius: 12, marginBottom: 16, flexDirection: 'row', alignItems: 'center' }}>
               <Text style={{ fontSize: 12, color: colors.primaryDark, fontWeight: '600', flex: 1 }}>
-                내 선택: {isMulti ? selected : selected === 'agree' ? '⭕ 찬성' : '❌ 반대'}
+                내 선택: {isMulti ? labelForOption(selected ?? '', vote.memberInfo) : selected === 'agree' ? '⭕ 찬성' : '❌ 반대'}
               </Text>
               <Pressable
                 onPress={() => setSelected(null)}
@@ -244,7 +252,7 @@ export default function VoteDetailScreen() {
                     <View key={opt} style={{ gap: 4 }}>
                       <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
                         <Text style={{ fontSize: 12, fontWeight: isMyChoice ? '700' : '500', color: isMyChoice ? color : colors.text }}>
-                          {isMyChoice ? '✓ ' : ''}{opt}
+                          {isMyChoice ? '✓ ' : ''}{labelForOption(opt, vote.memberInfo)}
                         </Text>
                         <Text style={{ fontSize: 12, color: colors.textSub }}>{barPct}% ({count}명)</Text>
                       </View>

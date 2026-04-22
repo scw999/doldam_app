@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TextInput, Pressable,
   Alert, KeyboardAvoidingView, Platform, SafeAreaView, ActivityIndicator,
-  Modal, TouchableOpacity,
+  Modal, TouchableOpacity, ScrollView,
 } from 'react-native';
 import { useLocalSearchParams, useFocusEffect, router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -11,6 +11,7 @@ import { Avatar, fmtRemaining } from '@/ui/atoms';
 import { useAuth } from '@/store/auth';
 import { api } from '@/api';
 import { buildWelcomeMessage, buildIcebreakerQuestion } from '@/utils/icebreaker';
+import { TBH_QUESTIONS } from '@/utils/tbhQuestions';
 
 const API_BASE = process.env.EXPO_PUBLIC_API_BASE ?? 'http://localhost:8787';
 const RECONNECT_DELAY = 3000;
@@ -57,6 +58,7 @@ export default function RoomScreen() {
   const [reportTarget, setReportTarget] = useState<{ userId: string; nickname: string } | null>(null);
   const [muted, setMuted] = useState(false);
   const [voteCreateVisible, setVoteCreateVisible] = useState(false);
+  const [voteMode, setVoteMode] = useState<'tbh' | 'custom'>('tbh');
   const [voteQuestion, setVoteQuestion] = useState('');
   const [voteOptions, setVoteOptions] = useState<string[]>(['', '']);
   const [creatingVote, setCreatingVote] = useState(false);
@@ -158,7 +160,6 @@ export default function RoomScreen() {
     const q = voteQuestion.trim();
     if (!q) { Alert.alert('질문을 입력해주세요'); return; }
     const opts = voteOptions.map((o) => o.trim()).filter(Boolean);
-    // 선택지 0-1개면 찬반형, 2개 이상이면 선택형
     const useMulti = opts.length >= 2;
     if (opts.length === 1) { Alert.alert('선택지는 0개(찬반) 또는 2개 이상(선택형)이어야 해요'); return; }
     setCreatingVote(true);
@@ -166,10 +167,31 @@ export default function RoomScreen() {
       const body: { question: string; options?: string[] } = { question: q };
       if (useMulti) body.options = opts;
       const { id: newVoteId } = await api.post<{ id: string }>('/votes', body);
-      send(useMulti ? `🗳️ ${q}` : `🗳️ ${q}`, newVoteId);
+      send(`🗳️ ${q}`, newVoteId);
       setVoteCreateVisible(false);
       setVoteQuestion('');
       setVoteOptions(['', '']);
+    } catch (e) {
+      Alert.alert('실패', (e as Error).message);
+    } finally { setCreatingVote(false); }
+  }
+
+  async function createPeerPoll(question: string) {
+    if (!room || room.members.length < 2) {
+      Alert.alert('멤버가 2명 이상 있어야 해요');
+      return;
+    }
+    setCreatingVote(true);
+    try {
+      const memberIds = room.members.map((m) => m.id);
+      const { id: newVoteId } = await api.post<{ id: string }>('/votes', {
+        question,
+        options: memberIds,
+        kind: 'peer_poll',
+        roomId: id,
+      });
+      send(`💘 ${question}`, newVoteId);
+      setVoteCreateVisible(false);
     } catch (e) {
       Alert.alert('실패', (e as Error).message);
     } finally { setCreatingVote(false); }
@@ -391,65 +413,118 @@ export default function RoomScreen() {
         {/* 투표 만들기 모달 */}
         <Modal visible={voteCreateVisible} transparent animationType="slide">
           <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setVoteCreateVisible(false)}>
-            <TouchableOpacity activeOpacity={1} style={[styles.icebreakerSheet, { width: '92%' }]}>
-              <Text style={{ fontSize: 15, fontWeight: '700', color: colors.text, marginBottom: 4 }}>🗳️ 방에 투표 띄우기</Text>
-              <Text style={{ fontSize: 11, color: colors.textSub, marginBottom: 14 }}>
-                선택지 비워두면 찬/반 투표 · 2~6개 적으면 선택형
-              </Text>
-              <TextInput
-                style={styles.icebreakerInput}
-                value={voteQuestion}
-                onChangeText={setVoteQuestion}
-                placeholder="질문 입력"
-                placeholderTextColor={colors.textLight}
-                multiline
-                maxLength={150}
-              />
-              <View style={{ marginTop: 12, gap: 6 }}>
-                {voteOptions.map((opt, i) => (
-                  <View key={i} style={{ flexDirection: 'row', gap: 6 }}>
-                    <TextInput
-                      style={[styles.input, { flex: 1 }]}
-                      value={opt}
-                      onChangeText={(t) => setVoteOptions((prev) => prev.map((o, j) => (j === i ? t : o)))}
-                      placeholder={`선택지 ${i + 1}`}
-                      placeholderTextColor={colors.textLight}
-                      maxLength={40}
-                    />
-                    {voteOptions.length > 2 && (
+            <TouchableOpacity activeOpacity={1} style={[styles.icebreakerSheet, { width: '92%', maxHeight: '85%' }]}>
+              <Text style={{ fontSize: 15, fontWeight: '700', color: colors.text, marginBottom: 10 }}>🗳️ 방에 투표 띄우기</Text>
+
+              {/* 모드 탭 */}
+              <View style={{ flexDirection: 'row', gap: 6, marginBottom: 14 }}>
+                {([
+                  { id: 'tbh' as const, label: '💘 멤버 투표', hint: 'TBH' },
+                  { id: 'custom' as const, label: '✍️ 직접 만들기', hint: '찬/반 · 선택형' },
+                ]).map((t) => (
+                  <Pressable
+                    key={t.id}
+                    onPress={() => setVoteMode(t.id)}
+                    style={{
+                      flex: 1, paddingVertical: 10, borderRadius: 10,
+                      backgroundColor: voteMode === t.id ? colors.primary : colors.tag,
+                      alignItems: 'center',
+                    }}
+                  >
+                    <Text style={{ fontSize: 12, fontWeight: '700', color: voteMode === t.id ? '#fff' : colors.textSub }}>{t.label}</Text>
+                    <Text style={{ fontSize: 10, color: voteMode === t.id ? 'rgba(255,255,255,0.85)' : colors.textLight, marginTop: 2 }}>{t.hint}</Text>
+                  </Pressable>
+                ))}
+              </View>
+
+              {voteMode === 'tbh' ? (
+                <>
+                  <Text style={{ fontSize: 11, color: colors.textSub, marginBottom: 10 }}>
+                    선택지는 채팅방 멤버({room?.members?.length ?? 0}명)로 자동 구성돼요
+                  </Text>
+                  <ScrollView style={{ maxHeight: 420 }} showsVerticalScrollIndicator={false}>
+                    <View style={{ gap: 6 }}>
+                      {TBH_QUESTIONS.map((q) => (
+                        <Pressable
+                          key={q.text}
+                          onPress={() => !creatingVote && createPeerPoll(q.text)}
+                          disabled={creatingVote}
+                          style={{
+                            flexDirection: 'row', alignItems: 'center', gap: 10,
+                            paddingVertical: 12, paddingHorizontal: 12,
+                            borderRadius: 10, backgroundColor: colors.bg,
+                            borderWidth: 1, borderColor: colors.border,
+                          }}
+                        >
+                          <Text style={{ fontSize: 18 }}>{q.emoji}</Text>
+                          <Text style={{ flex: 1, fontSize: 13, color: colors.text, lineHeight: 18 }}>{q.text}</Text>
+                          <Text style={{ fontSize: 14, color: colors.textLight }}>→</Text>
+                        </Pressable>
+                      ))}
+                    </View>
+                  </ScrollView>
+                </>
+              ) : (
+                <>
+                  <Text style={{ fontSize: 11, color: colors.textSub, marginBottom: 14 }}>
+                    선택지 비워두면 찬/반 투표 · 2~6개 적으면 선택형
+                  </Text>
+                  <TextInput
+                    style={styles.icebreakerInput}
+                    value={voteQuestion}
+                    onChangeText={setVoteQuestion}
+                    placeholder="질문 입력"
+                    placeholderTextColor={colors.textLight}
+                    multiline
+                    maxLength={150}
+                  />
+                  <View style={{ marginTop: 12, gap: 6 }}>
+                    {voteOptions.map((opt, i) => (
+                      <View key={i} style={{ flexDirection: 'row', gap: 6 }}>
+                        <TextInput
+                          style={[styles.input, { flex: 1 }]}
+                          value={opt}
+                          onChangeText={(t) => setVoteOptions((prev) => prev.map((o, j) => (j === i ? t : o)))}
+                          placeholder={`선택지 ${i + 1}`}
+                          placeholderTextColor={colors.textLight}
+                          maxLength={40}
+                        />
+                        {voteOptions.length > 2 && (
+                          <Pressable
+                            onPress={() => setVoteOptions((prev) => prev.filter((_, j) => j !== i))}
+                            style={{ width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.tag }}
+                          >
+                            <Text style={{ fontSize: 14, color: colors.textSub }}>✕</Text>
+                          </Pressable>
+                        )}
+                      </View>
+                    ))}
+                    {voteOptions.length < 6 && (
                       <Pressable
-                        onPress={() => setVoteOptions((prev) => prev.filter((_, j) => j !== i))}
-                        style={{ width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.tag }}
+                        onPress={() => setVoteOptions((prev) => [...prev, ''])}
+                        style={{ paddingVertical: 8, alignItems: 'center' }}
                       >
-                        <Text style={{ fontSize: 14, color: colors.textSub }}>✕</Text>
+                        <Text style={{ fontSize: 12, color: colors.primaryDark }}>+ 선택지 추가</Text>
                       </Pressable>
                     )}
                   </View>
-                ))}
-                {voteOptions.length < 6 && (
-                  <Pressable
-                    onPress={() => setVoteOptions((prev) => [...prev, ''])}
-                    style={{ paddingVertical: 8, alignItems: 'center' }}
-                  >
-                    <Text style={{ fontSize: 12, color: colors.primaryDark }}>+ 선택지 추가</Text>
-                  </Pressable>
-                )}
-              </View>
-              <View style={{ flexDirection: 'row', gap: 10, marginTop: 14 }}>
-                <Pressable style={[styles.icebreakerBtn, { backgroundColor: colors.tag, flex: 1 }]} onPress={() => setVoteCreateVisible(false)}>
-                  <Text style={{ color: colors.textSub, fontWeight: '600' }}>취소</Text>
-                </Pressable>
-                <Pressable
-                  style={[styles.icebreakerBtn, { backgroundColor: colors.primary, flex: 2, opacity: creatingVote ? 0.6 : 1 }]}
-                  onPress={createChatVote}
-                  disabled={creatingVote}
-                >
-                  {creatingVote
-                    ? <ActivityIndicator color="#fff" />
-                    : <Text style={{ color: '#fff', fontWeight: '700' }}>투표 올리기</Text>
-                  }
-                </Pressable>
-              </View>
+                  <View style={{ flexDirection: 'row', gap: 10, marginTop: 14 }}>
+                    <Pressable style={[styles.icebreakerBtn, { backgroundColor: colors.tag, flex: 1 }]} onPress={() => setVoteCreateVisible(false)}>
+                      <Text style={{ color: colors.textSub, fontWeight: '600' }}>취소</Text>
+                    </Pressable>
+                    <Pressable
+                      style={[styles.icebreakerBtn, { backgroundColor: colors.primary, flex: 2, opacity: creatingVote ? 0.6 : 1 }]}
+                      onPress={createChatVote}
+                      disabled={creatingVote}
+                    >
+                      {creatingVote
+                        ? <ActivityIndicator color="#fff" />
+                        : <Text style={{ color: '#fff', fontWeight: '700' }}>투표 올리기</Text>
+                      }
+                    </Pressable>
+                  </View>
+                </>
+              )}
             </TouchableOpacity>
           </TouchableOpacity>
         </Modal>
