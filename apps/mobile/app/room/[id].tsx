@@ -25,6 +25,7 @@ const REPORT_REASONS = [
 
 interface Message {
   id: string; from: string; nickname: string; text: string; ts: number;
+  voteId?: string;
 }
 
 interface RoomInfo {
@@ -32,6 +33,10 @@ interface RoomInfo {
   expires_at: number; status: string; tags?: string | null;
   members: { id: string; nickname: string; gender: 'M' | 'F'; age_range: string }[];
 }
+
+// 모듈레벨 캐시 — 방 재입장 시 즉시 표시
+const roomCache: Record<string, { info: RoomInfo; messages: Message[]; ts: number }> = {};
+const ROOM_CACHE_TTL = 120_000; // 2분
 
 export default function RoomScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -51,6 +56,10 @@ export default function RoomScreen() {
   const [welcomeMessage, setWelcomeMessage] = useState('');
   const [reportTarget, setReportTarget] = useState<{ userId: string; nickname: string } | null>(null);
   const [muted, setMuted] = useState(false);
+  const [voteCreateVisible, setVoteCreateVisible] = useState(false);
+  const [voteQuestion, setVoteQuestion] = useState('');
+  const [voteOptions, setVoteOptions] = useState<string[]>(['', '']);
+  const [creatingVote, setCreatingVote] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const listRef = useRef<FlatList<Message>>(null);
@@ -58,15 +67,22 @@ export default function RoomScreen() {
   const icebreakerShownRef = useRef(false);
 
   const loadRoom = useCallback(async () => {
+    const cached = roomCache[id];
+    const isFresh = cached && Date.now() - cached.ts < ROOM_CACHE_TTL;
+    if (isFresh) {
+      setRoom(cached.info);
+      setMessages(cached.messages);
+    }
     try {
       const [info, history, muteRes] = await Promise.all([
-        api.get<RoomInfo>(`/rooms/${id}`),
-        api.get<{ items: Message[] }>(`/rooms/${id}/history`),
+        api.get<RoomInfo>(`/rooms/${id}`, { cacheTtl: 0 }),
+        api.get<{ items: Message[] }>(`/rooms/${id}/history`, { cacheTtl: 0 }),
         api.get<{ muted: boolean }>(`/notifications/rooms/${id}/mute`, { cacheTtl: 0 }).catch(() => ({ muted: false })),
       ]);
       setMuted(muteRes.muted);
       setRoom(info);
       setMessages(history.items);
+      roomCache[id] = { info, messages: history.items, ts: Date.now() };
       // 내 메시지가 없으면 아이스브레이커 표시
       if (!icebreakerShownRef.current) {
         const myMsgs = history.items.filter((m) => m.from === myUserId);
@@ -131,11 +147,32 @@ export default function RoomScreen() {
     };
   }, [id, token]);
 
-  function send(text?: string) {
+  function send(text?: string, voteId?: string) {
     const t = (text ?? draft).trim();
-    if (!t || wsRef.current?.readyState !== WebSocket.OPEN) return;
-    wsRef.current.send(JSON.stringify({ text: t }));
+    if ((!t && !voteId) || wsRef.current?.readyState !== WebSocket.OPEN) return;
+    wsRef.current.send(JSON.stringify({ text: t, ...(voteId && { voteId }) }));
     if (!text) setDraft('');
+  }
+
+  async function createChatVote() {
+    const q = voteQuestion.trim();
+    if (!q) { Alert.alert('질문을 입력해주세요'); return; }
+    const opts = voteOptions.map((o) => o.trim()).filter(Boolean);
+    // 선택지 0-1개면 찬반형, 2개 이상이면 선택형
+    const useMulti = opts.length >= 2;
+    if (opts.length === 1) { Alert.alert('선택지는 0개(찬반) 또는 2개 이상(선택형)이어야 해요'); return; }
+    setCreatingVote(true);
+    try {
+      const body: { question: string; options?: string[] } = { question: q };
+      if (useMulti) body.options = opts;
+      const { id: newVoteId } = await api.post<{ id: string }>('/votes', body);
+      send(useMulti ? `🗳️ ${q}` : `🗳️ ${q}`, newVoteId);
+      setVoteCreateVisible(false);
+      setVoteQuestion('');
+      setVoteOptions(['', '']);
+    } catch (e) {
+      Alert.alert('실패', (e as Error).message);
+    } finally { setCreatingVote(false); }
   }
 
   function submitIcebreaker() {
@@ -308,6 +345,7 @@ export default function RoomScreen() {
                 msg={m}
                 mine={m.from === myUserId}
                 onReport={m.from !== myUserId ? () => setReportTarget({ userId: m.from, nickname: m.nickname }) : undefined}
+                onVoteTap={m.voteId ? () => router.push(`/vote/${m.voteId}`) : undefined}
               />
             );
           }}
@@ -315,6 +353,17 @@ export default function RoomScreen() {
 
         {/* 입력 */}
         <View style={styles.inputRow}>
+          <Pressable
+            onPress={() => setVoteCreateVisible(true)}
+            disabled={!connected || isExpired}
+            style={{
+              width: 40, height: 40, borderRadius: 20,
+              backgroundColor: colors.tag,
+              alignItems: 'center', justifyContent: 'center',
+            }}
+          >
+            <Text style={{ fontSize: 20 }}>🗳️</Text>
+          </Pressable>
           <TextInput
             style={styles.input}
             value={draft}
@@ -338,6 +387,72 @@ export default function RoomScreen() {
             <Text style={{ fontSize: 16, fontWeight: '700', color: draft.trim() ? '#fff' : colors.textLight }}>↑</Text>
           </Pressable>
         </View>
+
+        {/* 투표 만들기 모달 */}
+        <Modal visible={voteCreateVisible} transparent animationType="slide">
+          <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setVoteCreateVisible(false)}>
+            <TouchableOpacity activeOpacity={1} style={[styles.icebreakerSheet, { width: '92%' }]}>
+              <Text style={{ fontSize: 15, fontWeight: '700', color: colors.text, marginBottom: 4 }}>🗳️ 방에 투표 띄우기</Text>
+              <Text style={{ fontSize: 11, color: colors.textSub, marginBottom: 14 }}>
+                선택지 비워두면 찬/반 투표 · 2~6개 적으면 선택형
+              </Text>
+              <TextInput
+                style={styles.icebreakerInput}
+                value={voteQuestion}
+                onChangeText={setVoteQuestion}
+                placeholder="질문 입력"
+                placeholderTextColor={colors.textLight}
+                multiline
+                maxLength={150}
+              />
+              <View style={{ marginTop: 12, gap: 6 }}>
+                {voteOptions.map((opt, i) => (
+                  <View key={i} style={{ flexDirection: 'row', gap: 6 }}>
+                    <TextInput
+                      style={[styles.input, { flex: 1 }]}
+                      value={opt}
+                      onChangeText={(t) => setVoteOptions((prev) => prev.map((o, j) => (j === i ? t : o)))}
+                      placeholder={`선택지 ${i + 1}`}
+                      placeholderTextColor={colors.textLight}
+                      maxLength={40}
+                    />
+                    {voteOptions.length > 2 && (
+                      <Pressable
+                        onPress={() => setVoteOptions((prev) => prev.filter((_, j) => j !== i))}
+                        style={{ width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.tag }}
+                      >
+                        <Text style={{ fontSize: 14, color: colors.textSub }}>✕</Text>
+                      </Pressable>
+                    )}
+                  </View>
+                ))}
+                {voteOptions.length < 6 && (
+                  <Pressable
+                    onPress={() => setVoteOptions((prev) => [...prev, ''])}
+                    style={{ paddingVertical: 8, alignItems: 'center' }}
+                  >
+                    <Text style={{ fontSize: 12, color: colors.primaryDark }}>+ 선택지 추가</Text>
+                  </Pressable>
+                )}
+              </View>
+              <View style={{ flexDirection: 'row', gap: 10, marginTop: 14 }}>
+                <Pressable style={[styles.icebreakerBtn, { backgroundColor: colors.tag, flex: 1 }]} onPress={() => setVoteCreateVisible(false)}>
+                  <Text style={{ color: colors.textSub, fontWeight: '600' }}>취소</Text>
+                </Pressable>
+                <Pressable
+                  style={[styles.icebreakerBtn, { backgroundColor: colors.primary, flex: 2, opacity: creatingVote ? 0.6 : 1 }]}
+                  onPress={createChatVote}
+                  disabled={creatingVote}
+                >
+                  {creatingVote
+                    ? <ActivityIndicator color="#fff" />
+                    : <Text style={{ color: '#fff', fontWeight: '700' }}>투표 올리기</Text>
+                  }
+                </Pressable>
+              </View>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </Modal>
       </KeyboardAvoidingView>
 
       {/* 아이스브레이커 모달 */}
@@ -416,11 +531,14 @@ function Bubble({
   msg,
   mine,
   onReport,
+  onVoteTap,
 }: {
   msg: Message;
   mine: boolean;
   onReport?: () => void;
+  onVoteTap?: () => void;
 }) {
+  const hasVote = !!msg.voteId;
   return (
     <Pressable
       onLongPress={onReport}
@@ -428,25 +546,52 @@ function Bubble({
       style={{ flexDirection: mine ? 'row-reverse' : 'row', gap: 8, marginBottom: 12, alignItems: 'flex-end' }}
     >
       {!mine && <Avatar size={28} />}
-      <View style={{ maxWidth: '74%' }}>
+      <View style={{ maxWidth: '80%' }}>
         {!mine && (
           <Text style={{ fontSize: 10.5, color: colors.textSub, marginBottom: 3, marginLeft: 2 }}>
             {msg.nickname}
           </Text>
         )}
         <View style={{ flexDirection: mine ? 'row-reverse' : 'row', alignItems: 'flex-end', gap: 6 }}>
-          <View style={{
-            padding: 12, paddingHorizontal: 13,
-            backgroundColor: mine ? colors.primary : colors.card,
-            borderRadius: 16,
-            borderBottomRightRadius: mine ? 4 : 16,
-            borderBottomLeftRadius: mine ? 16 : 4,
-            elevation: mine ? 0 : 1,
-          }}>
-            <Text style={{ fontSize: 13.5, lineHeight: 20, color: mine ? '#fff' : colors.text, letterSpacing: -0.1 }}>
-              {msg.text}
-            </Text>
-          </View>
+          {hasVote ? (
+            <Pressable
+              onPress={onVoteTap}
+              style={{
+                padding: 14,
+                backgroundColor: mine ? colors.primary : colors.card,
+                borderWidth: 1.5,
+                borderColor: mine ? colors.primaryDark : colors.primary + '55',
+                borderRadius: 16,
+                minWidth: 220,
+              }}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+                <Text style={{ fontSize: 14 }}>🗳️</Text>
+                <Text style={{ fontSize: 10.5, fontWeight: '700', color: mine ? 'rgba(255,255,255,0.8)' : colors.primaryDark, letterSpacing: 0.3 }}>
+                  투표
+                </Text>
+              </View>
+              <Text style={{ fontSize: 13.5, lineHeight: 20, color: mine ? '#fff' : colors.text, fontWeight: '600', letterSpacing: -0.1 }}>
+                {msg.text.replace(/^🗳️\s*/, '')}
+              </Text>
+              <Text style={{ fontSize: 11, marginTop: 8, color: mine ? 'rgba(255,255,255,0.85)' : colors.primaryDark, fontWeight: '600' }}>
+                탭해서 참여 →
+              </Text>
+            </Pressable>
+          ) : (
+            <View style={{
+              padding: 12, paddingHorizontal: 13,
+              backgroundColor: mine ? colors.primary : colors.card,
+              borderRadius: 16,
+              borderBottomRightRadius: mine ? 4 : 16,
+              borderBottomLeftRadius: mine ? 16 : 4,
+              elevation: mine ? 0 : 1,
+            }}>
+              <Text style={{ fontSize: 13.5, lineHeight: 20, color: mine ? '#fff' : colors.text, letterSpacing: -0.1 }}>
+                {msg.text}
+              </Text>
+            </View>
+          )}
           <Text style={{ fontSize: 10, color: colors.textLight }}>{fmtHhmm(msg.ts)}</Text>
         </View>
       </View>

@@ -9,6 +9,7 @@ interface ChatMessage {
   nickname: string;
   text: string;
   ts: number;
+  voteId?: string;
 }
 
 interface Session {
@@ -53,7 +54,15 @@ export class ChatRoom {
   // DO 알람 핸들러 — 주기적 아이스브레이커 질문 전송
   async alarm(): Promise<void> {
     const now = Date.now();
-    const q = ICEBREAKER_QUESTIONS[Math.floor(Math.random() * ICEBREAKER_QUESTIONS.length)];
+    // 이미 물어본 질문 인덱스 추적 — 전부 소진되면 리셋
+    const asked = (await this.state.storage.get<number[]>('askedQuestions')) ?? [];
+    const remaining = ICEBREAKER_QUESTIONS.map((_, i) => i).filter((i) => !asked.includes(i));
+    const pool = remaining.length > 0 ? remaining : ICEBREAKER_QUESTIONS.map((_, i) => i);
+    const idx = pool[Math.floor(Math.random() * pool.length)];
+    const q = ICEBREAKER_QUESTIONS[idx];
+    const newAsked = remaining.length === 0 ? [idx] : [...asked, idx];
+    await this.state.storage.put('askedQuestions', newAsked);
+
     const msg: ChatMessage = {
       id: crypto.randomUUID(),
       from: 'system',
@@ -138,16 +147,19 @@ export class ChatRoom {
       try {
         const data = JSON.parse(evt.data as string);
         const text = String(data.text ?? '').trim();
-        if (!text) return;
+        const voteId = typeof data.voteId === 'string' && data.voteId.length <= 64 ? data.voteId : undefined;
+        if (!text && !voteId) return;
         if (text.length > 1000) {
           server.send(JSON.stringify({ type: 'error', error: 'message_too_long' }));
           return;
         }
 
-        const filter = await runKeywordFilter(text);
-        if (!filter.ok) {
-          server.send(JSON.stringify({ type: 'error', error: 'moderation_failed', reason: filter.reason }));
-          return;
+        if (text) {
+          const filter = await runKeywordFilter(text);
+          if (!filter.ok) {
+            server.send(JSON.stringify({ type: 'error', error: 'moderation_failed', reason: filter.reason }));
+            return;
+          }
         }
 
         const msg: ChatMessage = {
@@ -156,6 +168,7 @@ export class ChatRoom {
           nickname: user.nickname,
           text,
           ts: Date.now(),
+          ...(voteId && { voteId }),
         };
         await this.state.storage.put(`msg:${msg.ts}:${msg.id}`, msg);
         this.broadcast(msg);
