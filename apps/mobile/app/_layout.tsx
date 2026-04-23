@@ -50,23 +50,31 @@ export default function RootLayout() {
   useEffect(() => {
     if (!token) return;
     (async () => {
-      const { status: existing } = await Notifications.getPermissionsAsync();
-      const { status } = existing === 'granted'
-        ? { status: existing }
-        : await Notifications.requestPermissionsAsync();
-      if (status !== 'granted') return;
       try {
+        const { status: existing } = await Notifications.getPermissionsAsync();
+        const { status } = existing === 'granted'
+          ? { status: existing }
+          : await Notifications.requestPermissionsAsync();
+        if (status !== 'granted') {
+          console.log('[push] permission denied:', status);
+          return;
+        }
         const pushToken = await Notifications.getExpoPushTokenAsync({
           projectId: 'e319fb49-251c-4449-b120-d58ddb2ddc8d',
         });
-        if (pushToken.data) {
-          await api.post('/notifications/token', {
-            token: pushToken.data,
-            platform: Platform.OS,
-          }).catch(() => {});
+        if (!pushToken.data) {
+          console.warn('[push] got empty token');
+          return;
+        }
+        console.log('[push] expo token acquired:', pushToken.data.slice(0, 30) + '...');
+        try {
+          await api.post('/notifications/token', { token: pushToken.data, platform: Platform.OS });
+          console.log('[push] token registered to server');
+        } catch (apiErr) {
+          console.error('[push] server register failed:', (apiErr as Error).message);
         }
       } catch (e) {
-        console.warn('[push] token error', e);
+        console.error('[push] setup failed:', (e as Error).message);
       }
     })();
   }, [token]);

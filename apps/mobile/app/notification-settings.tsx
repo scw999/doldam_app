@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { View, Text, Switch, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
+import { View, Text, Switch, StyleSheet, ScrollView, ActivityIndicator, Alert } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -67,6 +67,20 @@ export default function NotificationSettingsScreen() {
     }
   }
 
+  async function sendTestPush() {
+    try {
+      await api.post('/notifications/test-self', {});
+      Alert.alert('전송 완료', '잠시 후 푸시 알림이 도착해요');
+    } catch (e) {
+      const msg = (e as Error).message;
+      if (msg.includes('no_tokens_registered')) {
+        Alert.alert('토큰 미등록', '아직 이 기기의 푸시 토큰이 서버에 등록되지 않았어요. 앱을 재시작해보세요.');
+      } else {
+        Alert.alert('전송 실패', msg);
+      }
+    }
+  }
+
   if (loading) return <ActivityIndicator style={{ marginTop: 80 }} />;
 
   return (
@@ -83,6 +97,10 @@ export default function NotificationSettingsScreen() {
       </View>
 
       <ScrollView contentContainerStyle={{ padding: spacing.md, paddingBottom: 40 }}>
+        <Pressable style={styles.testButton} onPress={sendTestPush}>
+          <Text style={styles.testButtonText}>🧪 푸시 테스트 보내기</Text>
+        </Pressable>
+
         <Text style={styles.sectionTitle}>활동 알림</Text>
         <View style={styles.card}>
           {prefs && [
@@ -148,4 +166,12 @@ const styles = StyleSheet.create({
   rowBorder: { borderBottomWidth: 1, borderBottomColor: colors.border },
   rowLabel: { fontSize: 14, color: colors.text, fontWeight: '500', marginBottom: 2 },
   rowDesc: { fontSize: 12, color: colors.textSub },
+  testButton: {
+    backgroundColor: colors.primary,
+    borderRadius: radius.md,
+    paddingVertical: 14,
+    alignItems: 'center',
+    marginBottom: spacing.lg,
+  },
+  testButtonText: { fontSize: 14, fontWeight: '600', color: '#fff' },
 });

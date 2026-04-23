@@ -22,6 +22,20 @@ notifications.post('/token', requireAuth, async (c) => {
   return c.json({ ok: true });
 });
 
+// ---- 자기 자신에게 테스트 푸시 (디버그용) ----
+notifications.post('/test-self', requireAuth, async (c) => {
+  const user = c.get('user');
+  const { results } = await c.env.DOLDAM_DB
+    .prepare('SELECT token FROM push_tokens WHERE user_id = ?')
+    .bind(user.id).all<{ token: string }>();
+  if (results.length === 0) return c.json({ error: 'no_tokens_registered' }, 400);
+
+  // sendPush 경유하면 notifications 테이블에도 기록됨 — 깔끔한 end-to-end 테스트
+  const { sendPush } = await import('../services/push');
+  await sendPush(c.env, user.id, '🔔 테스트 푸시', '정상적으로 푸시 알림이 도착했어요');
+  return c.json({ ok: true, tokenCount: results.length });
+});
+
 // ---- 토큰 삭제 ----
 notifications.delete('/token', requireAuth, async (c) => {
   const user = c.get('user');

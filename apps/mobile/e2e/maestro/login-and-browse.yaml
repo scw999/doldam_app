@@ -1,0 +1,19 @@
+appId: com.doldam.app
+---
+# 초기 진입 플로우: 앱 실행 → 로그인 화면 확인 → CTA 탭 직전까지
+# 실제 OTP 인증은 자동화하기 어려우므로 인증번호 요청 버튼을 노출만 확인
+- launchApp:
+    clearState: true
+- assertVisible:
+    text: "돌담"
+- assertVisible:
+    text: "인증된 돌싱만의 공간"
+- assertVisible:
+    text: "인증번호 받기"
+# 휴대폰 번호 입력 (테스트 번호) — OTP 발송까지만 시뮬레이션 시도
+- tapOn:
+    text: "010-0000-0000"
+- inputText: "01012345678"
+# 여기서 멈춤: 실제 OTP 검증은 외부 의존성(다날/NHN) 때문에 E2E 불가
+- assertVisible:
+    text: "인증번호 받기"

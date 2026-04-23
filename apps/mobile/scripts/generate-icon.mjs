@@ -21,7 +21,7 @@ const assetsDir = resolve(__dirname, '../assets');
  */
 function makeBrickWallSvg(size = 1024) {
   const mortar = 11;
-  const rx = 7;
+  const rx = 22;
 
   // 행 높이 + 행별 돌 너비 비율 (합계 = 1.0)
   const rowDefs = [
@@ -59,6 +59,10 @@ function makeBrickWallSvg(size = 1024) {
     y += row.h + mortar;
   }
 
+  const cx = size / 2;
+  const cy = size / 2;
+  const fontSize = Math.round(size * 0.195);
+
   return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" xmlns="http://www.w3.org/2000/svg">
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="0.35" y2="1">
@@ -67,7 +71,14 @@ function makeBrickWallSvg(size = 1024) {
     </linearGradient>
   </defs>
   <rect width="${size}" height="${size}" fill="url(#bg)"/>
-${rects}</svg>`;
+${rects}
+  <text x="${cx}" y="${cy + Math.round(fontSize * 0.36)}"
+    font-family="'Nanum Myeongjo','나눔명조','Malgun Gothic','맑은 고딕',serif"
+    font-size="${fontSize}" font-weight="700"
+    fill="#2C1408"
+    stroke="rgba(255,255,255,0.82)" stroke-width="10" paint-order="stroke fill"
+    text-anchor="middle" opacity="0.96">돌담</text>
+</svg>`;
 }
 
 function makeSplashSvg(w = 1284, h = 2778) {

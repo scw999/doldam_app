@@ -1,0 +1,35 @@
+appId: com.doldam.app
+---
+# 이미 로그인된 상태를 가정한 탭 네비게이션 스모크 테스트
+# 각 탭 방문 후 크래시 없이 다른 탭으로 이동 가능한지만 확인
+- launchApp
+# 홈 탭
+- assertVisible:
+    text: "홈"
+- tapOn:
+    text: "홈"
+# 게시판
+- tapOn:
+    text: "게시판"
+- assertVisible:
+    text: "게시판"
+# 투표
+- tapOn:
+    text: "투표"
+- assertVisible:
+    text: "투표"
+# 채팅
+- tapOn:
+    text: "채팅"
+- assertVisible:
+    text: "채팅"
+# 마이
+- tapOn:
+    text: "마이"
+- assertVisible:
+    text: "마이"
+# 다시 홈으로 복귀
+- tapOn:
+    text: "홈"
+- assertVisible:
+    text: "홈"
