@@ -45,7 +45,7 @@ votes.get('/', async (c) => {
   const { results } = gender
     ? await c.env.DOLDAM_DB.prepare(sql).bind(gender, limit).all()
     : await c.env.DOLDAM_DB.prepare(sql).bind(limit).all();
-  c.header('Cache-Control', 'public, max-age=20, stale-while-revalidate=40');
+  c.header('Cache-Control', 'no-store');
   return c.json({ items: results });
 });
 

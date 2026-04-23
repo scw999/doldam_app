@@ -19,6 +19,10 @@ type GenderFilter = 'all' | 'M' | 'F';
 const voteCache: Record<string, { items: Vote[]; hot3Count: number; ts: number }> = {};
 const VOTE_CACHE_TTL = 60_000;
 
+export function clearVoteCache() {
+  for (const key of Object.keys(voteCache)) delete voteCache[key];
+}
+
 export default function VoteScreen() {
   const hasUnread = useUnreadCount();
   const [filter, setFilter] = useState<GenderFilter>('all');

@@ -7,6 +7,7 @@ import { colors, radius, spacing, typography } from '@/theme';
 import { Pill } from '@/ui/atoms';
 import { api } from '@/api';
 import { useAuth } from '@/store/auth';
+import { clearVoteCache } from '../(tabs)/vote';
 
 const OPTION_COLORS = ['#5B8FC9', '#6BAF7B', '#D4728C', '#C4956A', '#8C7B6B', '#E85D4A'];
 
@@ -39,16 +40,22 @@ export default function VoteDetailScreen() {
   const [selected, setSelected] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [reportVisible, setReportVisible] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    const [all, m, f] = await Promise.all([
-      api.get<VoteDetail>(`/votes/${id}`, { cacheTtl: 0 }),
-      api.get<VoteDetail>(`/votes/${id}?gender=M`, { cacheTtl: 0 }).catch(() => null),
-      api.get<VoteDetail>(`/votes/${id}?gender=F`, { cacheTtl: 0 }).catch(() => null),
-    ]);
-    setVote(all);
-    setByGender({ M: m ?? undefined, F: f ?? undefined });
-    if (all.myChoice) setSelected(all.myChoice);
+    try {
+      const [all, m, f] = await Promise.all([
+        api.get<VoteDetail>(`/votes/${id}`, { cacheTtl: 0 }),
+        api.get<VoteDetail>(`/votes/${id}?gender=M`, { cacheTtl: 0 }).catch(() => null),
+        api.get<VoteDetail>(`/votes/${id}?gender=F`, { cacheTtl: 0 }).catch(() => null),
+      ]);
+      setLoadError(null);
+      setVote(all);
+      setByGender({ M: m ?? undefined, F: f ?? undefined });
+      if (all.myChoice) setSelected(all.myChoice);
+    } catch (e) {
+      setLoadError((e as Error).message ?? 'error');
+    }
   }, [id]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
@@ -89,6 +96,27 @@ export default function VoteDetailScreen() {
   }
 
   const insets = useSafeAreaInsets();
+
+  if (loadError) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg, justifyContent: 'center', paddingHorizontal: 32 }}>
+        <Text style={{ fontSize: 48, textAlign: 'center', marginBottom: 12 }}>🗑️</Text>
+        <Text style={[typography.h3, { color: colors.text, textAlign: 'center', marginBottom: 6 }]}>
+          삭제된 투표예요
+        </Text>
+        <Text style={{ fontSize: 13, color: colors.textSub, textAlign: 'center', marginBottom: 24, lineHeight: 20 }}>
+          작성자가 이 투표를 삭제했거나{'\n'}존재하지 않는 투표입니다
+        </Text>
+        <Pressable
+          onPress={() => router.back()}
+          style={{ paddingVertical: 14, backgroundColor: colors.primary, borderRadius: radius.lg, alignItems: 'center' }}
+        >
+          <Text style={{ color: '#fff', fontSize: 14, fontWeight: '700' }}>돌아가기</Text>
+        </Pressable>
+      </SafeAreaView>
+    );
+  }
+
   if (!vote) return <ActivityIndicator style={{ marginTop: 40 }} />;
 
   const isMulti = Array.isArray(vote.options) && vote.options.length > 0;
@@ -111,6 +139,7 @@ export default function VoteDetailScreen() {
         onPress: async () => {
           try {
             await api.delete(`/votes/${id}`);
+            clearVoteCache();
             router.back();
           } catch (e) {
             Alert.alert('실패', (e as Error).message);
