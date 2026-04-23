@@ -19,3 +19,11 @@ web-build/
 
 # Build
 *.tsbuildinfo
+
+# Firebase — 민감 파일, 저장소에 커밋 금지
+google-services.json
+GoogleService-Info.plist
+apps/mobile/google-services.json
+apps/mobile/GoogleService-Info.plist
+*-firebase-adminsdk-*.json
+fcm-service-account.json
