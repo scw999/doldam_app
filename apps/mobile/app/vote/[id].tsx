@@ -6,11 +6,13 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, radius, spacing, typography } from '@/theme';
 import { Pill } from '@/ui/atoms';
 import { api } from '@/api';
+import { useAuth } from '@/store/auth';
 
 const OPTION_COLORS = ['#5B8FC9', '#6BAF7B', '#D4728C', '#C4956A', '#8C7B6B', '#E85D4A'];
 
 interface VoteDetail {
   id: string;
+  user_id?: string;
   question: string;
   description?: string;
   options?: string[] | null;
@@ -31,6 +33,7 @@ function labelForOption(opt: string, memberInfo?: VoteDetail['memberInfo']): str
 
 export default function VoteDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const myUserId = useAuth((s) => s.userId);
   const [vote, setVote] = useState<VoteDetail | null>(null);
   const [byGender, setByGender] = useState<{ M?: VoteDetail; F?: VoteDetail }>({});
   const [selected, setSelected] = useState<string | null>(null);
@@ -100,6 +103,25 @@ export default function VoteDetailScreen() {
     } catch { Alert.alert('오류', '신고에 실패했어요'); }
   }
 
+  async function deleteVote() {
+    Alert.alert('투표 삭제', '이 투표를 정말 삭제할까요? 참여한 응답도 함께 사라져요.', [
+      { text: '취소', style: 'cancel' },
+      {
+        text: '삭제', style: 'destructive',
+        onPress: async () => {
+          try {
+            await api.delete(`/votes/${id}`);
+            router.back();
+          } catch (e) {
+            Alert.alert('실패', (e as Error).message);
+          }
+        },
+      },
+    ]);
+  }
+
+  const isMine = !!myUserId && vote?.user_id === myUserId;
+
   async function share() {
     if (isMulti && vote!.options) {
       const top = vote!.options.map((o) => ({ o, n: vote!.counts?.[o] ?? 0 })).sort((a, b) => b.n - a.n)[0];
@@ -123,7 +145,19 @@ export default function VoteDetailScreen() {
             </Text>
           </View>
         )}
-        <Pressable onPress={() => setReportVisible(true)} style={{ padding: 8, marginLeft: 'auto' }}>
+        <Pressable
+          onPress={() => {
+            if (isMine) {
+              Alert.alert('투표 관리', undefined, [
+                { text: '🗑️  삭제', style: 'destructive', onPress: deleteVote },
+                { text: '취소', style: 'cancel' },
+              ]);
+            } else {
+              setReportVisible(true);
+            }
+          }}
+          style={{ padding: 8, marginLeft: 'auto' }}
+        >
           <Text style={{ fontSize: 20, color: colors.textSub }}>⋯</Text>
         </Pressable>
       </View>

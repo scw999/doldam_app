@@ -158,6 +158,23 @@ votes.post('/', requireAuth, moderate, async (c) => {
   return c.json({ id });
 });
 
+// ---- 삭제 (작성자만) ----
+votes.delete('/:id', requireAuth, async (c) => {
+  const id = c.req.param('id');
+  const user = c.get('user');
+  const row = await c.env.DOLDAM_DB
+    .prepare('SELECT user_id FROM votes WHERE id = ?').bind(id).first<{ user_id: string }>();
+  if (!row) return c.json({ error: 'not_found' }, 404);
+  if (row.user_id !== user.id) return c.json({ error: 'forbidden' }, 403);
+
+  // 응답 먼저 삭제 후 투표 삭제 (FK 없이도 고아 데이터 방지)
+  await c.env.DOLDAM_DB
+    .prepare('DELETE FROM vote_responses WHERE vote_id = ?').bind(id).run();
+  await c.env.DOLDAM_DB
+    .prepare('DELETE FROM votes WHERE id = ?').bind(id).run();
+  return c.json({ ok: true });
+});
+
 // ---- 응답 ----
 votes.post('/:id/respond', requireAuth, async (c) => {
   const id = c.req.param('id');
