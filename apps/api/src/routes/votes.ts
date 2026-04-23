@@ -163,9 +163,19 @@ votes.delete('/:id', requireAuth, async (c) => {
   const id = c.req.param('id');
   const user = c.get('user');
   const row = await c.env.DOLDAM_DB
-    .prepare('SELECT user_id FROM votes WHERE id = ?').bind(id).first<{ user_id: string }>();
+    .prepare('SELECT user_id, kind FROM votes WHERE id = ?').bind(id).first<{ user_id: string; kind: string | null }>();
   if (!row) return c.json({ error: 'not_found' }, 404);
   if (row.user_id !== user.id) return c.json({ error: 'forbidden' }, 403);
+
+  // 피어 폴은 응답이 있으면 삭제 불가 — 유료 '나를 뽑은 사람 보기' 데이터 보호
+  if (row.kind === 'peer_poll') {
+    const resp = await c.env.DOLDAM_DB
+      .prepare('SELECT COUNT(*) AS n FROM vote_responses WHERE vote_id = ?').bind(id)
+      .first<{ n: number }>();
+    if ((resp?.n ?? 0) > 0) {
+      return c.json({ error: 'peer_poll_has_responses' }, 403);
+    }
+  }
 
   // 응답 먼저 삭제 후 투표 삭제 (FK 없이도 고아 데이터 방지)
   await c.env.DOLDAM_DB

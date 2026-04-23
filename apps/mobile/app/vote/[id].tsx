@@ -132,7 +132,18 @@ export default function VoteDetailScreen() {
   }
 
   async function deleteVote() {
-    Alert.alert('투표 삭제', '이 투표를 정말 삭제할까요? 참여한 응답도 함께 사라져요.', [
+    // 피어 폴은 응답 있으면 삭제 불가 (유료 공개 기능 보호) — 서버에서도 차단됨
+    if (vote?.kind === 'peer_poll' && (vote?.total ?? 0) > 0) {
+      Alert.alert(
+        '삭제 불가',
+        '이미 누군가 참여한 멤버 투표는 삭제할 수 없어요.\n\n"나를 뽑은 사람 보기" 기능을 위해 기록이 보존됩니다.'
+      );
+      return;
+    }
+    const warn = vote?.kind === 'peer_poll'
+      ? '아직 아무도 참여하지 않아 삭제할 수 있어요.'
+      : '참여한 응답도 함께 사라져요.';
+    Alert.alert('투표 삭제', `이 투표를 정말 삭제할까요?\n${warn}`, [
       { text: '취소', style: 'cancel' },
       {
         text: '삭제', style: 'destructive',
@@ -142,7 +153,12 @@ export default function VoteDetailScreen() {
             clearVoteCache();
             router.back();
           } catch (e) {
-            Alert.alert('실패', (e as Error).message);
+            const msg = (e as Error).message;
+            if (msg.includes('peer_poll_has_responses')) {
+              Alert.alert('삭제 불가', '직전에 누군가 참여한 것 같아요. 기록 보존을 위해 삭제할 수 없어요.');
+            } else {
+              Alert.alert('실패', msg);
+            }
           }
         },
       },
