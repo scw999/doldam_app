@@ -98,6 +98,11 @@ npx eas build --platform android --profile preview
 
 ---
 
-## 주의
-- `google-services.json`과 서비스 계정 JSON은 **절대 git commit 금지** (.gitignore로 막음)
-- 서비스 계정 JSON 유출 = Firebase 프로젝트 전체 제어권 탈취 가능
+## 커밋 정책
+
+| 파일 | 커밋 | 이유 |
+|------|------|------|
+| `google-services.json` | ✅ 커밋 | 클라이언트 설정 파일 · APK에 노출되는 값(비밀 아님) · EAS Build가 git 추적 파일만 업로드하므로 필수 |
+| `*-firebase-adminsdk-*.json` (서비스 계정 JSON) | ❌ 절대 금지 | 서버 전체 권한 키 · 유출 시 Firebase 제어권 탈취 |
+
+서비스 계정 JSON은 `.gitignore`로 차단되어 있고, EAS에 `eas credentials`로 업로드만 하면 됩니다.

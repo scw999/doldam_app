@@ -20,10 +20,10 @@ web-build/
 # Build
 *.tsbuildinfo
 
-# Firebase — 민감 파일, 저장소에 커밋 금지
-google-services.json
-GoogleService-Info.plist
-apps/mobile/google-services.json
-apps/mobile/GoogleService-Info.plist
+# Firebase
+# google-services.json / GoogleService-Info.plist 는 클라이언트 설정 파일로
+# 비밀이 아니며(APK/IPA에 노출되는 값), 커밋 필요 — EAS Build가 git 추적 파일만 업로드함
+# 단 서비스 계정 키(Admin SDK)는 절대 커밋 금지
 *-firebase-adminsdk-*.json
 fcm-service-account.json
+serviceAccount*.json
