@@ -1,9 +1,10 @@
 import { useCallback, useState } from 'react';
-import { View, Text, Switch, StyleSheet, ScrollView, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, Switch, StyleSheet, ScrollView, ActivityIndicator, Alert, Platform } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Pressable } from 'react-native';
+import * as Notifications from 'expo-notifications';
 import { colors, spacing, typography, radius } from '@/theme';
 import { api } from '@/api';
 
@@ -74,10 +75,59 @@ export default function NotificationSettingsScreen() {
     } catch (e) {
       const msg = (e as Error).message;
       if (msg.includes('no_tokens_registered')) {
-        Alert.alert('토큰 미등록', '아직 이 기기의 푸시 토큰이 서버에 등록되지 않았어요. 앱을 재시작해보세요.');
+        Alert.alert('토큰 미등록', '아직 이 기기의 푸시 토큰이 서버에 등록되지 않았어요. 아래 "진단 실행"으로 원인을 확인해보세요.');
       } else {
         Alert.alert('전송 실패', msg);
       }
+    }
+  }
+
+  const [diag, setDiag] = useState<{
+    permission: string;
+    token: string;
+    registerOk: boolean | null;
+    error: string;
+  } | null>(null);
+  const [diagRunning, setDiagRunning] = useState(false);
+
+  async function runDiagnostics() {
+    setDiagRunning(true);
+    const result = { permission: '', token: '', registerOk: null as boolean | null, error: '' };
+    try {
+      const existing = await Notifications.getPermissionsAsync();
+      result.permission = `existing=${existing.status}`;
+      if (existing.status !== 'granted') {
+        const req = await Notifications.requestPermissionsAsync();
+        result.permission += ` · requested=${req.status}`;
+        if (req.status !== 'granted') {
+          result.error = `알림 권한이 거부되었어요 (${req.status}). 기기 설정에서 돌담 알림 허용을 켜주세요.`;
+          setDiag(result); return;
+        }
+      }
+      let pushToken;
+      try {
+        pushToken = await Notifications.getExpoPushTokenAsync({
+          projectId: 'e319fb49-251c-4449-b120-d58ddb2ddc8d',
+        });
+      } catch (e) {
+        result.error = `토큰 획득 실패: ${(e as Error).message}`;
+        setDiag(result); return;
+      }
+      if (!pushToken?.data) {
+        result.error = '토큰이 비어있어요. 에뮬레이터이거나 FCM 설정이 누락됐을 수 있어요.';
+        setDiag(result); return;
+      }
+      result.token = pushToken.data;
+      try {
+        await api.post('/notifications/token', { token: pushToken.data, platform: Platform.OS });
+        result.registerOk = true;
+      } catch (e) {
+        result.registerOk = false;
+        result.error = `서버 등록 실패: ${(e as Error).message}`;
+      }
+      setDiag(result);
+    } finally {
+      setDiagRunning(false);
     }
   }
 
@@ -100,6 +150,37 @@ export default function NotificationSettingsScreen() {
         <Pressable style={styles.testButton} onPress={sendTestPush}>
           <Text style={styles.testButtonText}>🧪 푸시 테스트 보내기</Text>
         </Pressable>
+
+        <Pressable
+          style={[styles.testButton, { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, marginTop: -8, marginBottom: spacing.md }]}
+          onPress={runDiagnostics}
+          disabled={diagRunning}
+        >
+          <Text style={[styles.testButtonText, { color: colors.text }]}>
+            {diagRunning ? '진단 중...' : '🔎 진단 실행 (토큰 등록 단계별 확인)'}
+          </Text>
+        </Pressable>
+
+        {diag && (
+          <View style={[styles.card, { padding: spacing.md, marginBottom: spacing.lg, gap: 6 }]}>
+            <Text style={{ fontSize: 11, color: colors.textSub }}>1) 권한: {diag.permission || '-'}</Text>
+            <Text style={{ fontSize: 11, color: colors.textSub }} numberOfLines={2}>
+              2) Expo 토큰: {diag.token ? diag.token.slice(0, 50) + '...' : '-'}
+            </Text>
+            <Text style={{ fontSize: 11, color: colors.textSub }}>
+              3) 서버 등록: {diag.registerOk === true ? '✅ 성공' : diag.registerOk === false ? '❌ 실패' : '-'}
+            </Text>
+            {diag.error ? (
+              <Text style={{ fontSize: 12, color: '#E85D4A', marginTop: 6, lineHeight: 17 }}>
+                에러: {diag.error}
+              </Text>
+            ) : diag.registerOk ? (
+              <Text style={{ fontSize: 12, color: colors.green, marginTop: 6 }}>
+                ✓ 토큰 등록 완료. 위의 "푸시 테스트 보내기"를 눌러 알림 수신 확인.
+              </Text>
+            ) : null}
+          </View>
+        )}
 
         <Text style={styles.sectionTitle}>활동 알림</Text>
         <View style={styles.card}>
