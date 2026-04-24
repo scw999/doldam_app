@@ -23,6 +23,7 @@ import { tryMatch } from './services/matching';
 import { detectHotAndOpenRooms } from './services/themedRooms';
 import { sendPush } from './services/push';
 import { pollEasBuilds } from './services/easPoller';
+import { resolveVotesTick } from './services/voteResolver';
 
 export { ChatRoom } from './durable-objects/ChatRoom';
 
@@ -98,7 +99,13 @@ export default {
       }
     }
   },
-  async scheduled(_event: ScheduledEvent, env: Env) {
+  async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext) {
+    // 매분마다 — 유지/폭파 투표 결산
+    if (event.cron === '* * * * *') {
+      await resolveVotesTick(env, ctx);
+      return;
+    }
+    // 매시간 정각 — 만료 포인트/방 정리
     await Promise.all([
       cleanupExpiredPoints(env),
       expireRooms(env),

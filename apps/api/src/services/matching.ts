@@ -102,15 +102,19 @@ export async function tryMatch(env: Env, userId: string): Promise<string | null>
   const roomId = crypto.randomUUID();
   const now = Date.now();
   const expiresAt = now + ROOM.LIFESPAN_HOURS * 3600 * 1000;
+  const testMode = env.TEST_MODE === 'true';
+  const voteDeadline = testMode
+    ? now + ROOM.TEST_MODE_VOTE_DEADLINE_SEC * 1000
+    : now + ROOM.VOTE_DEADLINE_HOURS * 3600 * 1000;
   const mixLabel = genderMix === 'mixed' ? '남녀 모임' : (user.gender === 'M' ? '남성 모임' : '여성 모임');
   const theme = `${topRegion} ${mixLabel}`;
 
   await env.DOLDAM_DB
     .prepare(
-      `INSERT INTO rooms (id, theme, gender_mix, tags, created_at, expires_at, status)
-       VALUES (?, ?, ?, ?, ?, ?, 'active')`
+      `INSERT INTO rooms (id, theme, gender_mix, tags, created_at, expires_at, status, vote_deadline)
+       VALUES (?, ?, ?, ?, ?, ?, 'active', ?)`
     )
-    .bind(roomId, theme, genderMix, tags, now, expiresAt)
+    .bind(roomId, theme, genderMix, tags, now, expiresAt, voteDeadline)
     .run();
 
   for (const uid of picked) {

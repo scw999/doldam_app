@@ -42,12 +42,13 @@ new_sqlite_classes = ["ChatRoom"]
 
 # ---- Cron Triggers ----
 [triggers]
-crons = ["0 * * * *"]  # 매시간 — 만료 포인트/방 정리
+crons = ["0 * * * *", "* * * * *"]  # 매시간 — 만료 포인트/방 정리 | 매분 — 유지/폭파 투표 결산
 
 # ---- Vars ----
 [vars]
 ENV = "production"
 SLACK_CHANNEL_ID = "C0AU2202YDS"
+TEST_MODE = "false"
 
 # Secrets (wrangler secret put 으로 주입):
 # - JWT_SECRET

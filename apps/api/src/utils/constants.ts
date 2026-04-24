@@ -17,7 +17,10 @@ export const ROOM = {
   MIN_MEMBERS: 6,
   MAX_MEMBERS: 8,
   LIFESPAN_HOURS: 72,       // 3일 자동 폭파
-  KEEP_VOTE_THRESHOLD: 0.6, // 60% 찬성 시 유지
+  KEEP_VOTE_THRESHOLD: 0.6, // 60% 찬성 시 유지 (레거시 호환)
+  VOTE_DEADLINE_HOURS: 24,          // 투표 완료 시점 (방 생성 후 24시간)
+  KEEP_EXTEND_HOURS: 72,            // 유지 결정 시 연장 시간
+  TEST_MODE_VOTE_DEADLINE_SEC: 300, // 테스트용 5분 (서버 환경변수로 활성화)
 } as const;
 
 export const MISSION = {

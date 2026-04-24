@@ -69,13 +69,17 @@ async function createThemedRoom(
   const id = crypto.randomUUID();
   const now = Date.now();
   const expiresAt = now + ROOM.LIFESPAN_HOURS * 3600 * 1000;
+  const testMode = env.TEST_MODE === 'true';
+  const voteDeadline = testMode
+    ? now + ROOM.TEST_MODE_VOTE_DEADLINE_SEC * 1000
+    : now + ROOM.VOTE_DEADLINE_HOURS * 3600 * 1000;
 
   await env.DOLDAM_DB
     .prepare(
-      `INSERT INTO rooms (id, theme, gender_mix, kind, source_ref, created_at, expires_at, status)
-       VALUES (?, ?, ?, 'themed', ?, ?, ?, 'active')`
+      `INSERT INTO rooms (id, theme, gender_mix, kind, source_ref, created_at, expires_at, status, vote_deadline)
+       VALUES (?, ?, ?, 'themed', ?, ?, ?, 'active', ?)`
     )
-    .bind(id, input.theme, input.genderMix, input.sourceRef, now, expiresAt)
+    .bind(id, input.theme, input.genderMix, input.sourceRef, now, expiresAt, voteDeadline)
     .run();
 
   console.log('[themed] created', id, input.theme);

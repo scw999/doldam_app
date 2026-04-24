@@ -35,6 +35,8 @@ interface Message {
 interface RoomInfo {
   id: string; theme: string; kind: string; gender_mix: string;
   expires_at: number; status: string; tags?: string | null;
+  vote_deadline?: number | null;
+  vote_resolved?: number;
   members: { id: string; nickname: string; gender: 'M' | 'F'; age_range: string }[];
 }
 
@@ -68,6 +70,9 @@ export default function RoomScreen() {
   const [voteQuestion, setVoteQuestion] = useState('');
   const [voteOptions, setVoteOptions] = useState<string[]>(['', '']);
   const [creatingVote, setCreatingVote] = useState(false);
+  const [secondsToDeadline, setSecondsToDeadline] = useState<number | null>(null);
+  const [celebrating, setCelebrating] = useState(false);
+  const prevResolvedRef = useRef<number | undefined>(undefined);
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const listRef = useRef<FlatList<Message>>(null);
@@ -119,6 +124,34 @@ export default function RoomScreen() {
     const tick = setInterval(() => setNow(Date.now()), 60000);
     return () => clearInterval(tick);
   }, []);
+
+  // vote_deadline 카운트다운 (초 단위)
+  useEffect(() => {
+    if (!room?.vote_deadline || room.vote_resolved) {
+      setSecondsToDeadline(null);
+      return;
+    }
+    const tick = () => {
+      const s = Math.max(0, Math.floor((room.vote_deadline! - Date.now()) / 1000));
+      setSecondsToDeadline(s);
+    };
+    tick();
+    const iv = setInterval(tick, 1000);
+    return () => clearInterval(iv);
+  }, [room?.vote_deadline, room?.vote_resolved]);
+
+  // 방 유지 확정 시 축하 애니메이션
+  useEffect(() => {
+    const prev = prevResolvedRef.current;
+    const current = room?.vote_resolved;
+    if (prev === 0 && current === 1 && room?.status !== 'expired') {
+      setCelebrating(true);
+      const t = setTimeout(() => setCelebrating(false), 3000);
+      prevResolvedRef.current = current;
+      return () => clearTimeout(t);
+    }
+    prevResolvedRef.current = current;
+  }, [room?.vote_resolved, room?.status]);
 
   function connect() {
     if (!token || !id || !mountedRef.current) return;
@@ -288,6 +321,10 @@ export default function RoomScreen() {
   }
 
   function showLeaveConfirm() {
+    if (room?.vote_deadline && !room?.vote_resolved) {
+      Alert.alert('아직 나갈 수 없어요', '방 유지/폭파 투표가 끝나야 나갈 수 있어요.');
+      return;
+    }
     Alert.alert('방 나가기', '이 방에서 나가면 대화 내역을 더 이상 볼 수 없어요. 정말 나갈까요?', [
       { text: '취소', style: 'cancel' },
       {
@@ -316,6 +353,23 @@ export default function RoomScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
+      {/* 마감 10초 전 카운트다운 오버레이 */}
+      {secondsToDeadline !== null && secondsToDeadline > 0 && secondsToDeadline <= 10 && (
+        <View style={styles.countdownOverlay} pointerEvents="none">
+          <Text style={styles.countdownNumber}>{secondsToDeadline}</Text>
+          <Text style={styles.countdownLabel}>투표 마감까지</Text>
+        </View>
+      )}
+
+      {/* 방 유지 축하 오버레이 */}
+      {celebrating && (
+        <View style={styles.celebrationOverlay} pointerEvents="none">
+          <Text style={styles.celebrationEmoji}>🎉</Text>
+          <Text style={styles.celebrationText}>방이 유지됐어요!</Text>
+          <Text style={styles.celebrationSub}>3일 더 함께해요</Text>
+        </View>
+      )}
+
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
 
         {/* 헤더 */}
@@ -387,6 +441,15 @@ export default function RoomScreen() {
               </View>
             )}
           </View>
+
+          {/* 투표 마감 카운트다운 배너 (10초 오버레이 이외 구간) */}
+          {room?.vote_deadline && !room?.vote_resolved && secondsToDeadline !== null && secondsToDeadline > 10 && (
+            <View style={styles.voteDeadlineBar}>
+              <Text style={styles.voteDeadlineText}>
+                🗳️ 유지/폭파 투표 마감까지 {formatCountdown(secondsToDeadline)}
+              </Text>
+            </View>
+          )}
         </View>
 
         {/* 메시지 */}
@@ -651,9 +714,15 @@ export default function RoomScreen() {
                 borderBottomColor: colors.border,
               }}>
                 <Avatar size={32} />
-                <View style={{ flex: 1 }}>
-                  <Text style={{ fontSize: 14, fontWeight: '600', color: colors.text }}>{m.nickname}</Text>
-                  <Text style={{ fontSize: 11, color: colors.textSub }}>
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text
+                    style={{ fontSize: 14, fontWeight: '600', color: colors.text }}
+                    numberOfLines={1}
+                    ellipsizeMode="tail"
+                  >
+                    {m.nickname}
+                  </Text>
+                  <Text style={{ fontSize: 11, color: colors.textSub }} numberOfLines={1}>
                     {m.gender === 'M' ? '남성' : '여성'} · {m.age_range}
                   </Text>
                 </View>
@@ -878,6 +947,15 @@ function fmtHhmm(ts: number): string {
   return `${ap} ${h % 12 || 12}:${String(m).padStart(2, '0')}`;
 }
 
+function formatCountdown(sec: number): string {
+  const h = Math.floor(sec / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  const s = sec % 60;
+  if (h > 0) return `${h}시간 ${m}분`;
+  if (m > 0) return `${m}분 ${s}초`;
+  return `${s}초`;
+}
+
 const styles = StyleSheet.create({
   header: {
     paddingHorizontal: 16, paddingBottom: 14,
@@ -953,8 +1031,9 @@ const styles = StyleSheet.create({
   memberSheet: {
     backgroundColor: colors.card,
     borderTopLeftRadius: 24, borderTopRightRadius: 24,
-    padding: 20, paddingBottom: 40,
+    paddingHorizontal: 16, paddingTop: 20, paddingBottom: 40,
     marginTop: 'auto',
+    width: '100%',
   },
   memberSheetTitle: {
     fontSize: 15, fontWeight: '700', color: colors.text,
@@ -999,4 +1078,30 @@ const styles = StyleSheet.create({
   reactionAction: {
     paddingVertical: 14, alignItems: 'center',
   },
+  countdownOverlay: {
+    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.75)', zIndex: 100,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  countdownNumber: {
+    fontSize: 160, fontWeight: '900', color: '#fff',
+    letterSpacing: -5,
+  },
+  countdownLabel: {
+    fontSize: 16, color: 'rgba(255,255,255,0.9)', marginTop: 8,
+  },
+  celebrationOverlay: {
+    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+    backgroundColor: 'rgba(196, 149, 106, 0.92)', zIndex: 101,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  celebrationEmoji: { fontSize: 96, marginBottom: 20 },
+  celebrationText: { fontSize: 28, fontWeight: '800', color: '#fff', marginBottom: 6 },
+  celebrationSub: { fontSize: 14, color: 'rgba(255,255,255,0.9)' },
+  voteDeadlineBar: {
+    marginTop: 8, paddingHorizontal: 12, paddingVertical: 8,
+    backgroundColor: colors.accent, borderRadius: 10,
+    alignItems: 'center',
+  },
+  voteDeadlineText: { fontSize: 12, fontWeight: '700', color: colors.primaryDark },
 });

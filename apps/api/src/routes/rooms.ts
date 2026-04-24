@@ -155,6 +155,15 @@ rooms.post('/:id/keep-vote', requireAuth, async (c) => {
     .bind(id, user.id).first();
   if (!member) return c.json({ error: 'not_a_member' }, 403);
 
+  // 이미 결산된 방은 투표 불가
+  const roomState = await c.env.DOLDAM_DB
+    .prepare('SELECT vote_resolved, vote_deadline FROM rooms WHERE id = ?')
+    .bind(id).first<{ vote_resolved: number | null; vote_deadline: number | null }>();
+  if (roomState?.vote_resolved) return c.json({ error: 'vote_already_resolved' }, 400);
+  if (roomState?.vote_deadline && roomState.vote_deadline < Date.now()) {
+    return c.json({ error: 'vote_deadline_passed' }, 400);
+  }
+
   await c.env.DOLDAM_DB
     .prepare(
       `INSERT OR REPLACE INTO room_keep_votes (room_id, user_id, keep, created_at)
@@ -166,11 +175,14 @@ rooms.post('/:id/keep-vote', requireAuth, async (c) => {
     .prepare(
       `SELECT
          (SELECT COUNT(*) FROM room_keep_votes WHERE room_id = ? AND keep = 1) AS yes,
+         (SELECT COUNT(*) FROM room_keep_votes WHERE room_id = ? AND keep = 0) AS no,
          (SELECT COUNT(*) FROM room_members WHERE room_id = ?) AS total`
     )
-    .bind(id, id).first<{ yes: number; total: number }>();
+    .bind(id, id, id).first<{ yes: number; no: number; total: number }>();
 
-  if (agg && agg.total > 0 && agg.yes / agg.total >= ROOM.KEEP_VOTE_THRESHOLD) {
+  // 새 규칙: 즉시 결산하지 않고 resolver cron이 deadline에 처리함.
+  // vote_deadline 없는 레거시 방은 기존 즉시 결산 로직 유지.
+  if (!roomState?.vote_deadline && agg && agg.total > 0 && agg.yes / agg.total >= ROOM.KEEP_VOTE_THRESHOLD) {
     const newExpiry = Date.now() + ROOM.LIFESPAN_HOURS * 3600 * 1000;
     await c.env.DOLDAM_DB
       .prepare(`UPDATE rooms SET expires_at = ?, status = 'active' WHERE id = ?`)
@@ -178,7 +190,13 @@ rooms.post('/:id/keep-vote', requireAuth, async (c) => {
     return c.json({ ok: true, kept: true, newExpiry });
   }
 
-  return c.json({ ok: true, kept: false, yes: agg?.yes ?? 0, total: agg?.total ?? 0 });
+  return c.json({
+    ok: true,
+    kept: false,
+    yes: agg?.yes ?? 0,
+    no: agg?.no ?? 0,
+    total: agg?.total ?? 0,
+  });
 });
 
 // ---- 방 나가기 ----
@@ -189,6 +207,15 @@ rooms.post('/:id/leave', requireAuth, async (c) => {
     .prepare('SELECT 1 FROM room_members WHERE room_id = ? AND user_id = ?')
     .bind(id, user.id).first();
   if (!member) return c.json({ error: 'not_a_member' }, 404);
+
+  // 투표 결산 전에는 나갈 수 없음 (vote_deadline 있는 방만 해당)
+  const room = await c.env.DOLDAM_DB
+    .prepare('SELECT vote_deadline, vote_resolved FROM rooms WHERE id = ?').bind(id)
+    .first<{ vote_deadline: number | null; vote_resolved: number | null }>();
+  if (room && room.vote_deadline && !room.vote_resolved) {
+    return c.json({ error: 'vote_not_resolved' }, 403);
+  }
+
   await c.env.DOLDAM_DB
     .prepare('DELETE FROM room_members WHERE room_id = ? AND user_id = ?')
     .bind(id, user.id).run();

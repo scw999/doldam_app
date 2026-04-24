@@ -10,6 +10,7 @@ export interface Env {
 
   // Vars
   ENV: 'development' | 'production';
+  TEST_MODE?: string;
 
   // Secrets
   JWT_SECRET: string;

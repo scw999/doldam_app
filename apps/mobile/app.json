@@ -32,7 +32,7 @@
       "expo-router",
       "expo-font",
       ["expo-notifications", {
-        "icon": "./assets/icon.png",
+        "icon": "./assets/notification-icon.png",
         "color": "#C4956A",
         "sounds": []
       }]
