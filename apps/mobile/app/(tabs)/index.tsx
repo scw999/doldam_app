@@ -37,6 +37,7 @@ const CATEGORY_COLORS: Record<string, { label: string; color: string }> = {
   kids: { label: '양육일기', color: '#5B8FC9' },
   dating: { label: '연애/관계', color: '#C4956A' },
   legal: { label: '법률/돈', color: '#8C7B6B' },
+  remarriage: { label: '재혼', color: '#B8739E' },
   men_only: { label: '남성방', color: '#5B8FC9' },
   women_only: { label: '여성방', color: '#D4728C' },
 };
@@ -220,8 +221,6 @@ export default function HomeScreen() {
                       {p.nickname}
                       {getDivorceTitle(p.divorce_year, p.divorce_month, p.gender) ? ` · ${getDivorceTitle(p.divorce_year, p.divorce_month, p.gender)}` : ''}
                     </Text>
-                    <Text style={{ fontSize: 11, color: colors.textLight }}>·</Text>
-                    <Text style={{ fontSize: 11, color: colors.textLight }}>{timeAgo(p.created_at)}</Text>
                   </View>
                   <Text style={[typography.h3, { color: colors.text, marginBottom: 4 }]} numberOfLines={1}>{p.title}</Text>
                   <Text style={{ fontSize: 12.5, color: colors.textSub, lineHeight: 20, marginBottom: 10 }} numberOfLines={2}>

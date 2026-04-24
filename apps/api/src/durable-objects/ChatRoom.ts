@@ -214,6 +214,13 @@ export class ChatRoom {
           if (!msg) return;
 
           const reactions: Record<string, string[]> = { ...(msg.reactions ?? {}) };
+          // 한 사용자는 같은 메시지에 하나의 이모지만 — 기존 다른 이모지에서 제거
+          for (const [e, users] of Object.entries(reactions)) {
+            if (e === emoji) continue;
+            const filtered = users.filter((u) => u !== jwt.sub);
+            if (filtered.length === 0) delete reactions[e];
+            else reactions[e] = filtered;
+          }
           const users = new Set<string>(reactions[emoji] ?? []);
           if (add) users.add(jwt.sub);
           else users.delete(jwt.sub);

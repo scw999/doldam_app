@@ -155,7 +155,7 @@ posts.get('/:id', async (c) => {
 posts.patch('/:id', requireAuth, moderate, async (c) => {
   const user = c.get('user');
   const id = c.req.param('id');
-  const { title, content } = await c.req.json<{ title?: string; content?: string }>();
+  const { title, content, category } = await c.req.json<{ title?: string; content?: string; category?: string }>();
 
   const row = await c.env.DOLDAM_DB
     .prepare('SELECT user_id FROM posts WHERE id = ? AND deleted_at IS NULL')
@@ -164,11 +164,19 @@ posts.patch('/:id', requireAuth, moderate, async (c) => {
   if (row.user_id !== user.id) return c.json({ error: 'forbidden' }, 403);
 
   const t = title?.trim(); const ct = content?.trim();
-  if (!t && !ct) return c.json({ error: 'empty_content' }, 400);
+  if (!t && !ct && !category) return c.json({ error: 'empty_content' }, 400);
+
+  // 카테고리 검증 (기존 CATEGORIES 재사용)
+  if (category !== undefined) {
+    if (!CATEGORIES.includes(category as Category)) return c.json({ error: 'invalid_category' }, 400);
+    if (category === 'men_only' && user.gender !== 'M') return c.json({ error: 'forbidden_category' }, 403);
+    if (category === 'women_only' && user.gender !== 'F') return c.json({ error: 'forbidden_category' }, 403);
+  }
 
   const sets: string[] = []; const vals: unknown[] = [];
   if (t) { sets.push('title = ?'); vals.push(t); }
   if (ct) { sets.push('content = ?'); vals.push(ct); }
+  if (category) { sets.push('category = ?'); vals.push(category); }
   vals.push(id);
 
   await c.env.DOLDAM_DB

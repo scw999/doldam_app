@@ -33,6 +33,7 @@ const CATEGORY_COLORS: Record<string, { label: string; color: string }> = {
   kids: { label: '양육일기', color: '#5B8FC9' },
   dating: { label: '연애/관계', color: '#C4956A' },
   legal: { label: '법률/돈', color: '#8C7B6B' },
+  remarriage: { label: '재혼', color: '#B8739E' },
   men_only: { label: '남성방', color: '#5B8FC9' },
   women_only: { label: '여성방', color: '#D4728C' },
 };
@@ -42,6 +43,17 @@ const REACTIONS = [
   { emoji: '🫂', label: '안아줄게요' },
   { emoji: '💪', label: '힘내요' },
   { emoji: '😂', label: '웃겨요' },
+];
+
+const EDIT_CATEGORIES = [
+  { id: 'free',       label: '자유톡',   color: '#6BAF7B' },
+  { id: 'heart',      label: '속마음',   color: '#D4728C' },
+  { id: 'kids',       label: '양육일기', color: '#5B8FC9' },
+  { id: 'dating',     label: '연애/관계', color: '#C4956A' },
+  { id: 'legal',      label: '법률/돈',  color: '#8C7B6B' },
+  { id: 'remarriage', label: '재혼',     color: '#B8739E' },
+  { id: 'men_only',   label: '🚹 남성방', color: '#5B8FC9' },
+  { id: 'women_only', label: '🚺 여성방', color: '#D4728C' },
 ];
 
 export default function PostDetail() {
@@ -64,6 +76,7 @@ export default function PostDetail() {
   const [editVisible, setEditVisible] = useState(false);
   const [editTitle, setEditTitle] = useState('');
   const [editContent, setEditContent] = useState('');
+  const [editCategory, setEditCategory] = useState('');
   const [editSaving, setEditSaving] = useState(false);
 
   const [editingComment, setEditingComment] = useState<Comment | null>(null);
@@ -235,6 +248,7 @@ export default function PostDetail() {
     if (!post) return;
     setEditTitle(post.title);
     setEditContent(post.content);
+    setEditCategory(post.category);
     setEditVisible(true);
   }
 
@@ -242,10 +256,21 @@ export default function PostDetail() {
     if (!editTitle.trim() || !editContent.trim()) return;
     setEditSaving(true);
     try {
-      await api.patch(`/posts/${id}`, { title: editTitle.trim(), content: editContent.trim() });
+      await api.patch(`/posts/${id}`, {
+        title: editTitle.trim(),
+        content: editContent.trim(),
+        category: editCategory,
+      });
       setEditVisible(false);
       load();
-    } catch (e) { Alert.alert('수정 실패', (e as Error).message); }
+    } catch (e) {
+      const msg = (e as Error).message;
+      if (msg.includes('forbidden_category')) {
+        Alert.alert('카테고리 변경 불가', '해당 게시판은 지정된 성별만 이용할 수 있어요');
+      } else {
+        Alert.alert('수정 실패', msg);
+      }
+    }
     finally { setEditSaving(false); }
   }
 
@@ -565,6 +590,40 @@ export default function PostDetail() {
             </Pressable>
           </View>
           <ScrollView style={{ flex: 1, padding: 20 }}>
+            <Text style={{ fontSize: 12, fontWeight: '700', color: colors.textSub, marginBottom: 8 }}>게시판</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 16 }}>
+              <View style={{ flexDirection: 'row', gap: 8 }}>
+                {EDIT_CATEGORIES
+                  .filter((c) => {
+                    // 성별 전용 방은 해당 성별만 노출 (meProfile 없으면 모두 노출 — 서버가 최종 검증)
+                    if (!meProfile) return true;
+                    if (c.id === 'men_only' && meProfile.gender !== 'M') return false;
+                    if (c.id === 'women_only' && meProfile.gender !== 'F') return false;
+                    return true;
+                  })
+                  .map((c) => {
+                    const active = editCategory === c.id;
+                    return (
+                      <Pressable
+                        key={c.id}
+                        onPress={() => setEditCategory(c.id)}
+                        style={{
+                          paddingHorizontal: 14, paddingVertical: 8,
+                          borderRadius: 999,
+                          borderWidth: 1,
+                          borderColor: active ? c.color : colors.border,
+                          backgroundColor: active ? c.color : colors.card,
+                        }}
+                      >
+                        <Text style={{ fontSize: 13, color: active ? '#fff' : colors.text, fontWeight: active ? '700' : '400' }}>
+                          {c.label}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+              </View>
+            </ScrollView>
+
             <TextInput
               style={styles.editTitle}
               value={editTitle}

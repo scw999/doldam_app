@@ -175,4 +175,50 @@ auth.get('/me', requireAuth, async (c) => {
   return c.json(row);
 });
 
+// ---- 닉네임 변경 — 월 3회 제한 + 중복 체크 ----
+auth.post('/nickname', requireAuth, async (c) => {
+  const user = c.get('user');
+  const { nickname } = await c.req.json<{ nickname: string }>();
+  const nick = String(nickname ?? '').trim();
+  if (!nick) return c.json({ error: 'empty_nickname' }, 400);
+  if (nick.length < 2 || nick.length > 20) return c.json({ error: 'invalid_length' }, 400);
+
+  // 중복 체크 (deleted_at IS NULL)
+  const dup = await c.env.DOLDAM_DB
+    .prepare('SELECT id FROM users WHERE nickname = ? AND id != ? AND deleted_at IS NULL').bind(nick, user.id)
+    .first<{ id: string }>();
+  if (dup) return c.json({ error: 'nickname_taken' }, 409);
+
+  // 월 3회 제한 — 최근 30일 내 변경 이력 카운트
+  const since = Date.now() - 30 * 24 * 60 * 60 * 1000;
+  const row = await c.env.DOLDAM_DB
+    .prepare('SELECT COUNT(*) AS n FROM nickname_changes WHERE user_id = ? AND changed_at >= ?').bind(user.id, since)
+    .first<{ n: number }>();
+  if ((row?.n ?? 0) >= 3) return c.json({ error: 'rate_limited', resetAt: since + 30 * 24 * 60 * 60 * 1000 }, 429);
+
+  const currentRow = await c.env.DOLDAM_DB
+    .prepare('SELECT nickname FROM users WHERE id = ?').bind(user.id)
+    .first<{ nickname: string }>();
+  const oldNick = currentRow?.nickname ?? '';
+  if (oldNick === nick) return c.json({ ok: true, unchanged: true });
+
+  await c.env.DOLDAM_DB.prepare('UPDATE users SET nickname = ? WHERE id = ?').bind(nick, user.id).run();
+  await c.env.DOLDAM_DB
+    .prepare('INSERT INTO nickname_changes (user_id, old_nick, new_nick, changed_at) VALUES (?, ?, ?, ?)')
+    .bind(user.id, oldNick, nick, Date.now()).run();
+
+  const remaining = Math.max(0, 2 - (row?.n ?? 0));
+  return c.json({ ok: true, remaining });
+});
+
+// ---- 닉네임 변경 가능 횟수 조회 ----
+auth.get('/nickname/quota', requireAuth, async (c) => {
+  const user = c.get('user');
+  const since = Date.now() - 30 * 24 * 60 * 60 * 1000;
+  const row = await c.env.DOLDAM_DB
+    .prepare('SELECT COUNT(*) AS n FROM nickname_changes WHERE user_id = ? AND changed_at >= ?').bind(user.id, since)
+    .first<{ n: number }>();
+  return c.json({ used: row?.n ?? 0, limit: 3, remaining: Math.max(0, 3 - (row?.n ?? 0)) });
+});
+
 export default auth;

@@ -9,6 +9,8 @@ import { INTERESTS } from '@/utils/interests';
 export default function ProfileEdit() {
   const userId = useAuth((s) => s.userId);
   const [nickname, setNickname] = useState('');
+  const [originalNickname, setOriginalNickname] = useState('');
+  const [nicknameQuota, setNicknameQuota] = useState<{ used: number; limit: number; remaining: number } | null>(null);
   const [job, setJob] = useState('');
   const [hasKids, setHasKids] = useState<boolean | null>(null);
   const [custody, setCustody] = useState<string | null>(null);
@@ -24,7 +26,7 @@ export default function ProfileEdit() {
       custody: string | null; intro: string | null; interests: string | null;
     }>(`/profiles/${userId}`)
       .then((p) => {
-        if (p.nickname) setNickname(p.nickname);
+        if (p.nickname) { setNickname(p.nickname); setOriginalNickname(p.nickname); }
         if (p.job) setJob(p.job);
         if (p.has_kids !== null) setHasKids(p.has_kids === 1);
         if (p.custody) setCustody(p.custody);
@@ -36,6 +38,10 @@ export default function ProfileEdit() {
       })
       .catch(() => {})
       .finally(() => setLoading(false));
+
+    api.get<{ used: number; limit: number; remaining: number }>('/auth/nickname/quota')
+      .then(setNicknameQuota)
+      .catch(() => {});
   }, [userId]);
 
   function toggleInterest(item: string) {
@@ -49,8 +55,34 @@ export default function ProfileEdit() {
   async function save() {
     setSaving(true);
     try {
+      // 닉네임이 바뀐 경우에만 전용 엔드포인트 호출 (월 3회 제한 + 중복 체크)
+      const trimmedNick = nickname.trim();
+      if (trimmedNick && trimmedNick !== originalNickname) {
+        try {
+          await api.post('/auth/nickname', { nickname: trimmedNick });
+          setOriginalNickname(trimmedNick);
+          // 변경 성공 시 quota 재조회
+          api.get<{ used: number; limit: number; remaining: number }>('/auth/nickname/quota')
+            .then(setNicknameQuota).catch(() => {});
+        } catch (e) {
+          const msg = (e as Error).message;
+          if (msg.includes('nickname_taken')) {
+            Alert.alert('닉네임 중복', '이미 사용 중인 닉네임이에요');
+          } else if (msg.includes('rate_limited')) {
+            Alert.alert('변경 한도 초과', '이번 달 변경 한도를 초과했어요 (월 3회)');
+          } else if (msg.includes('invalid_length')) {
+            Alert.alert('닉네임 길이', '2~20자로 입력해주세요');
+          } else if (msg.includes('empty_nickname')) {
+            Alert.alert('닉네임', '닉네임을 입력해주세요');
+          } else {
+            Alert.alert('닉네임 변경 실패', msg);
+          }
+          setSaving(false);
+          return;
+        }
+      }
+
       await api.patch('/profiles/me', {
-        nickname: nickname.trim() || undefined,
         job,
         hasKids,
         custody: hasKids ? custody : null,
@@ -68,9 +100,16 @@ export default function ProfileEdit() {
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.label}>닉네임</Text>
+      <Text style={styles.label}>
+        닉네임
+        {nicknameQuota && (
+          <Text style={{ fontSize: 12, fontWeight: '400', color: colors.textSub }}>
+            {'  '}(이번 달 {nicknameQuota.remaining}회 더 변경 가능)
+          </Text>
+        )}
+      </Text>
       <TextInput style={styles.input} value={nickname} onChangeText={setNickname}
-        placeholder="2~12자" placeholderTextColor={colors.textSub} maxLength={12} />
+        placeholder="2~20자" placeholderTextColor={colors.textSub} maxLength={20} />
 
       <Text style={styles.label}>직업</Text>
       <TextInput style={styles.input} value={job} onChangeText={setJob}

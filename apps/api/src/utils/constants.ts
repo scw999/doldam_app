@@ -26,7 +26,7 @@ export const MISSION = {
 } as const;
 
 export const CATEGORIES = [
-  'free', 'dating', 'kids', 'money', 'legal', 'men_only', 'women_only',
+  'free', 'heart', 'kids', 'dating', 'legal', 'remarriage', 'men_only', 'women_only',
 ] as const;
 
 export type Category = typeof CATEGORIES[number];

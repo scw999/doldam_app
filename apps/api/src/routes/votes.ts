@@ -213,6 +213,27 @@ votes.post('/:id/respond', requireAuth, async (c) => {
     )
     .bind(id, user.id, choice, user.gender, Date.now()).run();
 
+  // 피어 폴(멤버 투표) — 뽑힌 사람에게 알림
+  const voteMeta = await c.env.DOLDAM_DB
+    .prepare('SELECT kind, question FROM votes WHERE id = ?').bind(id)
+    .first<{ kind: string; question: string }>();
+  if (voteMeta?.kind === 'peer_poll' && choice !== user.id) {
+    const targetExists = await c.env.DOLDAM_DB
+      .prepare('SELECT 1 FROM users WHERE id = ? AND deleted_at IS NULL').bind(choice).first();
+    if (targetExists) {
+      c.executionCtx.waitUntil(
+        sendPush(
+          c.env,
+          choice,
+          '💘 누군가 당신을 뽑았어요',
+          voteMeta.question.slice(0, 50),
+          { voteId: id },
+          'hot_vote' // 기존 카테고리 재사용
+        ).catch(() => {})
+      );
+    }
+  }
+
   // 첫 참여만 포인트 적립 + 핫 투표 알림
   if (!existing) {
     await awardPoints(c.env, user.id, POINTS.REWARD_VOTE_CAST, 'vote_cast');
