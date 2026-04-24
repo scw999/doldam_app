@@ -86,7 +86,11 @@ export default function RootLayout() {
       if (data?.roomId) {
         router.push(`/room/${data.roomId}` as any);
       } else if (data?.postId) {
-        router.push(`/post/${data.postId}` as any);
+        const path = data.commentId
+          ? `/post/${data.postId}?commentId=${data.commentId}`
+          : `/post/${data.postId}`;
+        router.push(path as any);
+        return;
       } else if (data?.voteId) {
         router.push(`/vote/${data.voteId}` as any);
       } else {

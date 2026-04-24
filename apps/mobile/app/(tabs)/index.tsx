@@ -90,7 +90,11 @@ export default function HomeScreen() {
     };
   }, []);
 
-  useFocusEffect(useCallback(() => { load(); }, [load]));
+  useFocusEffect(useCallback(() => {
+    load();
+    const iv = setInterval(load, 90_000);
+    return () => clearInterval(iv);
+  }, [load]));
 
   function selectMood(key: string) {
     if (todayMoodKey !== null) return;

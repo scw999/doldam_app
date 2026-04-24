@@ -315,7 +315,7 @@ posts.post('/:id/comments', requireAuth, moderate, async (c) => {
   const notifPromises: Promise<void>[] = [];
   if (author && author.user_id !== user.id) {
     notifPromises.push(
-      sendPush(c.env, author.user_id, '새 댓글이 달렸어요', `${nick}: ${content.trim().slice(0, 40)}`, { postId }, 'comment')
+      sendPush(c.env, author.user_id, '새 댓글이 달렸어요', `${nick}: ${content.trim().slice(0, 40)}`, { postId, commentId: id }, 'comment')
     );
   }
 
@@ -326,7 +326,7 @@ posts.post('/:id/comments', requireAuth, moderate, async (c) => {
       .bind(parentId).first<{ user_id: string }>();
     if (parentComment && parentComment.user_id !== user.id && parentComment.user_id !== author?.user_id) {
       notifPromises.push(
-        sendPush(c.env, parentComment.user_id, '답글이 달렸어요', `${nick}: ${content.trim().slice(0, 40)}`, { postId }, 'reply')
+        sendPush(c.env, parentComment.user_id, '답글이 달렸어요', `${nick}: ${content.trim().slice(0, 40)}`, { postId, commentId: id }, 'reply')
       );
     }
   }

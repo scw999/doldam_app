@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TextInput, Pressable,
   Alert, ActivityIndicator, SafeAreaView, Modal, TouchableOpacity,
@@ -45,8 +45,15 @@ const REACTIONS = [
 ];
 
 export default function PostDetail() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, commentId } = useLocalSearchParams<{ id: string; commentId?: string }>();
   const myUserId = useAuth((s) => s.userId);
+  const [highlightCommentId, setHighlightCommentId] = useState<string | null>(commentId ?? null);
+
+  useEffect(() => {
+    if (!highlightCommentId) return;
+    const t = setTimeout(() => setHighlightCommentId(null), 3000);
+    return () => clearTimeout(t);
+  }, [highlightCommentId]);
   const [post, setPost] = useState<Post | null>(null);
   const [comments, setComments] = useState<Comment[]>([]);
   const [myReact, setMyReact] = useState<number | null>(null);
@@ -80,6 +87,15 @@ export default function PostDetail() {
   }, [id]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
+
+  // 하이라이트 대상이 답글이면 부모 그룹을 자동으로 펼친다
+  useEffect(() => {
+    if (!highlightCommentId || comments.length === 0) return;
+    const target = comments.find((c) => c.id === highlightCommentId);
+    if (target?.parent_id) {
+      setExpandedParents((prev) => new Set([...prev, target.parent_id as string]));
+    }
+  }, [highlightCommentId, comments]);
 
   function bumpCounts(counts: Record<string, number> | undefined, delta: Record<number, number>) {
     const next = { ...(counts ?? {}) };
@@ -362,14 +378,15 @@ export default function PostDetail() {
               const isOP = parent.user_id === post!.user_id;
               const pEditing = editingComment?.id === parent.id;
 
+              const pHighlight = parent.id === highlightCommentId;
               return (
                 <View key={parent.id}>
                   {/* 부모 댓글 */}
                   <View style={{
                     padding: 14,
-                    backgroundColor: pMine ? colors.accent + '66' : colors.card,
+                    backgroundColor: pHighlight ? colors.accent : pMine ? colors.accent + '66' : colors.card,
                     borderWidth: 1,
-                    borderColor: pMine ? colors.primary + '33' : colors.border,
+                    borderColor: pHighlight ? colors.primary : pMine ? colors.primary + '33' : colors.border,
                     borderRadius: 14,
                   }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 }}>
@@ -425,11 +442,12 @@ export default function PostDetail() {
                         const rMine = reply.user_id === myUserId;
                         const rIsOP = reply.user_id === post!.user_id;
                         const rEditing = editingComment?.id === reply.id;
+                        const rHighlight = reply.id === highlightCommentId;
                         return (
                           <View key={reply.id} style={{
                             padding: 12,
-                            backgroundColor: colors.bg,
-                            borderWidth: 1, borderColor: colors.border,
+                            backgroundColor: rHighlight ? colors.accent : colors.bg,
+                            borderWidth: 1, borderColor: rHighlight ? colors.primary : colors.border,
                             borderLeftWidth: 3, borderLeftColor: colors.primary + '50',
                             borderRadius: 12,
                           }}>

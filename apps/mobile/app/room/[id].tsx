@@ -57,6 +57,7 @@ export default function RoomScreen() {
   const [welcomeMessage, setWelcomeMessage] = useState('');
   const [reportTarget, setReportTarget] = useState<{ userId: string; nickname: string } | null>(null);
   const [muted, setMuted] = useState(false);
+  const [memberListVisible, setMemberListVisible] = useState(false);
   const [voteCreateVisible, setVoteCreateVisible] = useState(false);
   const [voteMode, setVoteMode] = useState<'tbh' | 'custom'>('tbh');
   const [voteQuestion, setVoteQuestion] = useState('');
@@ -252,6 +253,20 @@ export default function RoomScreen() {
     ]);
   }
 
+  function showLeaveConfirm() {
+    Alert.alert('방 나가기', '이 방에서 나가면 대화 내역을 더 이상 볼 수 없어요. 정말 나갈까요?', [
+      { text: '취소', style: 'cancel' },
+      {
+        text: '나가기', style: 'destructive', onPress: async () => {
+          try {
+            await api.post(`/rooms/${id}/leave`, {});
+            router.back();
+          } catch (e) { Alert.alert('실패', (e as Error).message); }
+        },
+      },
+    ]);
+  }
+
   async function reportUser(targetUserId: string, reason: string) {
     try {
       await api.post('/reports', { targetId: targetUserId, targetType: 'user', reason });
@@ -280,7 +295,9 @@ export default function RoomScreen() {
                 {isThemed && '🔥 '}{room?.theme ?? '소그룹'}
               </Text>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 }}>
-                <Text style={{ fontSize: 11, color: colors.textSub }}>👥 {room?.members?.length ?? 0}명</Text>
+                <Pressable onPress={() => setMemberListVisible(true)}>
+                  <Text style={{ fontSize: 11, color: colors.textSub }}>👥 {room?.members?.length ?? 0}명</Text>
+                </Pressable>
                 <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: connected ? colors.green : colors.textLight }} />
                 <Text style={{ fontSize: 10, color: connected ? colors.green : colors.textLight }}>
                   {connected ? '연결됨' : '연결 중...'}
@@ -300,6 +317,9 @@ export default function RoomScreen() {
               style={{ padding: 8 }}
             >
               <Text style={{ fontSize: 20 }}>{muted ? '🔕' : '🔔'}</Text>
+            </Pressable>
+            <Pressable onPress={() => showLeaveConfirm()} style={{ padding: 8 }}>
+              <Text style={{ fontSize: 20, color: colors.textSub }}>⋯</Text>
             </Pressable>
           </View>
 
@@ -571,6 +591,38 @@ export default function RoomScreen() {
         </View>
       </Modal>
 
+      {/* 멤버 목록 모달 */}
+      <Modal visible={memberListVisible} transparent animationType="slide">
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setMemberListVisible(false)}
+        >
+          <TouchableOpacity activeOpacity={1} style={styles.memberSheet}>
+            <Text style={styles.memberSheetTitle}>참여 인원 ({room?.members?.length ?? 0}명)</Text>
+            {room?.members?.map((m, i) => (
+              <View key={m.id} style={{
+                flexDirection: 'row', alignItems: 'center', gap: 10,
+                paddingVertical: 12,
+                borderBottomWidth: i < (room.members.length - 1) ? 1 : 0,
+                borderBottomColor: colors.border,
+              }}>
+                <Avatar size={32} />
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 14, fontWeight: '600', color: colors.text }}>{m.nickname}</Text>
+                  <Text style={{ fontSize: 11, color: colors.textSub }}>
+                    {m.gender === 'M' ? '남성' : '여성'} · {m.age_range}
+                  </Text>
+                </View>
+                {m.id === myUserId && (
+                  <Text style={{ fontSize: 10, color: colors.primaryDark, fontWeight: '700' }}>나</Text>
+                )}
+              </View>
+            ))}
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
+
       {/* 유저 신고 모달 */}
       <Modal visible={!!reportTarget} transparent animationType="slide">
         <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setReportTarget(null)}>
@@ -753,6 +805,16 @@ const styles = StyleSheet.create({
     backgroundColor: colors.card,
     borderTopLeftRadius: 24, borderTopRightRadius: 24,
     padding: 24, paddingBottom: 40,
+  },
+  memberSheet: {
+    backgroundColor: colors.card,
+    borderTopLeftRadius: 24, borderTopRightRadius: 24,
+    padding: 20, paddingBottom: 40,
+    marginTop: 'auto',
+  },
+  memberSheetTitle: {
+    fontSize: 15, fontWeight: '700', color: colors.text,
+    marginBottom: 12, textAlign: 'center',
   },
   reportTitle: {
     fontSize: 16, fontWeight: '700', color: colors.text,

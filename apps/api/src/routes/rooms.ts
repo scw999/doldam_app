@@ -181,6 +181,20 @@ rooms.post('/:id/keep-vote', requireAuth, async (c) => {
   return c.json({ ok: true, kept: false, yes: agg?.yes ?? 0, total: agg?.total ?? 0 });
 });
 
+// ---- 방 나가기 ----
+rooms.post('/:id/leave', requireAuth, async (c) => {
+  const id = c.req.param('id');
+  const user = c.get('user');
+  const member = await c.env.DOLDAM_DB
+    .prepare('SELECT 1 FROM room_members WHERE room_id = ? AND user_id = ?')
+    .bind(id, user.id).first();
+  if (!member) return c.json({ error: 'not_a_member' }, 404);
+  await c.env.DOLDAM_DB
+    .prepare('DELETE FROM room_members WHERE room_id = ? AND user_id = ?')
+    .bind(id, user.id).run();
+  return c.json({ ok: true });
+});
+
 // ---- 부활 ----
 rooms.post('/:id/revive', requireAuth, async (c) => {
   const user = c.get('user');
