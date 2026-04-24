@@ -18,6 +18,7 @@ interface Post {
   divorce_year: number | null; divorce_month: number | null;
   like_count: number; comment_count: number; created_at: number;
   myReaction?: number | null;
+  reactionCounts?: Record<string, number>;
 }
 
 interface Comment {
@@ -80,26 +81,55 @@ export default function PostDetail() {
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
+  function bumpCounts(counts: Record<string, number> | undefined, delta: Record<number, number>) {
+    const next = { ...(counts ?? {}) };
+    for (const [k, d] of Object.entries(delta)) {
+      const cur = next[k] ?? 0;
+      next[k] = Math.max(0, cur + d);
+    }
+    return next;
+  }
+
   async function toggleLike(i: number) {
     if (myReact === i) {
+      // 취소
       setMyReact(null);
       setPost((p) => {
-        const updated = p ? { ...p, like_count: Math.max(0, p.like_count - 1) } : p;
-        if (updated) patchBoardPost(id, { like_count: updated.like_count });
+        if (!p) return p;
+        const updated = {
+          ...p,
+          like_count: Math.max(0, p.like_count - 1),
+          reactionCounts: bumpCounts(p.reactionCounts, { [i]: -1 }),
+        };
+        patchBoardPost(id, { like_count: updated.like_count });
         return updated;
       });
       try { await api.post(`/posts/${id}/like`, { reaction: i }); } catch {}
     } else if (myReact === null) {
+      // 첫 반응
       setMyReact(i);
       setPost((p) => {
-        const updated = p ? { ...p, like_count: p.like_count + 1 } : p;
-        if (updated) patchBoardPost(id, { like_count: updated.like_count });
+        if (!p) return p;
+        const updated = {
+          ...p,
+          like_count: p.like_count + 1,
+          reactionCounts: bumpCounts(p.reactionCounts, { [i]: 1 }),
+        };
+        patchBoardPost(id, { like_count: updated.like_count });
         return updated;
       });
       try { await api.post(`/posts/${id}/like`, { reaction: i }); } catch {}
     } else {
+      // 변경 (이전 카운트 -1, 새 카운트 +1)
       const prev = myReact;
       setMyReact(i);
+      setPost((p) => {
+        if (!p) return p;
+        return {
+          ...p,
+          reactionCounts: bumpCounts(p.reactionCounts, { [prev]: -1, [i]: 1 }),
+        };
+      });
       try {
         await api.post(`/posts/${id}/like`, { reaction: prev });
         await api.post(`/posts/${id}/like`, { reaction: i });
@@ -287,7 +317,7 @@ export default function PostDetail() {
           <View style={styles.reactPicker}>
             {REACTIONS.map((r, i) => {
               const active = myReact === i;
-              const count = i === 0 ? (myReact === null || myReact === 0 ? post.like_count : 0) : (active ? 1 : 0);
+              const count = post.reactionCounts?.[String(i)] ?? 0;
               return (
                 <Pressable
                   key={r.emoji}

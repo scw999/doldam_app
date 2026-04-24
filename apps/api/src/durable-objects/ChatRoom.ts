@@ -135,13 +135,7 @@ export class ChatRoom {
       await this.state.storage.setAlarm(Date.now() + Q_FIRST_DELAY);
     }
 
-    this.broadcast({
-      id: crypto.randomUUID(),
-      from: 'system',
-      nickname: 'system',
-      text: `${user.nickname} 님이 입장했어요`,
-      ts: Date.now(),
-    }, server);
+    // 입장 시스템 메시지 제거 — 앱 전환만으로도 퇴장/재입장처럼 보이는 혼란 방지
 
     server.addEventListener('message', async (evt) => {
       try {
@@ -193,17 +187,8 @@ export class ChatRoom {
     });
 
     server.addEventListener('close', () => {
-      const s = this.sessions.get(server);
       this.sessions.delete(server);
-      if (s) {
-        this.broadcast({
-          id: crypto.randomUUID(),
-          from: 'system',
-          nickname: 'system',
-          text: `${s.nickname} 님이 나갔어요`,
-          ts: Date.now(),
-        });
-      }
+      // 퇴장 시스템 메시지 제거 — 앱 백그라운드/전환과 실제 퇴장 구분 어려움
     });
 
     return new Response(null, { status: 101, webSocket: client });

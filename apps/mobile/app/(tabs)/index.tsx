@@ -7,12 +7,14 @@ import { BrandBar } from '@/ui/BrandBar';
 import { useUnreadCount } from '@/hooks/useUnreadCount';
 import { Section, Card, Tag, ReactionRow, Progress } from '@/ui/atoms';
 import { api } from '@/api';
+import { getDivorceTitle } from '@/utils/divorce';
 
 interface Me { nickname: string }
 interface Vote { id: string; question: string; total: number; agree: number; disagree: number }
 interface Post {
   id: string; title: string; content: string; category: string;
   nickname: string; gender: 'M' | 'F'; age_range: string;
+  divorce_year: number | null; divorce_month: number | null;
   like_count: number; comment_count: number; created_at: number;
 }
 
@@ -210,7 +212,10 @@ export default function HomeScreen() {
                 <Card key={p.id} onPress={() => router.push(`/post/${p.id}`)} style={{ padding: 14 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                     <Tag label={cat.label} color={cat.color} compact />
-                    <Text style={{ fontSize: 11, color: colors.textLight }}>{p.nickname}</Text>
+                    <Text style={{ fontSize: 11, color: colors.textLight, flexShrink: 1 }} numberOfLines={1}>
+                      {p.nickname}
+                      {getDivorceTitle(p.divorce_year, p.divorce_month, p.gender) ? ` · ${getDivorceTitle(p.divorce_year, p.divorce_month, p.gender)}` : ''}
+                    </Text>
                     <Text style={{ fontSize: 11, color: colors.textLight }}>·</Text>
                     <Text style={{ fontSize: 11, color: colors.textLight }}>{timeAgo(p.created_at)}</Text>
                   </View>

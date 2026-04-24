@@ -141,7 +141,14 @@ posts.get('/:id', async (c) => {
     if (liked) myReaction = liked.reaction;
   }
 
-  return c.json({ ...row, myReaction });
+  // 반응 종류별 집계 — 모든 사용자에게 동일하게 보여야 하므로 서버에서 계산
+  const reactionAgg = await c.env.DOLDAM_DB
+    .prepare('SELECT reaction, COUNT(*) AS n FROM post_likes WHERE post_id = ? GROUP BY reaction')
+    .bind(id).all<{ reaction: number; n: number }>();
+  const reactionCounts: Record<string, number> = {};
+  for (const r of reactionAgg.results) reactionCounts[String(r.reaction)] = r.n;
+
+  return c.json({ ...row, myReaction, reactionCounts });
 });
 
 // ---- 수정 (작성자만) ----

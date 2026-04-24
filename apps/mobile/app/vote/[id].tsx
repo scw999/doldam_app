@@ -86,6 +86,13 @@ export default function VoteDetailScreen() {
     });
     try {
       await api.post(`/votes/${id}/respond`, { choice });
+      // 성별 통계 즉시 반영 — 백그라운드 재조회
+      Promise.all([
+        api.get<VoteDetail>(`/votes/${id}?gender=M`, { cacheTtl: 0 }).catch(() => null),
+        api.get<VoteDetail>(`/votes/${id}?gender=F`, { cacheTtl: 0 }).catch(() => null),
+      ]).then(([m, f]) => {
+        setByGender({ M: m ?? undefined, F: f ?? undefined });
+      });
     } catch (e) {
       setSelected(prevVote?.myChoice ?? null);
       setVote(prevVote);
