@@ -10,6 +10,7 @@ interface ChatMessage {
   text: string;
   ts: number;
   voteId?: string;
+  reactions?: Record<string, string[]>;
 }
 
 interface Session {
@@ -170,6 +171,12 @@ export class ChatRoom {
     }
     this.sessions.set(server, { userId: jwt.sub, nickname: user.nickname });
 
+    // 연결 직후 현재 읽음 커서 스냅샷 전송
+    const initialCursors = (await this.state.storage.get<Record<string, number>>('readCursors')) ?? {};
+    try {
+      server.send(JSON.stringify({ type: 'cursors', data: initialCursors }));
+    } catch {}
+
     // 첫 번째 WebSocket 연결 시 알람 예약
     const existingAlarm = await this.state.storage.getAlarm();
     if (existingAlarm === null) {
@@ -181,6 +188,44 @@ export class ChatRoom {
     server.addEventListener('message', async (evt) => {
       try {
         const data = JSON.parse(evt.data as string);
+
+        // 읽음 커서 업데이트
+        if (data.type === 'read') {
+          const ts = Number(data.ts);
+          if (!Number.isFinite(ts) || ts <= 0) return;
+          const cursors = (await this.state.storage.get<Record<string, number>>('readCursors')) ?? {};
+          if ((cursors[jwt.sub] ?? 0) >= ts) return; // no-op
+          cursors[jwt.sub] = ts;
+          await this.state.storage.put('readCursors', cursors);
+          this.broadcast({ type: 'cursors', data: cursors } as any);
+          return;
+        }
+
+        // 반응(이모지) 토글
+        if (data.type === 'react') {
+          const messageId = typeof data.messageId === 'string' ? data.messageId : null;
+          const messageTs = Number(data.messageTs);
+          const emoji = typeof data.emoji === 'string' && data.emoji.length <= 8 ? data.emoji : null;
+          const add = !!data.add;
+          if (!messageId || !messageTs || !emoji) return;
+
+          const key = `msg:${messageTs}:${messageId}`;
+          const msg = await this.state.storage.get<ChatMessage>(key);
+          if (!msg) return;
+
+          const reactions: Record<string, string[]> = { ...(msg.reactions ?? {}) };
+          const users = new Set<string>(reactions[emoji] ?? []);
+          if (add) users.add(jwt.sub);
+          else users.delete(jwt.sub);
+          if (users.size === 0) delete reactions[emoji];
+          else reactions[emoji] = [...users];
+
+          const updated: ChatMessage = { ...msg, reactions };
+          await this.state.storage.put(key, updated);
+          this.broadcast({ type: 'reaction_updated', messageId, reactions } as any);
+          return;
+        }
+
         const text = String(data.text ?? '').trim();
         const voteId = typeof data.voteId === 'string' && data.voteId.length <= 64 ? data.voteId : undefined;
         if (!text && !voteId) return;
@@ -238,7 +283,8 @@ export class ChatRoom {
   private async getHistory(): Promise<Response> {
     const list = await this.state.storage.list<ChatMessage>({ prefix: 'msg:', limit: 200 });
     const items = [...list.values()].sort((a, b) => a.ts - b.ts);
-    return new Response(JSON.stringify({ items }), {
+    const cursors = (await this.state.storage.get<Record<string, number>>('readCursors')) ?? {};
+    return new Response(JSON.stringify({ items, cursors }), {
       headers: { 'Content-Type': 'application/json' },
     });
   }

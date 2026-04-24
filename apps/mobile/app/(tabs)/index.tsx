@@ -92,7 +92,7 @@ export default function HomeScreen() {
 
   useFocusEffect(useCallback(() => {
     load();
-    const iv = setInterval(load, 90_000);
+    const iv = setInterval(load, 120_000);
     return () => clearInterval(iv);
   }, [load]));
 

@@ -24,9 +24,12 @@ const REPORT_REASONS = [
   '기타 부적절한 행동',
 ];
 
+const REACTION_EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '🙏', '🔥', '💪'];
+
 interface Message {
   id: string; from: string; nickname: string; text: string; ts: number;
   voteId?: string;
+  reactions?: Record<string, string[]>;
 }
 
 interface RoomInfo {
@@ -57,6 +60,8 @@ export default function RoomScreen() {
   const [welcomeMessage, setWelcomeMessage] = useState('');
   const [reportTarget, setReportTarget] = useState<{ userId: string; nickname: string } | null>(null);
   const [muted, setMuted] = useState(false);
+  const [cursors, setCursors] = useState<Record<string, number>>({});
+  const [reactionTarget, setReactionTarget] = useState<Message | null>(null);
   const [memberListVisible, setMemberListVisible] = useState(false);
   const [voteCreateVisible, setVoteCreateVisible] = useState(false);
   const [voteMode, setVoteMode] = useState<'tbh' | 'custom'>('tbh');
@@ -79,12 +84,18 @@ export default function RoomScreen() {
     try {
       const [info, history, muteRes] = await Promise.all([
         api.get<RoomInfo>(`/rooms/${id}`, { cacheTtl: 0 }),
-        api.get<{ items: Message[] }>(`/rooms/${id}/history`, { cacheTtl: 0 }),
+        api.get<{ items: Message[]; cursors?: Record<string, number> }>(`/rooms/${id}/history`, { cacheTtl: 0 }),
         api.get<{ muted: boolean }>(`/notifications/rooms/${id}/mute`, { cacheTtl: 0 }).catch(() => ({ muted: false })),
       ]);
       setMuted(muteRes.muted);
       setRoom(info);
       setMessages(history.items);
+      setCursors(history.cursors ?? {});
+      // 마지막 메시지까지 읽음 처리
+      const lastMsg = history.items[history.items.length - 1];
+      if (lastMsg && wsRef.current?.readyState === WebSocket.OPEN) {
+        wsRef.current.send(JSON.stringify({ type: 'read', ts: lastMsg.ts }));
+      }
       roomCache[id] = { info, messages: history.items, ts: Date.now() };
       // 내 메시지가 없으면 아이스브레이커 표시
       if (!icebreakerShownRef.current) {
@@ -132,9 +143,23 @@ export default function RoomScreen() {
       try {
         const data = JSON.parse(evt.data);
         if (data.type === 'error') { Alert.alert('전송 실패', data.reason ?? data.error); return; }
+        if (data.type === 'cursors') {
+          setCursors(data.data ?? {});
+          return;
+        }
+        if (data.type === 'reaction_updated') {
+          setMessages((prev) => prev.map((m) => m.id === data.messageId ? { ...m, reactions: data.reactions } : m));
+          return;
+        }
         if (data.type === 'message' || data.id) {
-          setMessages((prev) => [...prev, data as Message]);
+          const msg = data as Message;
+          setMessages((prev) => [...prev, msg]);
           setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 50);
+          // 방을 보고 있으니 즉시 읽음 처리
+          if (wsRef.current?.readyState === WebSocket.OPEN) {
+            wsRef.current.send(JSON.stringify({ type: 'read', ts: msg.ts }));
+          }
+          return;
         }
       } catch {}
     };
@@ -149,6 +174,15 @@ export default function RoomScreen() {
       wsRef.current?.close();
     };
   }, [id, token]);
+
+  // WS 연결 직후 마지막 메시지까지 읽음 처리 (REST 로드가 WS 연결 전에 끝날 수 있음)
+  useEffect(() => {
+    if (!connected || messages.length === 0) return;
+    const last = messages[messages.length - 1];
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({ type: 'read', ts: last.ts }));
+    }
+  }, [connected, messages.length]);
 
   function send(text?: string, voteId?: string) {
     const t = (text ?? draft).trim();
@@ -386,8 +420,17 @@ export default function RoomScreen() {
               <Bubble
                 msg={m}
                 mine={m.from === myUserId}
-                onReport={m.from !== myUserId ? () => setReportTarget({ userId: m.from, nickname: m.nickname }) : undefined}
+                onLongPress={() => setReactionTarget(m)}
                 onVoteTap={m.voteId ? () => router.push(`/vote/${m.voteId}`) : undefined}
+                unreadCount={computeUnread(m, cursors, room?.members ?? [])}
+                myUserId={myUserId ?? ''}
+                onToggleReaction={(emoji, add) => {
+                  if (wsRef.current?.readyState === WebSocket.OPEN) {
+                    wsRef.current.send(JSON.stringify({
+                      type: 'react', messageId: m.id, messageTs: m.ts, emoji, add,
+                    }));
+                  }
+                }}
               />
             );
           }}
@@ -623,6 +666,63 @@ export default function RoomScreen() {
         </TouchableOpacity>
       </Modal>
 
+      {/* 반응(이모지) 모달 */}
+      <Modal visible={!!reactionTarget} transparent animationType="fade">
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setReactionTarget(null)}
+        >
+          <TouchableOpacity activeOpacity={1} style={styles.reactionSheet}>
+            <View style={styles.emojiRow}>
+              {REACTION_EMOJIS.map((emoji) => {
+                const mine = reactionTarget?.reactions?.[emoji]?.includes(myUserId ?? '') ?? false;
+                return (
+                  <Pressable
+                    key={emoji}
+                    onPress={() => {
+                      const target = reactionTarget;
+                      if (!target) return;
+                      if (wsRef.current?.readyState === WebSocket.OPEN) {
+                        wsRef.current.send(JSON.stringify({
+                          type: 'react',
+                          messageId: target.id,
+                          messageTs: target.ts,
+                          emoji,
+                          add: !mine,
+                        }));
+                      }
+                      setReactionTarget(null);
+                    }}
+                    style={[styles.emojiBtn, mine && styles.emojiBtnActive]}
+                  >
+                    <Text style={{ fontSize: 26 }}>{emoji}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+            {reactionTarget && reactionTarget.from !== myUserId && (
+              <>
+                <View style={styles.reactionDivider} />
+                <Pressable
+                  onPress={() => {
+                    const target = reactionTarget;
+                    setReactionTarget(null);
+                    if (target) setReportTarget({ userId: target.from, nickname: target.nickname });
+                  }}
+                  style={styles.reactionAction}
+                >
+                  <Text style={{ fontSize: 14, color: '#E85D4A', fontWeight: '600' }}>🚨 신고하기</Text>
+                </Pressable>
+              </>
+            )}
+            <Pressable onPress={() => setReactionTarget(null)} style={styles.reactionAction}>
+              <Text style={{ fontSize: 14, color: colors.textSub }}>취소</Text>
+            </Pressable>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
+
       {/* 유저 신고 모달 */}
       <Modal visible={!!reportTarget} transparent animationType="slide">
         <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setReportTarget(null)}>
@@ -657,18 +757,24 @@ export default function RoomScreen() {
 function Bubble({
   msg,
   mine,
-  onReport,
+  onLongPress,
   onVoteTap,
+  unreadCount,
+  myUserId,
+  onToggleReaction,
 }: {
   msg: Message;
   mine: boolean;
-  onReport?: () => void;
+  onLongPress?: () => void;
   onVoteTap?: () => void;
+  unreadCount: number;
+  myUserId: string;
+  onToggleReaction: (emoji: string, add: boolean) => void;
 }) {
   const hasVote = !!msg.voteId;
   return (
     <Pressable
-      onLongPress={onReport}
+      onLongPress={onLongPress}
       delayLongPress={500}
       style={{ flexDirection: mine ? 'row-reverse' : 'row', gap: 8, marginBottom: 12, alignItems: 'flex-end' }}
     >
@@ -719,11 +825,49 @@ function Bubble({
               </Text>
             </View>
           )}
-          <Text style={{ fontSize: 10, color: colors.textLight }}>{fmtHhmm(msg.ts)}</Text>
+          <View style={{ flexDirection: 'column', alignItems: mine ? 'flex-end' : 'flex-start', gap: 1 }}>
+            {unreadCount > 0 && (
+              <Text style={{ fontSize: 10, color: colors.primaryDark, fontWeight: '700' }}>{unreadCount}</Text>
+            )}
+            <Text style={{ fontSize: 10, color: colors.textLight }}>{fmtHhmm(msg.ts)}</Text>
+          </View>
         </View>
+        {msg.reactions && Object.keys(msg.reactions).length > 0 && (
+          <View style={{ flexDirection: 'row', gap: 4, marginTop: 4, flexWrap: 'wrap' }}>
+            {Object.entries(msg.reactions).map(([emoji, users]) => {
+              const isMine = users.includes(myUserId);
+              return (
+                <Pressable
+                  key={emoji}
+                  onPress={() => onToggleReaction(emoji, !isMine)}
+                  style={{
+                    flexDirection: 'row', gap: 3, alignItems: 'center',
+                    paddingHorizontal: 7, paddingVertical: 3,
+                    borderRadius: 10,
+                    backgroundColor: isMine ? colors.accent : colors.card,
+                    borderWidth: 1, borderColor: isMine ? colors.primary : colors.border,
+                  }}
+                >
+                  <Text style={{ fontSize: 12 }}>{emoji}</Text>
+                  <Text style={{ fontSize: 10, color: colors.textSub, fontWeight: '600' }}>{users.length}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        )}
       </View>
     </Pressable>
   );
+}
+
+function computeUnread(msg: Message, cursors: Record<string, number>, members: { id: string }[]): number {
+  if (msg.from === 'system') return 0;
+  let count = 0;
+  for (const m of members) {
+    if (m.id === msg.from) continue; // 보낸 사람은 이미 읽음
+    if ((cursors[m.id] ?? 0) < msg.ts) count++;
+  }
+  return count;
 }
 
 function fmtHhmm(ts: number): string {
@@ -829,5 +973,30 @@ const styles = StyleSheet.create({
     marginTop: 16, paddingVertical: 14,
     alignItems: 'center', backgroundColor: colors.tag,
     borderRadius: radius.md,
+  },
+  reactionSheet: {
+    backgroundColor: colors.card,
+    borderRadius: 20,
+    marginHorizontal: 24,
+    padding: 8,
+    marginTop: 'auto',
+    marginBottom: 40,
+  },
+  emojiRow: {
+    flexDirection: 'row', justifyContent: 'space-between',
+    paddingHorizontal: 8, paddingVertical: 12,
+  },
+  emojiBtn: {
+    width: 40, height: 40, borderRadius: 20,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  emojiBtnActive: {
+    backgroundColor: colors.accent,
+  },
+  reactionDivider: {
+    height: 1, backgroundColor: colors.border, marginVertical: 4,
+  },
+  reactionAction: {
+    paddingVertical: 14, alignItems: 'center',
   },
 });
