@@ -69,7 +69,7 @@ export default function HomeScreen() {
     const [meRes, pts, votes, board, moodRes] = await Promise.all([
       api.get<Me>('/auth/me', { cacheTtl: 0 }).catch(() => null),
       api.get<{ balance: number }>('/points/balance', { cacheTtl: 0 }).catch(() => null),
-      api.get<{ items: Vote[] }>('/votes?limit=3', { cacheTtl: 0 }).catch(() => null),
+      api.get<{ items: Vote[] }>('/votes?limit=3&sort=hot', { cacheTtl: 0 }).catch(() => null),
       api.get<{ items: Post[] }>('/posts?category=all&limit=3&sort=hot', { cacheTtl: 0 }).catch(() => null),
       api.get<{ items: { created_at: number; mood: string }[] }>('/moods/feed?limit=1&mine=true', { cacheTtl: 0 }).catch(() => null),
     ]);

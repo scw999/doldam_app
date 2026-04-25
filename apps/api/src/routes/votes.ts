@@ -17,9 +17,13 @@ const votes = new Hono<{ Bindings: Env; Variables: Vars }>();
 votes.get('/', async (c) => {
   const limit = Math.min(Number(c.req.query('limit') ?? 50), 100);
   const gender = c.req.query('gender') as 'M' | 'F' | undefined;
+  const hot = c.req.query('sort') === 'hot';
 
   // JOIN + GROUP BY 로 N+1 서브쿼리 제거 (30개 조회 시 90쿼리 → 1쿼리)
   // 방 전용 투표(room_id IS NOT NULL)는 해당 채팅방에서만 보이므로 전역 목록에서 제외
+  const ORDER = hot
+    ? 'ORDER BY total DESC, v.created_at DESC'
+    : 'ORDER BY v.created_at DESC';
   const sql = gender
     ? `SELECT v.id, v.question, v.description, v.options, v.created_at, v.expires_at,
               u.nickname,
@@ -30,7 +34,7 @@ votes.get('/', async (c) => {
        LEFT JOIN vote_responses vr ON vr.vote_id = v.id AND vr.gender = ?
        WHERE v.room_id IS NULL
        GROUP BY v.id, v.question, v.description, v.options, v.created_at, v.expires_at, u.nickname
-       ORDER BY v.created_at DESC LIMIT ?`
+       ${ORDER} LIMIT ?`
     : `SELECT v.id, v.question, v.description, v.options, v.created_at, v.expires_at,
               u.nickname,
               COUNT(vr.vote_id) AS total,
@@ -40,7 +44,7 @@ votes.get('/', async (c) => {
        LEFT JOIN vote_responses vr ON vr.vote_id = v.id
        WHERE v.room_id IS NULL
        GROUP BY v.id, v.question, v.description, v.options, v.created_at, v.expires_at, u.nickname
-       ORDER BY v.created_at DESC LIMIT ?`;
+       ${ORDER} LIMIT ?`;
 
   const { results } = gender
     ? await c.env.DOLDAM_DB.prepare(sql).bind(gender, limit).all()
