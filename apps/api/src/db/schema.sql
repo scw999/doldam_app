@@ -121,14 +121,19 @@ CREATE TABLE IF NOT EXISTS room_keep_votes (
 
 -- ===== 포인트 원장 =====
 CREATE TABLE IF NOT EXISTS points_ledger (
-  id            TEXT PRIMARY KEY,
-  user_id       TEXT NOT NULL,
-  amount        INTEGER NOT NULL,             -- +적립 / -소비
-  reason        TEXT NOT NULL,
-  created_at    INTEGER NOT NULL,
-  expires_at    INTEGER NOT NULL              -- 적립 시 + 30일
+  id              TEXT PRIMARY KEY,
+  user_id         TEXT NOT NULL,
+  amount          INTEGER NOT NULL,           -- +적립 / -소비
+  reason          TEXT NOT NULL,
+  created_at      INTEGER NOT NULL,
+  expires_at      INTEGER NOT NULL,           -- 무상=+30일, 유상=+5년
+  kind            TEXT NOT NULL DEFAULT 'free',  -- free(무상) / paid(유상) / spend(사용내역)
+  remaining       INTEGER NOT NULL DEFAULT 0,    -- 적립 lot 의 잔여량 (FIFO 차감), 잔액=SUM(remaining)
+  expiry_notified INTEGER NOT NULL DEFAULT 0     -- 만료 예정 알림 발송 여부
 );
 CREATE INDEX IF NOT EXISTS idx_pl_user_exp ON points_ledger(user_id, expires_at);
+-- 잔액/소비 후보 조회 가속 (살아있는 적립 lot)
+CREATE INDEX IF NOT EXISTS idx_pl_balance ON points_ledger(user_id, kind, expires_at) WHERE amount > 0 AND remaining > 0;
 
 -- ===== Q&A 미션 =====
 CREATE TABLE IF NOT EXISTS mission_questions (

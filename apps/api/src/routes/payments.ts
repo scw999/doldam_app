@@ -46,15 +46,8 @@ payments.post('/verify', requireAuth, async (c) => {
 
   if (!result.valid) return c.json({ error: 'verification_failed', reason: result.reason }, 400);
 
-  // 충전 시 일일 캡 무시 — 구매는 별도 흐름. Direct insert into ledger.
-  const expiresAt = now + 30 * 86400 * 1000;
-  await c.env.DOLDAM_DB
-    .prepare(
-      `INSERT INTO points_ledger (id, user_id, amount, reason, created_at, expires_at)
-       VALUES (?, ?, ?, ?, ?, ?)`
-    )
-    .bind(crypto.randomUUID(), user.id, product.points, `iap:${productId}`, now, expiresAt)
-    .run();
+  // 유상(paid) 충전 — 5년 만료, 일일 캡 미적용. (만료 기간은 awardPoints 내부에서 결정)
+  await awardPoints(c.env, user.id, product.points, `iap:${productId}`, 'paid');
 
   return c.json({ ok: true, pointsAdded: product.points });
 });

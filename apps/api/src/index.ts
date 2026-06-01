@@ -18,7 +18,7 @@ import admin from './routes/admin';
 import webhooks from './routes/webhooks';
 
 import { runOcr } from './services/ocr';
-import { cleanupExpiredPoints, expireRooms } from './services/cleanup';
+import { cleanupExpiredPoints, expireRooms, notifyExpiringFreePoints } from './services/cleanup';
 import { tryMatch } from './services/matching';
 import { detectHotAndOpenRooms } from './services/themedRooms';
 import { sendPush } from './services/push';
@@ -105,9 +105,10 @@ export default {
       await resolveVotesTick(env, ctx);
       return;
     }
-    // 매시간 정각 — 만료 포인트/방 정리
+    // 매시간 정각 — 만료 포인트/방 정리 + 만료 예정 알림
     await Promise.all([
       cleanupExpiredPoints(env),
+      notifyExpiringFreePoints(env),
       expireRooms(env),
       detectHotAndOpenRooms(env),
       // pollEasBuilds(env),  // 수동 전송으로 전환 (/admin/poll-eas)

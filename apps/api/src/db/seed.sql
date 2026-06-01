@@ -81,16 +81,16 @@ INSERT OR IGNORE INTO vote_responses (vote_id, user_id, choice, gender, created_
   ('vote-4', 'user-m1', 'disagree', 'M', 1736225000000),
   ('vote-4', 'user-m4', 'agree', 'M', 1736230000000);
 
--- ===== 포인트 =====
-INSERT OR IGNORE INTO points_ledger (id, user_id, amount, reason, expires_at, created_at) VALUES
-  ('pts-01', 'user-m1', 100, 'signup_bonus', 1767225600000, 1735689600000),
-  ('pts-02', 'user-f1', 100, 'signup_bonus', 1767225600000, 1735689600000),
-  ('pts-03', 'user-f2', 100, 'signup_bonus', 1767225600000, 1735689600000),
-  ('pts-04', 'user-m2', 100, 'signup_bonus', 1767225600000, 1735689600000),
-  ('pts-05', 'user-f3', 100, 'signup_bonus', 1767225600000, 1735689600000),
-  ('pts-06', 'user-m1', 50, 'post_create', 1767225600000, 1735776000000),
-  ('pts-07', 'user-f1', 50, 'post_create', 1767225600000, 1735862400000),
-  ('pts-08', 'user-f2', 10, 'comment_create', 1767225600000, 1735952000000);
+-- ===== 포인트 ===== (kind/remaining 포함 — remaining 이 잔액에 반영됨)
+INSERT OR IGNORE INTO points_ledger (id, user_id, amount, reason, expires_at, created_at, kind, remaining) VALUES
+  ('pts-01', 'user-m1', 100, 'signup_bonus', 1767225600000, 1735689600000, 'free', 100),
+  ('pts-02', 'user-f1', 100, 'signup_bonus', 1767225600000, 1735689600000, 'free', 100),
+  ('pts-03', 'user-f2', 100, 'signup_bonus', 1767225600000, 1735689600000, 'free', 100),
+  ('pts-04', 'user-m2', 100, 'signup_bonus', 1767225600000, 1735689600000, 'free', 100),
+  ('pts-05', 'user-f3', 100, 'signup_bonus', 1767225600000, 1735689600000, 'free', 100),
+  ('pts-06', 'user-m1', 50, 'post_create', 1767225600000, 1735776000000, 'free', 50),
+  ('pts-07', 'user-f1', 50, 'post_create', 1767225600000, 1735862400000, 'free', 50),
+  ('pts-08', 'user-f2', 10, 'comment_create', 1767225600000, 1735952000000, 'free', 10);
 
 -- ===== Q&A 미션 질문 30개 =====
 INSERT OR IGNORE INTO mission_questions (id, question, category, created_at) VALUES

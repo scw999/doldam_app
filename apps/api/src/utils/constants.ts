@@ -1,6 +1,9 @@
 export const POINTS = {
   DAILY_CAP: 500,
-  EXPIRY_DAYS: 30,
+  EXPIRY_DAYS: 30,              // (레거시) 무상 만료일 — FREE_EXPIRY_DAYS 사용
+  FREE_EXPIRY_DAYS: 30,        // 무상(적립·이벤트) 포인트: 30일
+  PAID_EXPIRY_DAYS: 365 * 5,  // 유상(결제 충전) 포인트: 5년 (한국 상사 소멸시효 관행)
+  EXPIRY_NOTIFY_DAYS: 3,      // 무상 만료 N일 전 1회 알림
 
   // 적립
   REWARD_MISSION_COMPLETE: 100,
