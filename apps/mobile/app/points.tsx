@@ -7,6 +7,7 @@ import { api } from '@/api';
 
 interface Ledger {
   id: string; amount: number; reason: string; created_at: number; expires_at: number;
+  kind?: 'free' | 'paid' | 'spend';
 }
 
 const PRODUCTS = [
@@ -47,9 +48,18 @@ function fmtExpiry(ts: number) {
   return `${Math.ceil(d / 30)}개월 후 만료`;
 }
 
+// 내역 한 줄의 부가설명 (종류·만료) — 유상/무상/사용을 구분해 표시
+function ledgerMeta(l: Ledger): string {
+  if (l.amount < 0 || l.kind === 'spend') return timeAgo(l.created_at);
+  if (l.kind === 'paid') return `${timeAgo(l.created_at)} · 유상 · 장기 보관`;
+  return `${timeAgo(l.created_at)} · 무상 · ${fmtExpiry(l.expires_at)}`;
+}
+
 export default function PointsScreen() {
   const [items, setItems] = useState<Ledger[]>([]);
   const [balance, setBalance] = useState(0);
+  const [paid, setPaid] = useState(0);
+  const [free, setFree] = useState(0);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
@@ -57,10 +67,12 @@ export default function PointsScreen() {
     try {
       const [ledger, pts] = await Promise.all([
         api.get<{ items: Ledger[] }>('/points/history'),
-        api.get<{ balance: number }>('/points/balance'),
+        api.get<{ balance: number; paid: number; free: number }>('/points/balance'),
       ]);
       setItems(ledger.items);
       setBalance(pts.balance);
+      setPaid(pts.paid ?? 0);
+      setFree(pts.free ?? 0);
     } catch {
       Alert.alert('오류', '포인트 내역을 불러올 수 없어요');
     } finally {
@@ -95,8 +107,22 @@ export default function PointsScreen() {
         <Text style={{ fontSize: 36, fontWeight: '700', color: '#fff', letterSpacing: -1 }}>
           {balance}<Text style={{ fontSize: 18 }}> P</Text>
         </Text>
-        <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', marginTop: 6 }}>
-          포인트는 적립일로부터 30일 후 만료돼요
+
+        {/* 유상/무상 분리 */}
+        <View style={{ flexDirection: 'row', gap: 16, marginTop: 10 }}>
+          <View>
+            <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)' }}>유상 (결제)</Text>
+            <Text style={{ fontSize: 15, fontWeight: '700', color: '#fff' }}>{paid} P</Text>
+          </View>
+          <View style={{ width: 1, backgroundColor: 'rgba(255,255,255,0.25)' }} />
+          <View>
+            <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)' }}>무상 (적립)</Text>
+            <Text style={{ fontSize: 15, fontWeight: '700', color: '#fff' }}>{free} P</Text>
+          </View>
+        </View>
+
+        <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', marginTop: 10 }}>
+          무상 포인트는 적립일로부터 30일 후 만료돼요{'\n'}유상(결제) 포인트는 5년간 유효해요
         </Text>
       </View>
 
@@ -136,7 +162,7 @@ export default function PointsScreen() {
           ))}
         </View>
         <Text style={{ fontSize: 11, color: colors.textLight, marginTop: 8, textAlign: 'center' }}>
-          포인트는 충전 후 30일 내 사용하세요
+          충전한 포인트(유상)는 5년간 유효해요
         </Text>
       </View>
 
@@ -167,7 +193,7 @@ export default function PointsScreen() {
                 {REASON_LABEL[l.reason] ?? l.reason}
               </Text>
               <Text style={{ fontSize: 11, color: colors.textSub, marginTop: 2 }}>
-                {timeAgo(l.created_at)} · {fmtExpiry(l.expires_at)}
+                {ledgerMeta(l)}
               </Text>
             </View>
             <Text style={{
