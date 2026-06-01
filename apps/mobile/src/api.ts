@@ -51,6 +51,24 @@ async function parseOrThrow<T>(res: Response): Promise<T> {
   return res.json() as Promise<T>;
 }
 
+// ---- 세션 만료(401) 중앙 처리 ----
+// 저장된 user 토큰이 서버에서 거부되면(만료/시크릿 교체 등) 세션을 정리한다.
+// clear() 가 token 을 null 로 만들면 _layout.tsx 의 AuthGate 가 로그인 화면으로 보낸다.
+let _loggingOut = false;
+
+function handleSessionExpired() {
+  if (_loggingOut) return;
+  _loggingOut = true;
+  // 토큰/캐시 정리 → AuthGate 가 /auth/login 으로 리다이렉트
+  void useAuth.getState().clear();
+}
+
+// 새 로그인이 들어오면 다음 만료를 다시 처리할 수 있도록 가드 해제
+type TokenSlice = { token: string | null };
+useAuth.subscribe((state: TokenSlice, prev: TokenSlice) => {
+  if (state.token && !prev.token) _loggingOut = false;
+});
+
 async function call<T>(path: string, init: RequestInit, opts: CallOpts = {}): Promise<T> {
   const auth = opts.auth ?? 'user';
   const token = currentToken(auth);
@@ -59,7 +77,10 @@ async function call<T>(path: string, init: RequestInit, opts: CallOpts = {}): Pr
     headers['Content-Type'] = 'application/json';
   }
   if (token) headers['Authorization'] = `Bearer ${token}`;
-  return parseOrThrow<T>(await fetch(`${API_BASE}${path}`, { ...init, headers }));
+  const res = await fetch(`${API_BASE}${path}`, { ...init, headers });
+  // user 토큰을 보냈는데 401 → 토큰이 더 이상 유효하지 않음. 세션 정리 후 로그인 유도.
+  if (res.status === 401 && auth === 'user' && token) handleSessionExpired();
+  return parseOrThrow<T>(res);
 }
 
 async function cachedGet<T>(path: string, opts: CallOpts = {}): Promise<T> {
