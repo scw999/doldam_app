@@ -49,6 +49,7 @@ crons = ["0 * * * *", "* * * * *"]  # 매시간 — 만료 포인트/방 정리 
 ENV = "production"
 SLACK_CHANNEL_ID = "C0AU2202YDS"
 TEST_MODE = "false"
+ALLOW_DEV_OTP = "true"  # SMS(다날) 연동 전까지 OTP를 응답에 노출 — 정식 출시 전 반드시 제거
 
 # Secrets (wrangler secret put 으로 주입):
 # - JWT_SECRET

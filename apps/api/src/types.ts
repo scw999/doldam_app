@@ -11,6 +11,7 @@ export interface Env {
   // Vars
   ENV: 'development' | 'production';
   TEST_MODE?: string;
+  ALLOW_DEV_OTP?: string; // 'true'면 OTP를 응답에 노출 (SMS 연동 전 테스트용 — 출시 전 제거)
 
   // Secrets
   JWT_SECRET: string;

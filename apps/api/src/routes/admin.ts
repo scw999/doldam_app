@@ -118,7 +118,8 @@ admin.get('/certificates/:phoneHash/image', requireAdmin, async (c) => {
   const { phoneHash } = c.req.param();
   const raw = await c.env.DOLDAM_KV.get(`cert:${phoneHash}`);
   if (!raw) return c.json({ error: 'not_found' }, 404);
-  const data = JSON.parse(raw) as { r2Key: string };
+  const data = JSON.parse(raw) as { r2Key?: string };
+  if (!data.r2Key) return c.json({ error: 'file_deleted' }, 404);
   const obj = await c.env.DOLDAM_R2.get(data.r2Key);
   if (!obj) return c.json({ error: 'not_found' }, 404);
   const bytes = await obj.arrayBuffer();
@@ -130,14 +131,21 @@ admin.get('/certificates/:phoneHash/image', requireAdmin, async (c) => {
   });
 });
 
+// 검증 판정 직후 R2 원본 즉시 삭제 (개인정보 보호 — 검증 플래그만 남김)
+async function deleteCertFile(c: { env: Env }, r2Key: string | undefined): Promise<void> {
+  if (!r2Key) return;
+  await c.env.DOLDAM_R2.delete(r2Key).catch((e) => console.error('[admin] cert r2 delete', e));
+}
+
 admin.post('/certificates/:phoneHash/approve', requireAdmin, async (c) => {
   const { phoneHash } = c.req.param();
   const raw = await c.env.DOLDAM_KV.get(`cert:${phoneHash}`);
   if (!raw) return c.json({ error: 'not_found' }, 404);
-  const data = JSON.parse(raw);
+  const data = JSON.parse(raw) as { r2Key?: string };
+  await deleteCertFile(c, data.r2Key);
   await c.env.DOLDAM_KV.put(
     `cert:${phoneHash}`,
-    JSON.stringify({ ...data, status: 'verified', verifiedAt: Date.now() }),
+    JSON.stringify({ ...data, r2Key: null, status: 'verified', verifiedAt: Date.now() }),
     { expirationTtl: 604800 }
   );
   return c.json({ ok: true });
@@ -148,10 +156,11 @@ admin.post('/certificates/:phoneHash/reject', requireAdmin, async (c) => {
   const { reason = '검증 실패' } = await c.req.json<{ reason?: string }>().catch((): { reason?: string } => ({}));
   const raw = await c.env.DOLDAM_KV.get(`cert:${phoneHash}`);
   if (!raw) return c.json({ error: 'not_found' }, 404);
-  const data = JSON.parse(raw);
+  const data = JSON.parse(raw) as { r2Key?: string };
+  await deleteCertFile(c, data.r2Key);
   await c.env.DOLDAM_KV.put(
     `cert:${phoneHash}`,
-    JSON.stringify({ ...data, status: 'rejected', reason, rejectedAt: Date.now() }),
+    JSON.stringify({ ...data, r2Key: null, status: 'rejected', reason, rejectedAt: Date.now() }),
     { expirationTtl: 86400 }
   );
   return c.json({ ok: true });

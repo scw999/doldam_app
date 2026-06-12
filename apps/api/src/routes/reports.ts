@@ -21,19 +21,15 @@ reports.post('/', requireAuth, async (c) => {
   }
   if (!reason?.trim()) return c.json({ error: 'reason_required' }, 400);
 
-  // 중복 신고 방지
-  const dup = await c.env.DOLDAM_DB
-    .prepare('SELECT 1 FROM reports WHERE reporter_id = ? AND target_id = ? AND target_type = ?')
-    .bind(user.id, targetId, targetType).first();
-  if (dup) return c.json({ ok: true, duplicate: true });
-
-  await c.env.DOLDAM_DB
+  // 중복 신고 방지 — UNIQUE 인덱스 + OR IGNORE로 동시 요청에도 1회만 집계
+  const res = await c.env.DOLDAM_DB
     .prepare(
-      `INSERT INTO reports (id, reporter_id, target_type, target_id, reason, status, created_at)
+      `INSERT OR IGNORE INTO reports (id, reporter_id, target_type, target_id, reason, status, created_at)
        VALUES (?, ?, ?, ?, ?, 'pending', ?)`
     )
     .bind(crypto.randomUUID(), user.id, targetType, targetId, reason.trim(), Date.now())
     .run();
+  if (res.meta.changes === 0) return c.json({ ok: true, duplicate: true });
 
   if (targetType === 'post') {
     await c.env.DOLDAM_DB

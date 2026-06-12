@@ -207,6 +207,8 @@ posts.post('/:id/like', requireAuth, async (c) => {
   const user = c.get('user');
   const id = c.req.param('id');
   const { reaction = 0 } = await c.req.json<{ reaction?: number }>().catch((): { reaction?: number } => ({}));
+  // 0=공감돼요 1=안아줄게요 2=힘내요 3=웃겨요
+  if (![0, 1, 2, 3].includes(reaction)) return c.json({ error: 'invalid_reaction' }, 400);
 
   const existing = await c.env.DOLDAM_DB
     .prepare('SELECT 1 FROM post_likes WHERE post_id = ? AND user_id = ?')

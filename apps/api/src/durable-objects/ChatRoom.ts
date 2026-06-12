@@ -93,8 +93,34 @@ export class ChatRoom {
     this.env = env;
   }
 
+  // D1 이중 저장 — DO storage 유실 대비 + 보관 정책(90일) 적용 대상
+  private persistMessage(roomId: string, msg: ChatMessage): void {
+    this.env.DOLDAM_DB
+      .prepare(
+        `INSERT OR REPLACE INTO chat_messages (id, room_id, user_id, nickname, text, vote_id, reactions, ts)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+      )
+      .bind(
+        msg.id, roomId, msg.from, msg.nickname, msg.text,
+        msg.voteId ?? null,
+        msg.reactions ? JSON.stringify(msg.reactions) : null,
+        msg.ts
+      )
+      .run()
+      .catch((e) => console.error('[chat] d1 persist', e));
+  }
+
   // DO 알람 핸들러 — 주기적 아이스브레이커 질문 전송
   async alarm(): Promise<void> {
+    // 만료/삭제된 방이면 질문 전송과 알람 재예약을 중단
+    const alarmRoomId = await this.state.storage.get<string>('roomId');
+    if (alarmRoomId) {
+      const room = await this.env.DOLDAM_DB
+        .prepare('SELECT status FROM rooms WHERE id = ?')
+        .bind(alarmRoomId).first<{ status: string }>();
+      if (!room || room.status === 'expired') return;
+    }
+
     const now = Date.now();
     // 이미 물어본 질문 인덱스 추적 — 전부 소진되면 리셋
     const asked = (await this.state.storage.get<number[]>('askedQuestions')) ?? [];
@@ -115,6 +141,8 @@ export class ChatRoom {
     // 히스토리에 저장 (나중에 입장해도 볼 수 있도록)
     await this.state.storage.put(`msg:${now}:${msg.id}`, msg);
     await this.state.storage.put('lastQuestionTs', now);
+    const roomId = await this.state.storage.get<string>('roomId');
+    if (roomId) this.persistMessage(roomId, msg);
     // 현재 연결된 세션에 즉시 전송
     if (this.sessions.size > 0) this.broadcast(msg);
     // 다음 질문 예약
@@ -156,6 +184,10 @@ export class ChatRoom {
       .prepare("SELECT status FROM rooms WHERE id = ?")
       .bind(roomId).first<{ status: string }>();
     if (room?.status === 'expired') return new Response('room_expired', { status: 410 });
+
+    // alarm()/history 폴백에서 쓸 수 있도록 방 ID를 storage에 보관
+    const storedRoomId = await this.state.storage.get<string>('roomId');
+    if (storedRoomId !== roomId) await this.state.storage.put('roomId', roomId);
 
     const pair = new WebSocketPair();
     const [client, server] = Object.values(pair);
@@ -229,6 +261,10 @@ export class ChatRoom {
 
           const updated: ChatMessage = { ...msg, reactions };
           await this.state.storage.put(key, updated);
+          this.env.DOLDAM_DB
+            .prepare('UPDATE chat_messages SET reactions = ? WHERE id = ?')
+            .bind(Object.keys(reactions).length > 0 ? JSON.stringify(reactions) : null, messageId)
+            .run().catch(() => {});
           this.broadcast({ type: 'reaction_updated', messageId, reactions } as any);
           return;
         }
@@ -258,6 +294,7 @@ export class ChatRoom {
           ...(voteId && { voteId }),
         };
         await this.state.storage.put(`msg:${msg.ts}:${msg.id}`, msg);
+        this.persistMessage(roomId, msg);
         this.broadcast(msg);
 
         // 오프라인 멤버에게 푸시 알림
@@ -289,7 +326,33 @@ export class ChatRoom {
 
   private async getHistory(): Promise<Response> {
     const list = await this.state.storage.list<ChatMessage>({ prefix: 'msg:', limit: 200 });
-    const items = [...list.values()].sort((a, b) => a.ts - b.ts);
+    let items = [...list.values()].sort((a, b) => a.ts - b.ts);
+
+    // DO storage가 비어 있으면 D1 백업본에서 복구
+    if (items.length === 0) {
+      const roomId = await this.state.storage.get<string>('roomId');
+      if (roomId) {
+        const { results } = await this.env.DOLDAM_DB
+          .prepare(
+            `SELECT id, user_id, nickname, text, vote_id, reactions, ts
+             FROM chat_messages WHERE room_id = ? ORDER BY ts DESC LIMIT 200`
+          )
+          .bind(roomId)
+          .all<{ id: string; user_id: string; nickname: string; text: string; vote_id: string | null; reactions: string | null; ts: number }>();
+        items = results
+          .map((r) => ({
+            id: r.id,
+            from: r.user_id,
+            nickname: r.nickname,
+            text: r.text,
+            ts: r.ts,
+            ...(r.vote_id && { voteId: r.vote_id }),
+            ...(r.reactions && { reactions: JSON.parse(r.reactions) as Record<string, string[]> }),
+          }))
+          .sort((a, b) => a.ts - b.ts);
+      }
+    }
+
     const cursors = (await this.state.storage.get<Record<string, number>>('readCursors')) ?? {};
     return new Response(JSON.stringify({ items, cursors }), {
       headers: { 'Content-Type': 'application/json' },

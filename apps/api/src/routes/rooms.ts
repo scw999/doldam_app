@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import type { Env, AuthedUser } from '../types';
 import { requireAuth } from '../middleware/auth';
-import { spendPoints } from '../services/points';
+import { spendPoints, grantPoints } from '../services/points';
 import { enqueueForMatch, cancelMatch, matchQueueStatus } from '../services/matching';
 import { POINTS, ROOM } from '../utils/constants';
 
@@ -53,20 +53,23 @@ rooms.post('/themed/:id/join', requireAuth, async (c) => {
   if (room.gender_mix === 'men_only' && user.gender !== 'M') return c.json({ error: 'forbidden' }, 403);
   if (room.gender_mix === 'women_only' && user.gender !== 'F') return c.json({ error: 'forbidden' }, 403);
 
-  const existing = await c.env.DOLDAM_DB
-    .prepare(`SELECT 1 FROM room_members WHERE room_id = ? AND user_id = ?`)
-    .bind(id, user.id).first();
-  if (existing) return c.json({ ok: true, alreadyJoined: true });
+  // 정원 체크 + 가입을 단일 조건부 INSERT로 — 동시 가입으로 정원 초과 방지
+  const res = await c.env.DOLDAM_DB
+    .prepare(
+      `INSERT INTO room_members (room_id, user_id, joined_at)
+       SELECT ?1, ?2, ?3
+       WHERE (SELECT COUNT(*) FROM room_members WHERE room_id = ?1) < ?4
+         AND NOT EXISTS (SELECT 1 FROM room_members WHERE room_id = ?1 AND user_id = ?2)`
+    )
+    .bind(id, user.id, Date.now(), ROOM.MAX_MEMBERS).run();
 
-  // 인원 제한 체크
-  const count = await c.env.DOLDAM_DB
-    .prepare(`SELECT COUNT(*) AS n FROM room_members WHERE room_id = ?`)
-    .bind(id).first<{ n: number }>();
-  if ((count?.n ?? 0) >= ROOM.MAX_MEMBERS) return c.json({ error: 'room_full' }, 400);
-
-  await c.env.DOLDAM_DB
-    .prepare(`INSERT OR IGNORE INTO room_members (room_id, user_id, joined_at) VALUES (?, ?, ?)`)
-    .bind(id, user.id, Date.now()).run();
+  if (res.meta.changes === 0) {
+    const existing = await c.env.DOLDAM_DB
+      .prepare(`SELECT 1 FROM room_members WHERE room_id = ? AND user_id = ?`)
+      .bind(id, user.id).first();
+    if (existing) return c.json({ ok: true, alreadyJoined: true });
+    return c.json({ error: 'room_full' }, 400);
+  }
 
   return c.json({ ok: true });
 });
@@ -105,7 +108,14 @@ rooms.get('/match/status', requireAuth, async (c) => {
 // ---- 매칭 신청 ----
 rooms.post('/match', requireAuth, async (c) => {
   const user = c.get('user');
-  await enqueueForMatch(c.env, user.id);
+  try {
+    await enqueueForMatch(c.env, user.id);
+  } catch (e) {
+    if (e instanceof Error && e.message === 'already_in_room') {
+      return c.json({ error: 'already_in_room' }, 400);
+    }
+    throw e;
+  }
   await c.env.DOLDAM_QUEUE.send({ type: 'matching', userId: user.id });
   return c.json({ ok: true, queued: true });
 });
@@ -241,10 +251,16 @@ rooms.post('/:id/revive', requireAuth, async (c) => {
   const spent = await spendPoints(c.env, user.id, POINTS.COST_REVIVE_ROOM, 'room_revive');
   if (!spent.ok) return c.json({ error: spent.reason ?? 'cannot_spend' }, 400);
 
+  // 조건부 UPDATE — 그 사이 다른 경로(투표 유지 등)로 방이 살아났으면 포인트 환불
   const newExpiry = Date.now() + ROOM.LIFESPAN_HOURS * 3600 * 1000;
-  await c.env.DOLDAM_DB
-    .prepare(`UPDATE rooms SET status = 'revived', expires_at = ? WHERE id = ?`)
+  const upd = await c.env.DOLDAM_DB
+    .prepare(`UPDATE rooms SET status = 'revived', expires_at = ?, vote_resolved = 1 WHERE id = ? AND status = 'expired'`)
     .bind(newExpiry, id).run();
+
+  if (upd.meta.changes === 0) {
+    await grantPoints(c.env, user.id, POINTS.COST_REVIVE_ROOM, 'room_revive_refund');
+    return c.json({ error: 'already_active' }, 400);
+  }
 
   return c.json({ ok: true, newExpiry });
 });

@@ -23,12 +23,30 @@ async function writeQueue(env: Env, key: string, list: string[]): Promise<void> 
   else await env.DOLDAM_KV.put(key, JSON.stringify(list), { expirationTtl: QUEUE_TTL });
 }
 
+// 활성 방에 이미 속한 유저 집합 조회 (중복 매칭 방지)
+async function usersInActiveRooms(env: Env, userIds: string[]): Promise<Set<string>> {
+  if (userIds.length === 0) return new Set();
+  const placeholders = userIds.map(() => '?').join(',');
+  const { results } = await env.DOLDAM_DB
+    .prepare(
+      `SELECT DISTINCT rm.user_id FROM room_members rm
+       JOIN rooms r ON r.id = rm.room_id
+       WHERE r.status IN ('active', 'revived') AND rm.user_id IN (${placeholders})`
+    )
+    .bind(...userIds)
+    .all<{ user_id: string }>();
+  return new Set(results.map((r) => r.user_id));
+}
+
 export async function enqueueForMatch(env: Env, userId: string): Promise<void> {
   const user = await env.DOLDAM_DB
     .prepare('SELECT gender FROM users WHERE id = ?')
     .bind(userId)
     .first<{ gender: string }>();
   if (!user) throw new Error('user_not_found');
+
+  const inRoom = await usersInActiveRooms(env, [userId]);
+  if (inRoom.has(userId)) throw new Error('already_in_room');
 
   const key = queueKey(user.gender);
   const list = await readQueue(env, key);
@@ -47,7 +65,14 @@ export async function tryMatch(env: Env, userId: string): Promise<string | null>
 
   const mKey = queueKey('M');
   const fKey = queueKey('F');
-  const [mList, fList] = await Promise.all([readQueue(env, mKey), readQueue(env, fKey)]);
+  const [mRaw, fRaw] = await Promise.all([readQueue(env, mKey), readQueue(env, fKey)]);
+
+  // 큐 처리 지연 사이에 이미 방에 배정된 유저는 큐에서 제거 (이중 배정 방지)
+  const inRoom = await usersInActiveRooms(env, [...new Set([...mRaw, ...fRaw])]);
+  const mList = mRaw.filter((id) => !inRoom.has(id));
+  const fList = fRaw.filter((id) => !inRoom.has(id));
+  if (mList.length !== mRaw.length) await writeQueue(env, mKey, mList);
+  if (fList.length !== fRaw.length) await writeQueue(env, fKey, fList);
 
   let picked: string[];
   let genderMix: string;
@@ -119,7 +144,7 @@ export async function tryMatch(env: Env, userId: string): Promise<string | null>
 
   for (const uid of picked) {
     await env.DOLDAM_DB
-      .prepare('INSERT INTO room_members (room_id, user_id, joined_at) VALUES (?, ?, ?)')
+      .prepare('INSERT OR IGNORE INTO room_members (room_id, user_id, joined_at) VALUES (?, ?, ?)')
       .bind(roomId, uid, now)
       .run();
 

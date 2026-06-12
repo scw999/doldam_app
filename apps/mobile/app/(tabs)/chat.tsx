@@ -46,7 +46,12 @@ export default function ChatScreen() {
       await api.post('/rooms/match', {});
       await load();
       Alert.alert('매칭 대기 중', '6명이 모이면 자동으로 방이 열려요');
-    } catch (e) { Alert.alert('실패', (e as Error).message); }
+    } catch (e) {
+      const msg = (e as Error).message === 'already_in_room'
+        ? '이미 참여 중인 채팅방이 있어요. 방이 끝난 뒤 다시 신청해주세요.'
+        : (e as Error).message;
+      Alert.alert('실패', msg);
+    }
     finally { setMatching(false); }
   }
 
@@ -64,7 +69,12 @@ export default function ChatScreen() {
     try {
       await api.post(`/rooms/themed/${id}/join`, {});
       router.push(`/room/${id}`);
-    } catch (e) { Alert.alert('실패', (e as Error).message); }
+    } catch (e) {
+      const msg = (e as Error).message === 'room_full'
+        ? '방 정원(8명)이 가득 찼어요.'
+        : (e as Error).message;
+      Alert.alert('실패', msg);
+    }
   }
 
   return (

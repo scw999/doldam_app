@@ -314,7 +314,16 @@ export default function RoomScreen() {
           try {
             await api.post(`/rooms/${id}/revive`, {});
             loadRoom();
-          } catch (e) { Alert.alert('실패', (e as Error).message); }
+          } catch (e) {
+            const code = (e as Error).message;
+            const msg = code === 'already_active'
+              ? '방이 이미 살아있어요. 포인트는 차감되지 않았어요.'
+              : code === 'insufficient_balance'
+                ? '포인트가 부족해요.'
+                : code;
+            Alert.alert('실패', msg);
+            loadRoom();
+          }
         },
       },
     ]);

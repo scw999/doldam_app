@@ -13,13 +13,33 @@ const OTP_MAX_ATTEMPTS = 5;
 const TEMP_PHONE_JWT_TTL = 1800; // 30분 (증명서 업로드 + 온보딩 완료까지)
 const USER_JWT_TTL = 60 * 60 * 24 * 30; // 30일
 
+const OTP_REQUEST_MIN_GAP_MS = 60_000; // 같은 번호 재발송 최소 간격
+const OTP_REQUEST_HOURLY_MAX = 5;      // 같은 번호 시간당 최대 발송
+
 // ---- 1. OTP 발송 ----
 auth.post('/phone/request', async (c) => {
   const { phone } = await c.req.json<{ phone: string }>();
   if (!/^01[016-9]\d{7,8}$/.test(phone)) return c.json({ error: 'invalid_phone' }, 400);
 
-  const code = genOtp();
   const phoneHash = await sha256Hex(phone);
+
+  // 발송 레이트리밋 — SMS 폭탄/비용 공격 방지
+  const now = Date.now();
+  const rlRaw = await c.env.DOLDAM_KV.get(`otprl:${phoneHash}`);
+  const rl = rlRaw ? (JSON.parse(rlRaw) as { count: number; last: number }) : { count: 0, last: 0 };
+  if (now - rl.last < OTP_REQUEST_MIN_GAP_MS) {
+    return c.json({ error: 'too_many_requests', retryAfterSec: Math.ceil((OTP_REQUEST_MIN_GAP_MS - (now - rl.last)) / 1000) }, 429);
+  }
+  if (rl.count >= OTP_REQUEST_HOURLY_MAX) {
+    return c.json({ error: 'hourly_limit_exceeded' }, 429);
+  }
+  await c.env.DOLDAM_KV.put(
+    `otprl:${phoneHash}`,
+    JSON.stringify({ count: rl.count + 1, last: now }),
+    { expirationTtl: 3600 }
+  );
+
+  const code = genOtp();
   await c.env.DOLDAM_KV.put(
     `otp:${phoneHash}`,
     JSON.stringify({ code, attempts: 0 }),
@@ -27,7 +47,8 @@ auth.post('/phone/request', async (c) => {
   );
   await sendOtp(c.env, phone, code);
 
-  const devMode = c.env.ENV === 'development' || !c.env.DANAL_API_KEY;
+  // devCode 노출은 명시적 플래그로만 — SMS 연동 후 ALLOW_DEV_OTP 제거 필수
+  const devMode = c.env.ENV === 'development' || c.env.ALLOW_DEV_OTP === 'true';
   return c.json({ ok: true, ttlSec: OTP_TTL_SEC, ...(devMode && { devCode: code }) });
 });
 

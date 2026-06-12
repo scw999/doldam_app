@@ -18,7 +18,7 @@ import admin from './routes/admin';
 import webhooks from './routes/webhooks';
 
 import { runOcr } from './services/ocr';
-import { cleanupExpiredPoints, expireRooms } from './services/cleanup';
+import { cleanupExpiredPoints, expireRooms, cleanupOldChatMessages, cleanupOrphanCertificates } from './services/cleanup';
 import { tryMatch } from './services/matching';
 import { detectHotAndOpenRooms } from './services/themedRooms';
 import { sendPush } from './services/push';
@@ -30,7 +30,7 @@ export { ChatRoom } from './durable-objects/ChatRoom';
 const app = new Hono<{ Bindings: Env }>();
 
 app.use('*', logger());
-app.use('*', cors({ origin: '*', credentials: true }));
+app.use('*', cors({ origin: '*' }));
 
 app.get('/', (c) => c.json({ name: 'doldam-api', status: 'ok' }));
 app.get('/health', (c) => c.json({ ok: true, ts: Date.now() }));
@@ -105,10 +105,12 @@ export default {
       await resolveVotesTick(env, ctx);
       return;
     }
-    // 매시간 정각 — 만료 포인트/방 정리
+    // 매시간 정각 — 만료 포인트/방/채팅 보관분/방치 증명서 정리
     await Promise.all([
       cleanupExpiredPoints(env),
       expireRooms(env),
+      cleanupOldChatMessages(env),
+      cleanupOrphanCertificates(env),
       detectHotAndOpenRooms(env),
       // pollEasBuilds(env),  // 수동 전송으로 전환 (/admin/poll-eas)
     ]);
