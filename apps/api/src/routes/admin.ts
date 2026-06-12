@@ -281,7 +281,7 @@ admin.get('/rooms', requireAdmin, async (c) => {
   const { status = 'active', limit = '30', offset = '0' } = c.req.query();
   const { results } = await c.env.DOLDAM_DB
     .prepare(
-      `SELECT r.id, r.name, r.status, r.gender_mix, r.tags,
+      `SELECT r.id, r.theme AS name, r.status, r.gender_mix, r.tags,
               r.created_at, r.expires_at,
               COUNT(rm.user_id) AS member_count
        FROM rooms r LEFT JOIN room_members rm ON rm.room_id = r.id
