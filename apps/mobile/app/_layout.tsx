@@ -117,7 +117,7 @@ export default function RootLayout() {
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="auth/login" options={{ title: '로그인' }} />
         <Stack.Screen name="auth/verify" options={{ title: '본인인증' }} />
-        <Stack.Screen name="auth/certificate" options={{ title: '증명서 업로드' }} />
+        <Stack.Screen name="auth/certificate" options={{ title: '본인 인증' }} />
         <Stack.Screen name="auth/onboarding" options={{ title: '프로필 설정' }} />
         <Stack.Screen name="post/[id]" options={{ headerShown: false, presentation: 'modal' }} />
         <Stack.Screen name="post/new" options={{ title: '글쓰기' }} />
