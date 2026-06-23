@@ -225,3 +225,13 @@ CREATE TABLE IF NOT EXISTS notifications (
   created_at    INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id, created_at DESC);
+
+-- ===== 사용자 차단 (양방향) =====
+CREATE TABLE IF NOT EXISTS user_blocks (
+  blocker_id  TEXT NOT NULL,
+  blocked_id  TEXT NOT NULL,
+  created_at  INTEGER NOT NULL,
+  PRIMARY KEY (blocker_id, blocked_id)
+);
+CREATE INDEX IF NOT EXISTS idx_user_blocks_blocker ON user_blocks(blocker_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_user_blocks_blocked ON user_blocks(blocked_id);

@@ -356,6 +356,25 @@ export default function RoomScreen() {
     }
   }
 
+  function confirmBlockChatUser(targetUserId: string, nickname: string) {
+    Alert.alert(
+      `${nickname} 차단`,
+      '차단해도 이 채팅방은 계속 보입니다. 게시판/투표/프로필에서 이 사용자의 콘텐츠가 더 이상 보이지 않습니다.',
+      [
+        { text: '취소', style: 'cancel' },
+        {
+          text: '차단', style: 'destructive',
+          onPress: async () => {
+            try {
+              await api.post('/blocks', { targetId: targetUserId });
+              Alert.alert('차단 완료', '게시판/투표/프로필에서 더 이상 보이지 않습니다.');
+            } catch { Alert.alert('오류', '잠시 후 다시 시도해주세요'); }
+          },
+        },
+      ]
+    );
+  }
+
   const rem = room ? fmtRemaining(room.expires_at) : { label: '...', urgent: false };
   const isThemed = room?.kind === 'themed';
   const isExpired = room?.status === 'expired' || rem.label === '0분';
@@ -791,6 +810,16 @@ export default function RoomScreen() {
                   style={styles.reactionAction}
                 >
                   <Text style={{ fontSize: 14, color: '#E85D4A', fontWeight: '600' }}>🚨 신고하기</Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => {
+                    const target = reactionTarget;
+                    setReactionTarget(null);
+                    if (target) confirmBlockChatUser(target.from, target.nickname);
+                  }}
+                  style={styles.reactionAction}
+                >
+                  <Text style={{ fontSize: 14, color: '#E85D4A', fontWeight: '600' }}>🚫 차단하기</Text>
                 </Pressable>
               </>
             )}

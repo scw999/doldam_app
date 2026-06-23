@@ -7,18 +7,24 @@ import { awardPoints } from '../services/points';
 import { POINTS, CATEGORIES, type Category } from '../utils/constants';
 import { REPORT_HIDE_THRESHOLD } from './reports';
 import { sendPush } from '../services/push';
+import { blockFilterSql, isBlocked } from '../utils/blocks';
 
 type Vars = { user: AuthedUser };
 const posts = new Hono<{ Bindings: Env; Variables: Vars }>();
 
-async function getReqGender(req: Request, env: Env): Promise<'M' | 'F' | null> {
+async function getReqUserId(req: Request, env: Env): Promise<string | null> {
   const token = req.headers.get('Authorization')?.replace(/^Bearer\s+/i, '');
   if (!token) return null;
   const jwt = await verifyJwt(token, env.JWT_SECRET).catch(() => null);
-  if (!jwt?.sub) return null;
+  return jwt?.sub ?? null;
+}
+
+async function getReqGender(req: Request, env: Env): Promise<'M' | 'F' | null> {
+  const userId = await getReqUserId(req, env);
+  if (!userId) return null;
   const row = await env.DOLDAM_DB
     .prepare('SELECT gender FROM users WHERE id = ? AND deleted_at IS NULL')
-    .bind(jwt.sub).first<{ gender: 'M' | 'F' }>();
+    .bind(userId).first<{ gender: 'M' | 'F' }>();
   return row?.gender ?? null;
 }
 
@@ -31,6 +37,11 @@ posts.get('/', async (c) => {
   const cursor = Number(c.req.query('cursor') ?? Date.now());
   const hot = c.req.query('sort') === 'hot';
 
+  // 차단 양방향 필터 — 인증된 요청에만 적용 (게스트는 그냥 전체)
+  const meId = await getReqUserId(c.req.raw, c.env);
+  const blockClause = meId ? ` AND ${blockFilterSql('p.user_id')}` : '';
+  const blockBinds: unknown[] = meId ? [meId, meId] : [];
+
   const SEL = `SELECT p.id, p.title, p.content, p.category, p.view_count, p.like_count,
                       p.comment_count, p.created_at, u.nickname, u.gender, u.age_range, u.divorce_year, u.divorce_month
                FROM posts p JOIN users u ON u.id = p.user_id`;
@@ -41,19 +52,19 @@ posts.get('/', async (c) => {
   const { results } = hot
     ? await c.env.DOLDAM_DB
         .prepare(
-          `${SEL} WHERE ${all ? '' : 'p.category = ? AND '}p.deleted_at IS NULL AND p.report_count < ?
+          `${SEL} WHERE ${all ? '' : 'p.category = ? AND '}p.deleted_at IS NULL AND p.report_count < ?${blockClause}
            ${ORDER} LIMIT ?`
         )
-        .bind(...(all ? [REPORT_HIDE_THRESHOLD, limit] : [categoryParam, REPORT_HIDE_THRESHOLD, limit]))
+        .bind(...(all ? [REPORT_HIDE_THRESHOLD, ...blockBinds, limit] : [categoryParam, REPORT_HIDE_THRESHOLD, ...blockBinds, limit]))
         .all<{ created_at: number }>()
     : all
     ? await c.env.DOLDAM_DB
-        .prepare(`${SEL} WHERE p.deleted_at IS NULL AND p.created_at < ? AND p.report_count < ? ${ORDER} LIMIT ?`)
-        .bind(cursor, REPORT_HIDE_THRESHOLD, limit)
+        .prepare(`${SEL} WHERE p.deleted_at IS NULL AND p.created_at < ? AND p.report_count < ?${blockClause} ${ORDER} LIMIT ?`)
+        .bind(cursor, REPORT_HIDE_THRESHOLD, ...blockBinds, limit)
         .all<{ created_at: number }>()
     : await c.env.DOLDAM_DB
-        .prepare(`${SEL} WHERE p.category = ? AND p.deleted_at IS NULL AND p.created_at < ? AND p.report_count < ? ${ORDER} LIMIT ?`)
-        .bind(categoryParam, cursor, REPORT_HIDE_THRESHOLD, limit)
+        .prepare(`${SEL} WHERE p.category = ? AND p.deleted_at IS NULL AND p.created_at < ? AND p.report_count < ?${blockClause} ${ORDER} LIMIT ?`)
+        .bind(categoryParam, cursor, REPORT_HIDE_THRESHOLD, ...blockBinds, limit)
         .all<{ created_at: number }>();
 
   const nextCursor = (!hot && results.length === limit) ? results[results.length - 1].created_at : null;
@@ -117,8 +128,14 @@ posts.get('/:id', async (c) => {
        WHERE p.id = ? AND p.deleted_at IS NULL`
     )
     .bind(id)
-    .first<{ category: string }>();
+    .first<{ category: string; user_id: string }>();
   if (!row) return c.json({ error: 'not_found' }, 404);
+
+  // 차단 양방향 필터 — 작성자와 차단 관계면 안 보이게
+  const meId = await getReqUserId(c.req.raw, c.env);
+  if (meId && meId !== row.user_id && await isBlocked(c.env.DOLDAM_DB, meId, row.user_id)) {
+    return c.json({ error: 'not_found' }, 404);
+  }
 
   if (row.category === 'men_only' || row.category === 'women_only') {
     const myGender = await getReqGender(c.req.raw, c.env);
@@ -247,14 +264,19 @@ posts.get('/:id/comments', async (c) => {
     if (postRow.category === 'women_only' && myGender !== 'F') return c.json({ error: 'forbidden_category' }, 403);
   }
 
+  // 차단 양방향 필터 — 인증된 요청에만 적용
+  const meId = await getReqUserId(c.req.raw, c.env);
+  const blockClause = meId ? ` AND ${blockFilterSql('cm.user_id')}` : '';
+  const blockBinds: unknown[] = meId ? [meId, meId] : [];
+
   const { results } = await c.env.DOLDAM_DB
     .prepare(
       `SELECT cm.id, cm.content, cm.parent_id, cm.created_at, cm.user_id, u.nickname, u.gender
        FROM comments cm JOIN users u ON u.id = cm.user_id
-       WHERE cm.post_id = ? AND cm.deleted_at IS NULL AND cm.report_count < ?
+       WHERE cm.post_id = ? AND cm.deleted_at IS NULL AND cm.report_count < ?${blockClause}
        ORDER BY cm.created_at ASC LIMIT 200`
     )
-    .bind(id, REPORT_HIDE_THRESHOLD).all();
+    .bind(id, REPORT_HIDE_THRESHOLD, ...blockBinds).all();
   return c.json({ items: results });
 });
 

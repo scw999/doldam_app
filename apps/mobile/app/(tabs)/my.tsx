@@ -51,26 +51,8 @@ export default function MyScreen() {
     ]);
   }
 
-  function deleteAccount() {
-    Alert.alert(
-      '계정 삭제',
-      '계정을 삭제하면 모든 데이터가 영구적으로 삭제됩니다. 정말 삭제하시겠어요?',
-      [
-        { text: '취소', style: 'cancel' },
-        {
-          text: '삭제',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await api.delete('/auth/me');
-              clear();
-            } catch {
-              Alert.alert('오류', '계정 삭제에 실패했어요. 고객센터에 문의해주세요.');
-            }
-          },
-        },
-      ]
-    );
+  function goWithdraw() {
+    router.push('/withdraw' as any);
   }
 
   const BADGES = [
@@ -92,6 +74,7 @@ export default function MyScreen() {
     { icon: '🔔', label: '알림 내역', onPress: () => router.push('/notifications' as any) },
     { icon: '🔕', label: '알림 설정', onPress: () => router.push('/notification-settings' as any) },
     { icon: '✏️', label: '프로필 편집', onPress: () => router.push('/profile-edit' as any) },
+    { icon: '🚫', label: '차단한 사용자', onPress: () => router.push('/blocks' as any) },
   ];
 
   return (
@@ -221,8 +204,8 @@ export default function MyScreen() {
             <Text style={{ fontSize: 13, color: colors.textSub }}>로그아웃</Text>
           </Pressable>
           <Text style={{ fontSize: 13, color: colors.border }}>|</Text>
-          <Pressable onPress={deleteAccount}>
-            <Text style={{ fontSize: 13, color: colors.error }}>계정 삭제</Text>
+          <Pressable onPress={goWithdraw}>
+            <Text style={{ fontSize: 13, color: colors.error }}>탈퇴하기</Text>
           </Pressable>
         </View>
       </ScrollView>

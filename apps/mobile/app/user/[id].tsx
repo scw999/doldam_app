@@ -1,9 +1,14 @@
 import { useCallback, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, Alert, ActivityIndicator } from 'react-native';
-import { useLocalSearchParams, useFocusEffect } from 'expo-router';
+import { useLocalSearchParams, useFocusEffect, router } from 'expo-router';
 import { colors, spacing, typography, radius } from '@/theme';
 import { api } from '@/api';
+import { useAuth } from '@/store/auth';
 import { getDivorceTitle } from '@/utils/divorce';
+
+const REPORT_REASONS = [
+  '욕설·비방', '음란물', '광고·스팸', '개인정보 노출', '사기·기만', '기타',
+];
 
 interface Profile {
   id: string;
@@ -30,14 +35,71 @@ const FIELD_LABELS: Record<Field, string> = {
 
 export default function UserProfile() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const myId = useAuth((s) => s.userId);
   const [profile, setProfile] = useState<Profile | null>(null);
 
   const load = useCallback(async () => {
-    const p = await api.get<Profile>(`/profiles/${id}`);
-    setProfile(p);
+    try {
+      const p = await api.get<Profile>(`/profiles/${id}`, { cacheTtl: 0 });
+      setProfile(p);
+    } catch {
+      Alert.alert('알림', '프로필을 볼 수 없어요.', [{ text: '확인', onPress: () => router.back() }]);
+    }
   }, [id]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
+
+  function openMenu() {
+    if (!profile || profile.id === myId) return;
+    Alert.alert(profile.nickname, '어떻게 할까요?', [
+      { text: '취소', style: 'cancel' },
+      { text: '🚨 신고하기', onPress: openReportPicker },
+      { text: '🚫 차단하기', style: 'destructive', onPress: confirmBlock },
+    ]);
+  }
+
+  function openReportPicker() {
+    if (!profile) return;
+    Alert.alert('신고 사유', '사유를 선택해 주세요', [
+      { text: '취소', style: 'cancel' },
+      ...REPORT_REASONS.map((reason) => ({
+        text: reason,
+        onPress: async () => {
+          try {
+            await api.post('/reports', { targetType: 'user', targetId: profile.id, reason });
+            Alert.alert('신고 완료', '검토 후 조치하겠습니다');
+          } catch {
+            Alert.alert('오류', '신고에 실패했어요');
+          }
+        },
+      })),
+    ]);
+  }
+
+  function confirmBlock() {
+    if (!profile) return;
+    Alert.alert(
+      `${profile.nickname} 차단`,
+      '차단하면 서로의 글·댓글·프로필이 보이지 않아요. 언제든 해제할 수 있어요.',
+      [
+        { text: '취소', style: 'cancel' },
+        {
+          text: '차단',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await api.post('/blocks', { targetId: profile.id });
+              Alert.alert('차단 완료', '이 사용자의 콘텐츠가 더 이상 보이지 않습니다.', [
+                { text: '확인', onPress: () => router.back() },
+              ]);
+            } catch {
+              Alert.alert('오류', '잠시 후 다시 시도해주세요');
+            }
+          },
+        },
+      ]
+    );
+  }
 
   async function unlock(field: Field) {
     Alert.alert('항목 열람', `포인트 30P로 ${FIELD_LABELS[field]}을 열람할까요?`, [
@@ -93,6 +155,12 @@ export default function UserProfile() {
       <View style={styles.card}>
         {(['job', 'has_kids', 'intro', 'interests'] as Field[]).map(renderField)}
       </View>
+
+      {profile.id !== myId && (
+        <Pressable onPress={openMenu} style={styles.menuBtn}>
+          <Text style={styles.menuText}>⋯ 신고 / 차단</Text>
+        </Pressable>
+      )}
     </ScrollView>
   );
 }
@@ -127,4 +195,10 @@ const styles = StyleSheet.create({
     borderRadius: radius.full,
   },
   lockText: { ...typography.caption, color: '#fff' },
+  menuBtn: {
+    marginTop: spacing.lg, alignItems: 'center',
+    paddingVertical: spacing.md, borderRadius: radius.md,
+    borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card,
+  },
+  menuText: { fontSize: 13, color: colors.textSub, fontWeight: '500' },
 });

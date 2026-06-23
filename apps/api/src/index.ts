@@ -14,6 +14,7 @@ import payments from './routes/payments';
 import profiles from './routes/profiles';
 import notifications from './routes/notifications';
 import reports from './routes/reports';
+import blocks from './routes/blocks';
 import admin from './routes/admin';
 import webhooks from './routes/webhooks';
 
@@ -46,6 +47,7 @@ app.route('/payments', payments);
 app.route('/profiles', profiles);
 app.route('/notifications', notifications);
 app.route('/reports', reports);
+app.route('/blocks', blocks);
 app.route('/admin', admin);
 app.route('/webhooks', webhooks);
 

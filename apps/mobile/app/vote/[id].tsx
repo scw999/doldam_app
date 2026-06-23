@@ -205,7 +205,36 @@ export default function VoteDetailScreen() {
                 { text: '취소', style: 'cancel' },
               ]);
             } else {
-              setReportVisible(true);
+              Alert.alert('투표 메뉴', undefined, [
+                { text: '🚨 신고하기', onPress: () => setReportVisible(true) },
+                {
+                  text: '🚫 작성자 차단',
+                  style: 'destructive',
+                  onPress: () => {
+                    if (!vote?.user_id) return;
+                    const authorId = vote.user_id;
+                    Alert.alert(
+                      '작성자 차단',
+                      '차단하면 서로의 글·댓글·투표가 더 이상 보이지 않아요.',
+                      [
+                        { text: '취소', style: 'cancel' },
+                        {
+                          text: '차단', style: 'destructive',
+                          onPress: async () => {
+                            try {
+                              await api.post('/blocks', { targetId: authorId });
+                              Alert.alert('차단 완료', '이 사용자의 콘텐츠가 더 이상 보이지 않습니다.', [
+                                { text: '확인', onPress: () => router.back() },
+                              ]);
+                            } catch { Alert.alert('오류', '잠시 후 다시 시도해주세요'); }
+                          },
+                        },
+                      ]
+                    );
+                  },
+                },
+                { text: '취소', style: 'cancel' },
+              ]);
             }
           }}
           style={{ padding: 8, marginLeft: 'auto' }}

@@ -4,6 +4,7 @@ import { randomNickname } from '../utils/nickname';
 import { sha256Hex } from '../utils/hash';
 import { signJwt, type JwtPayload } from '../utils/jwt';
 import { genOtp, sendOtp } from '../services/sms';
+import { cancelMatch } from '../services/matching';
 import { requireAuth, requireTempPhone } from '../middleware/auth';
 
 const auth = new Hono<{ Bindings: Env; Variables: { user: AuthedUser; jwt: JwtPayload } }>();
@@ -179,6 +180,52 @@ auth.post('/signup', requireTempPhone, async (c) => {
     c.env.JWT_SECRET
   );
   return c.json({ userId: id, nickname, token });
+});
+
+// ---- 6a. 탈퇴 (계정 삭제) ----
+// 앱스토어 심사 필수 (Apple Guideline 5.1.1(v), Google Play Account Deletion 정책).
+// 개인정보는 anonymize, 컨텐츠(글·댓글·투표)는 작성자만 '(탈퇴한 회원)'으로 표기하고 남김.
+// phone_hash는 NULL로 → 같은 번호로 재가입 가능 (banned 상태가 아닌 한).
+auth.delete('/me', requireAuth, async (c) => {
+  const me = c.get('user');
+  const now = Date.now();
+  const { reason } = await c.req.json<{ reason?: string }>().catch(() => ({ reason: undefined }));
+
+  // 단일 batch — 한 번에 anonymize + 개인정보 삭제. D1은 batch 내에서 자동 트랜잭션 처리.
+  await c.env.DOLDAM_DB.batch([
+    c.env.DOLDAM_DB.prepare(
+      `UPDATE users SET
+        deleted_at = ?,
+        phone_hash = NULL,
+        nickname   = '(탈퇴한 회원)',
+        intro      = NULL,
+        interests  = NULL,
+        job        = NULL,
+        has_kids   = NULL,
+        custody    = NULL
+       WHERE id = ?`
+    ).bind(now, me.id),
+    // 푸시 토큰·알림·차단·환경설정은 본인 식별이 끝나므로 즉시 삭제
+    c.env.DOLDAM_DB.prepare('DELETE FROM push_tokens WHERE user_id = ?').bind(me.id),
+    c.env.DOLDAM_DB.prepare('DELETE FROM notifications WHERE user_id = ?').bind(me.id),
+    c.env.DOLDAM_DB.prepare('DELETE FROM notification_preferences WHERE user_id = ?').bind(me.id),
+    c.env.DOLDAM_DB.prepare('DELETE FROM room_notification_mutes WHERE user_id = ?').bind(me.id),
+    c.env.DOLDAM_DB.prepare('DELETE FROM user_blocks WHERE blocker_id = ? OR blocked_id = ?').bind(me.id, me.id),
+    // 프로필 언락 이력도 삭제 (개인정보 - 누가 누구를 봤는지)
+    c.env.DOLDAM_DB.prepare('DELETE FROM profile_unlocks WHERE unlocker_id = ? OR target_id = ?').bind(me.id, me.id),
+    // 닉네임 변경 이력 — 과거 닉네임이 남으므로 삭제
+    c.env.DOLDAM_DB.prepare('DELETE FROM nickname_changes WHERE user_id = ?').bind(me.id),
+  ]);
+
+  // 매칭 큐(KV)에서 제거
+  await cancelMatch(c.env, me.id).catch(() => {});
+
+  // 사유는 익명 통계로만 기록 (탈퇴자 id와 연결하지 않음)
+  if (reason && reason.trim()) {
+    console.log(`[withdraw] reason: ${reason.trim().slice(0, 200)}`);
+  }
+
+  return c.json({ ok: true });
 });
 
 // ---- 6. 내 정보 ----

@@ -7,6 +7,14 @@ import { awardPoints } from '../services/points';
 import { buildVoteCardSvg } from '../services/shareCard';
 import { sendPush } from '../services/push';
 import { POINTS } from '../utils/constants';
+import { blockFilterSql, isBlocked } from '../utils/blocks';
+
+async function getReqUserId(req: Request, env: Env): Promise<string | null> {
+  const token = req.headers.get('Authorization')?.replace(/^Bearer\s+/i, '');
+  if (!token) return null;
+  const jwt = await verifyJwt(token, env.JWT_SECRET).catch(() => null);
+  return jwt?.sub ?? null;
+}
 
 const HOT_VOTE_THRESHOLD = 10;
 
@@ -18,6 +26,11 @@ votes.get('/', async (c) => {
   const limit = Math.min(Number(c.req.query('limit') ?? 50), 100);
   const gender = c.req.query('gender') as 'M' | 'F' | undefined;
   const hot = c.req.query('sort') === 'hot';
+
+  // 차단 양방향 필터 — 인증된 요청에만 적용
+  const meId = await getReqUserId(c.req.raw, c.env);
+  const blockClause = meId ? ` AND ${blockFilterSql('v.user_id')}` : '';
+  const blockBinds: unknown[] = meId ? [meId, meId] : [];
 
   // JOIN + GROUP BY 로 N+1 서브쿼리 제거 (30개 조회 시 90쿼리 → 1쿼리)
   // 방 전용 투표(room_id IS NOT NULL)는 해당 채팅방에서만 보이므로 전역 목록에서 제외
@@ -32,7 +45,7 @@ votes.get('/', async (c) => {
               COALESCE(SUM(CASE WHEN vr.choice = 'disagree' THEN 1 ELSE 0 END), 0) AS disagree
        FROM votes v JOIN users u ON u.id = v.user_id
        LEFT JOIN vote_responses vr ON vr.vote_id = v.id AND vr.gender = ?
-       WHERE v.room_id IS NULL
+       WHERE v.room_id IS NULL${blockClause}
        GROUP BY v.id, v.question, v.description, v.options, v.created_at, v.expires_at, u.nickname
        ${ORDER} LIMIT ?`
     : `SELECT v.id, v.question, v.description, v.options, v.created_at, v.expires_at,
@@ -42,13 +55,13 @@ votes.get('/', async (c) => {
               COALESCE(SUM(CASE WHEN vr.choice = 'disagree' THEN 1 ELSE 0 END), 0) AS disagree
        FROM votes v JOIN users u ON u.id = v.user_id
        LEFT JOIN vote_responses vr ON vr.vote_id = v.id
-       WHERE v.room_id IS NULL
+       WHERE v.room_id IS NULL${blockClause}
        GROUP BY v.id, v.question, v.description, v.options, v.created_at, v.expires_at, u.nickname
        ${ORDER} LIMIT ?`;
 
   const { results } = gender
-    ? await c.env.DOLDAM_DB.prepare(sql).bind(gender, limit).all()
-    : await c.env.DOLDAM_DB.prepare(sql).bind(limit).all();
+    ? await c.env.DOLDAM_DB.prepare(sql).bind(gender, ...blockBinds, limit).all()
+    : await c.env.DOLDAM_DB.prepare(sql).bind(...blockBinds, limit).all();
   c.header('Cache-Control', 'no-store');
   return c.json({ items: results });
 });
@@ -61,6 +74,13 @@ votes.get('/:id', async (c) => {
   const vote = await c.env.DOLDAM_DB
     .prepare('SELECT * FROM votes WHERE id = ?').bind(id).first<Record<string, unknown>>();
   if (!vote) return c.json({ error: 'not_found' }, 404);
+
+  // 차단 양방향이면 404로 위장
+  const meId = await getReqUserId(c.req.raw, c.env);
+  const voteUserId = vote.user_id as string;
+  if (meId && meId !== voteUserId && await isBlocked(c.env.DOLDAM_DB, meId, voteUserId)) {
+    return c.json({ error: 'not_found' }, 404);
+  }
 
   const options: string[] | null = vote.options ? JSON.parse(vote.options as string) : null;
 

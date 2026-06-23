@@ -4,6 +4,7 @@ import { requireAuth } from '../middleware/auth';
 import { moderate } from '../middleware/moderation';
 import { spendPoints } from '../services/points';
 import { POINTS } from '../utils/constants';
+import { isBlocked } from '../utils/blocks';
 
 type Vars = { user: AuthedUser };
 const profiles = new Hono<{ Bindings: Env; Variables: Vars }>();
@@ -77,6 +78,11 @@ profiles.get('/:id', requireAuth, async (c) => {
   // 본인이면 전체 노출
   if (viewer.id === targetId) {
     return c.json({ ...target, unlocked: UNLOCKABLE_FIELDS });
+  }
+
+  // 차단 양방향이면 404로 위장 (차단당한 쪽도 차단 여부 모르게)
+  if (await isBlocked(c.env.DOLDAM_DB, viewer.id, targetId)) {
+    return c.json({ error: 'not_found' }, 404);
   }
 
   const { results } = await c.env.DOLDAM_DB

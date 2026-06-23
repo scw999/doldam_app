@@ -196,6 +196,7 @@ export default function PostDetail() {
     } else {
       Alert.alert('댓글 메뉴', '', [
         { text: '🚨 신고하기', onPress: () => setReportTarget({ type: 'comment', id: c.id }) },
+        { text: '🚫 작성자 차단', style: 'destructive', onPress: () => c.user_id && blockUser(c.user_id, c.nickname) },
         { text: '취소', style: 'cancel' },
       ]);
     }
@@ -306,9 +307,31 @@ export default function PostDetail() {
     } else {
       Alert.alert('게시글 메뉴', '', [
         { text: '🚨 신고하기', onPress: () => setReportTarget({ type: 'post', id }) },
+        { text: '🚫 작성자 차단', style: 'destructive', onPress: () => post && blockUser(post.user_id, post.nickname) },
         { text: '취소', style: 'cancel' },
       ]);
     }
+  }
+
+  function blockUser(targetId: string, nickname: string) {
+    Alert.alert(
+      `${nickname} 차단`,
+      '차단하면 서로의 글·댓글이 더 이상 보이지 않아요. 언제든 해제할 수 있어요.',
+      [
+        { text: '취소', style: 'cancel' },
+        {
+          text: '차단', style: 'destructive',
+          onPress: async () => {
+            try {
+              await api.post('/blocks', { targetId });
+              Alert.alert('차단 완료', '이 사용자의 콘텐츠가 더 이상 보이지 않습니다.', [
+                { text: '확인', onPress: () => router.back() },
+              ]);
+            } catch { Alert.alert('오류', '잠시 후 다시 시도해주세요'); }
+          },
+        },
+      ]
+    );
   }
 
   const insets = useSafeAreaInsets();
