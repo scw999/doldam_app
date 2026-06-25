@@ -114,15 +114,12 @@ function StepProgress({ status }: { status: Status }) {
   );
 }
 
-// ---- 안심 포인트 ----
-function ReassuranceBullet({ icon, title, sub }: { icon: React.ReactNode; title: string; sub: string }) {
+// ---- 안심 포인트 (한 줄 압축) ----
+function ReassuranceLine({ icon, text }: { icon: React.ReactNode; text: string }) {
   return (
-    <View style={s.bulletRow}>
-      <View style={s.bulletIcon}>{icon}</View>
-      <View style={{ flex: 1 }}>
-        <Text style={s.bulletTitle}>{title}</Text>
-        <Text style={s.bulletSub}>{sub}</Text>
-      </View>
+    <View style={s.bulletLine}>
+      <View style={s.bulletIconSm}>{icon}</View>
+      <Text style={s.bulletLineText} numberOfLines={1}>{text}</Text>
     </View>
   );
 }
@@ -255,43 +252,29 @@ export default function CertificateScreen() {
           </View>
           <GuideItem
             num="1"
-            title={'반드시 "혼인관계증명서 (상세)"'}
-            sub="정부24 또는 동주민센터에서 '상세' 옵션으로 발급해 주세요. 일반 발급본은 이혼 일자가 안 나옵니다."
+            title={'"혼인관계증명서 (상세)"'}
+            sub="정부24 / 주민센터에서 '상세' 옵션으로 발급"
           />
           <View style={s.guideDivider} />
           <GuideItem
             num="2"
-            title="6개월 이내 발급분만 가능"
-            sub="발급일이 오래되면 반려될 수 있어요. 새로 발급받으시는 게 안전합니다."
+            title="6개월 이내 발급분"
+            sub="오래된 서류는 반려될 수 있어요"
           />
           <View style={s.guideDivider} />
           <GuideItem
             num="3"
-            title="주민번호 뒷자리는 가려서 올리기"
-            sub="뒷자리 첫 번째 숫자(성별 표시)만 남기고 나머지는 종이로 가리거나 사진 편집으로 지운 뒤 업로드해 주세요."
+            title="주민번호 뒷자리 마스킹"
+            sub="첫 번째 숫자(성별)만 남기고 나머지는 가려서"
           />
         </View>
       )}
 
-      {/* 3가지 안심 포인트 */}
+      {/* 안심 포인트 — 한 줄 압축 */}
       <View style={s.bulletCard}>
-        <ReassuranceBullet
-          icon={<ShieldIcon />}
-          title="검토 후 서류는 즉시 삭제돼요"
-          sub="원본은 서버에 저장되지 않아요"
-        />
-        <View style={s.bulletDivider} />
-        <ReassuranceBullet
-          icon={<EyeOffIcon />}
-          title="실명·사진은 공개되지 않아요"
-          sub="인증은 자격 확인에만 쓰여요"
-        />
-        <View style={s.bulletDivider} />
-        <ReassuranceBullet
-          icon={<BadgeIcon />}
-          title="인증은 처음 한 번이면 끝나요"
-          sub="이후엔 완전한 익명으로 활동해요"
-        />
+        <ReassuranceLine icon={<ShieldIcon size={14} />} text="검토 후 서류는 즉시 삭제" />
+        <ReassuranceLine icon={<EyeOffIcon size={14} />} text="실명·사진 비공개, 자격 확인에만 사용" />
+        <ReassuranceLine icon={<BadgeIcon size={14} />} text="인증은 처음 한 번이면 끝" />
       </View>
 
       {/* CTA */}
@@ -339,15 +322,10 @@ function renderCard(status: Status, reason: string | null) {
     return (
       <View style={s.statusCard}>
         <View style={[s.statusIconWrap, { backgroundColor: colors.primary + '1A' }]}>
-          <DocIcon color={colors.primary} />
+          <DocIcon color={colors.primary} size={28} />
         </View>
         <Text style={s.statusTitle}>혼인관계증명서를 올려주세요</Text>
-        <Text style={s.statusSub}>
-          사진 또는 PDF 캡처를 선택해 주세요.{'\n'}담당자가 확인 후 가입을 승인합니다.
-        </Text>
-        <View style={[s.pill, { backgroundColor: colors.tag }]}>
-          <Text style={[s.pillText, { color: colors.textSub }]}>서류 대기</Text>
-        </View>
+        <Text style={s.statusSub}>담당자 확인 후 가입을 승인해 드려요</Text>
       </View>
     );
   }
@@ -404,44 +382,45 @@ function renderCard(status: Status, reason: string | null) {
 
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
-  scrollContent: { padding: spacing.lg, paddingBottom: spacing.xxl + spacing.md, gap: spacing.lg },
+  scrollContent: { paddingHorizontal: spacing.lg, paddingTop: spacing.sm, paddingBottom: spacing.lg, gap: spacing.sm },
 
   // 단계 프로그레스
   stepRow: {
     flexDirection: 'row', alignItems: 'flex-start',
-    paddingHorizontal: spacing.xs, marginTop: spacing.sm,
+    paddingHorizontal: spacing.xs, marginTop: 2, marginBottom: 2,
   },
   stepWrap: { alignItems: 'center', width: 70 },
   stepCircle: {
-    width: 32, height: 32, borderRadius: 16,
+    width: 26, height: 26, borderRadius: 13,
     alignItems: 'center', justifyContent: 'center',
   },
-  stepNum: { fontSize: 13, fontWeight: '700', color: '#fff' },
-  stepLabel: { fontSize: 12, marginTop: 6, letterSpacing: -0.2 },
-  connector: { flex: 1, height: 2, marginTop: 15, marginHorizontal: -8 },
+  stepNum: { fontSize: 12, fontWeight: '700', color: '#fff' },
+  stepLabel: { fontSize: 11, marginTop: 4, letterSpacing: -0.2 },
+  connector: { flex: 1, height: 2, marginTop: 12, marginHorizontal: -8 },
 
-  // 상태 카드
+  // 상태 카드 (idle: 컴팩트)
   statusCard: {
     backgroundColor: colors.card,
     borderRadius: radius.xl,
-    padding: spacing.xl,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
     alignItems: 'center',
     borderWidth: 1, borderColor: colors.border,
     ...shadow.card,
   },
   statusIconWrap: {
-    width: 64, height: 64, borderRadius: 32,
+    width: 48, height: 48, borderRadius: 24,
     alignItems: 'center', justifyContent: 'center',
-    marginBottom: spacing.md,
+    marginBottom: spacing.xs,
   },
   statusCheck: {
-    width: 38, height: 38, borderRadius: 19,
+    width: 30, height: 30, borderRadius: 15,
     alignItems: 'center', justifyContent: 'center',
   },
-  statusTitle: { ...typography.h2, color: colors.text, textAlign: 'center', marginBottom: spacing.xs },
-  statusSub: { ...typography.body, color: colors.textSub, textAlign: 'center', lineHeight: 21, marginBottom: spacing.md },
-  pill: { paddingHorizontal: 14, paddingVertical: 5, borderRadius: radius.full },
-  pillText: { fontSize: 12, fontWeight: '700' },
+  statusTitle: { ...typography.h3, color: colors.text, textAlign: 'center', marginBottom: 2 },
+  statusSub: { fontSize: 12, color: colors.textSub, textAlign: 'center', lineHeight: 18, marginBottom: spacing.xs },
+  pill: { paddingHorizontal: 12, paddingVertical: 4, borderRadius: radius.full },
+  pillText: { fontSize: 11, fontWeight: '700' },
 
   // 발급·업로드 가이드 카드
   guideCard: {
@@ -449,59 +428,58 @@ const s = StyleSheet.create({
     borderRadius: radius.xl,
     borderWidth: 1,
     borderColor: '#F4D88E',
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 2,
   },
   guideHeader: {
     paddingTop: spacing.sm,
-    paddingBottom: spacing.xs,
+    paddingBottom: 2,
   },
-  guideTitle: { fontSize: 14, fontWeight: '700', color: '#7A5000' },
+  guideTitle: { fontSize: 13, fontWeight: '700', color: '#7A5000' },
   guideItem: {
     flexDirection: 'row', alignItems: 'flex-start',
-    paddingVertical: spacing.sm + 2, gap: spacing.sm,
+    paddingVertical: spacing.xs + 2, gap: spacing.sm,
   },
   guideNum: {
-    width: 22, height: 22, borderRadius: 11,
+    width: 18, height: 18, borderRadius: 9,
     backgroundColor: '#E8A838',
     alignItems: 'center', justifyContent: 'center',
     marginTop: 1,
   },
-  guideNumText: { fontSize: 12, fontWeight: '800', color: '#fff' },
-  guideItemTitle: { fontSize: 13, fontWeight: '700', color: '#5C3D00', marginBottom: 2 },
-  guideItemSub: { fontSize: 12, color: '#7A5000', lineHeight: 18 },
-  guideDivider: { height: 1, backgroundColor: '#F4D88E', marginLeft: 30 },
+  guideNumText: { fontSize: 11, fontWeight: '800', color: '#fff' },
+  guideItemTitle: { fontSize: 12, fontWeight: '700', color: '#5C3D00', marginBottom: 1 },
+  guideItemSub: { fontSize: 11, color: '#7A5000', lineHeight: 15 },
+  guideDivider: { height: 1, backgroundColor: '#F4D88E', marginLeft: 26 },
 
-  // 안심 포인트 카드
+  // 안심 포인트 카드 (한 줄)
   bulletCard: {
     backgroundColor: colors.card,
     borderRadius: radius.xl,
     borderWidth: 1, borderColor: colors.border,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
   },
-  bulletRow: {
+  bulletLine: {
     flexDirection: 'row', alignItems: 'center',
-    paddingVertical: spacing.md, gap: spacing.md,
+    paddingVertical: spacing.xs + 1, gap: spacing.sm,
   },
-  bulletIcon: {
-    width: 36, height: 36, borderRadius: 18,
+  bulletIconSm: {
+    width: 22, height: 22, borderRadius: 11,
     backgroundColor: colors.primary + '14',
     alignItems: 'center', justifyContent: 'center',
   },
-  bulletTitle: { fontSize: 13, fontWeight: '600', color: colors.text, marginBottom: 2 },
-  bulletSub: { fontSize: 12, color: colors.textSub, lineHeight: 17 },
-  bulletDivider: { height: 1, backgroundColor: colors.border, marginLeft: 48 },
+  bulletLineText: { flex: 1, fontSize: 12, color: colors.text },
 
   // CTA
   cta: {
     backgroundColor: colors.primary,
-    paddingVertical: spacing.md + 2,
+    paddingVertical: spacing.md,
     borderRadius: radius.md,
     alignItems: 'center',
+    marginTop: spacing.xs,
     ...shadow.primaryCta,
   },
   ctaText: { ...typography.h3, color: '#fff' },
-  secondary: { alignItems: 'center', paddingVertical: spacing.md },
-  secondaryText: { fontSize: 13, color: colors.textSub, fontWeight: '500' },
+  secondary: { alignItems: 'center', paddingVertical: spacing.sm },
+  secondaryText: { fontSize: 12, color: colors.textSub, fontWeight: '500' },
 });
