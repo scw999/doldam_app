@@ -127,6 +127,21 @@ function ReassuranceBullet({ icon, title, sub }: { icon: React.ReactNode; title:
   );
 }
 
+// ---- 서류 가이드 아이템 ----
+function GuideItem({ num, title, sub }: { num: string; title: string; sub: string }) {
+  return (
+    <View style={s.guideItem}>
+      <View style={s.guideNum}>
+        <Text style={s.guideNumText}>{num}</Text>
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={s.guideItemTitle}>{title}</Text>
+        <Text style={s.guideItemSub}>{sub}</Text>
+      </View>
+    </View>
+  );
+}
+
 export default function CertificateScreen() {
   const [status, setStatus] = useState<Status>('idle');
   const [reason, setReason] = useState<string | null>(null);
@@ -224,12 +239,39 @@ export default function CertificateScreen() {
   }
 
   const card = renderCard(status, reason);
+  const showGuide = status === 'idle' || status === 'rejected';
 
   return (
     <ScrollView style={s.container} contentContainerStyle={s.scrollContent}>
       <StepProgress status={status} />
 
       {card}
+
+      {/* 발급·업로드 가이드 — idle/rejected 상태에서만 노출 */}
+      {showGuide && (
+        <View style={s.guideCard}>
+          <View style={s.guideHeader}>
+            <Text style={s.guideTitle}>📋 서류 준비 가이드</Text>
+          </View>
+          <GuideItem
+            num="1"
+            title={'반드시 "혼인관계증명서 (상세)"'}
+            sub="정부24 또는 동주민센터에서 '상세' 옵션으로 발급해 주세요. 일반 발급본은 이혼 일자가 안 나옵니다."
+          />
+          <View style={s.guideDivider} />
+          <GuideItem
+            num="2"
+            title="6개월 이내 발급분만 가능"
+            sub="발급일이 오래되면 반려될 수 있어요. 새로 발급받으시는 게 안전합니다."
+          />
+          <View style={s.guideDivider} />
+          <GuideItem
+            num="3"
+            title="주민번호 뒷자리는 가려서 올리기"
+            sub="뒷자리 첫 번째 숫자(성별 표시)만 남기고 나머지는 종이로 가리거나 사진 편집으로 지운 뒤 업로드해 주세요."
+          />
+        </View>
+      )}
 
       {/* 3가지 안심 포인트 */}
       <View style={s.bulletCard}>
@@ -400,6 +442,35 @@ const s = StyleSheet.create({
   statusSub: { ...typography.body, color: colors.textSub, textAlign: 'center', lineHeight: 21, marginBottom: spacing.md },
   pill: { paddingHorizontal: 14, paddingVertical: 5, borderRadius: radius.full },
   pillText: { fontSize: 12, fontWeight: '700' },
+
+  // 발급·업로드 가이드 카드
+  guideCard: {
+    backgroundColor: '#FFF7E6',
+    borderRadius: radius.xl,
+    borderWidth: 1,
+    borderColor: '#F4D88E',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+  },
+  guideHeader: {
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.xs,
+  },
+  guideTitle: { fontSize: 14, fontWeight: '700', color: '#7A5000' },
+  guideItem: {
+    flexDirection: 'row', alignItems: 'flex-start',
+    paddingVertical: spacing.sm + 2, gap: spacing.sm,
+  },
+  guideNum: {
+    width: 22, height: 22, borderRadius: 11,
+    backgroundColor: '#E8A838',
+    alignItems: 'center', justifyContent: 'center',
+    marginTop: 1,
+  },
+  guideNumText: { fontSize: 12, fontWeight: '800', color: '#fff' },
+  guideItemTitle: { fontSize: 13, fontWeight: '700', color: '#5C3D00', marginBottom: 2 },
+  guideItemSub: { fontSize: 12, color: '#7A5000', lineHeight: 18 },
+  guideDivider: { height: 1, backgroundColor: '#F4D88E', marginLeft: 30 },
 
   // 안심 포인트 카드
   bulletCard: {
