@@ -132,6 +132,8 @@ export default function RootLayout() {
         <Stack.Screen name="points" options={{ title: '포인트 내역' }} />
         <Stack.Screen name="blocks" options={{ title: '차단한 사용자' }} />
         <Stack.Screen name="withdraw" options={{ title: '탈퇴하기' }} />
+        <Stack.Screen name="legal/privacy" options={{ title: '개인정보 처리방침' }} />
+        <Stack.Screen name="legal/terms" options={{ title: '이용약관' }} />
         <Stack.Screen name="notifications" options={{ headerShown: false }} />
         <Stack.Screen name="notification-settings" options={{ headerShown: false }} />
       </Stack>

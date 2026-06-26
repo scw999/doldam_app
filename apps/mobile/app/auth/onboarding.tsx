@@ -39,6 +39,7 @@ export default function OnboardingScreen() {
   const [provinceModal, setProvinceModal] = useState(false);
   const [cityModal, setCityModal] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [agreed, setAgreed] = useState(false);
   const setUser = useAuth((s) => s.setUser);
 
   const cities = province ? (REGIONS.find((r) => r.province === province)?.cities ?? []) : [];
@@ -68,6 +69,10 @@ export default function OnboardingScreen() {
       Alert.alert('입력 필요', '모든 항목을 선택해주세요');
       return;
     }
+    if (!agreed) {
+      Alert.alert('약관 동의 필요', '이용약관과 개인정보 처리방침에 동의해 주세요');
+      return;
+    }
     setLoading(true);
     try {
       const region = formatRegion(province, city);
@@ -86,7 +91,7 @@ export default function OnboardingScreen() {
   }
 
   const regionLabel = province && city ? formatRegion(province, city) : province ?? '지역 선택';
-  const ready = !!(gender && ageRange && province && city && divorceYear && divorceMonth);
+  const ready = !!(gender && ageRange && province && city && divorceYear && divorceMonth && agreed);
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
@@ -223,6 +228,25 @@ export default function OnboardingScreen() {
         ))}
       </View>
 
+      {/* 약관 동의 */}
+      <Pressable onPress={() => setAgreed((v) => !v)} style={styles.agreeRow}>
+        <View style={[styles.checkbox, agreed && styles.checkboxOn]}>
+          {agreed && <Text style={styles.checkmark}>✓</Text>}
+        </View>
+        <Text style={styles.agreeText}>
+          <Text
+            style={styles.agreeLink}
+            onPress={(e) => { e.stopPropagation?.(); router.push('/legal/terms' as any); }}
+          >이용약관</Text>
+          <Text>과 </Text>
+          <Text
+            style={styles.agreeLink}
+            onPress={(e) => { e.stopPropagation?.(); router.push('/legal/privacy' as any); }}
+          >개인정보 처리방침</Text>
+          <Text>에 동의합니다 (필수)</Text>
+        </Text>
+      </Pressable>
+
       <Pressable
         style={[styles.cta, (!ready || loading) && { opacity: 0.5 }]}
         onPress={onSubmit}
@@ -331,6 +355,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   ctaText: { ...typography.h3, color: '#fff' },
+  agreeRow: {
+    flexDirection: 'row', alignItems: 'flex-start',
+    marginTop: spacing.lg, paddingHorizontal: 4, gap: spacing.sm,
+  },
+  checkbox: {
+    width: 22, height: 22, borderRadius: 5,
+    borderWidth: 1.5, borderColor: colors.border,
+    backgroundColor: colors.card,
+    alignItems: 'center', justifyContent: 'center',
+    marginTop: 1,
+  },
+  checkboxOn: { backgroundColor: colors.primary, borderColor: colors.primary },
+  checkmark: { color: '#fff', fontSize: 14, fontWeight: '700' },
+  agreeText: { flex: 1, fontSize: 13, color: colors.text, lineHeight: 19 },
+  agreeLink: { color: colors.primary, fontWeight: '600', textDecorationLine: 'underline' },
   modalOverlay: {
     flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end',
   },

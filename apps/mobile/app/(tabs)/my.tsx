@@ -75,6 +75,8 @@ export default function MyScreen() {
     { icon: '🔕', label: '알림 설정', onPress: () => router.push('/notification-settings' as any) },
     { icon: '✏️', label: '프로필 편집', onPress: () => router.push('/profile-edit' as any) },
     { icon: '🚫', label: '차단한 사용자', onPress: () => router.push('/blocks' as any) },
+    { icon: '📜', label: '이용약관', onPress: () => router.push('/legal/terms' as any) },
+    { icon: '🔐', label: '개인정보 처리방침', onPress: () => router.push('/legal/privacy' as any) },
   ];
 
   return (
