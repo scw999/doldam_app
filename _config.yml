@@ -1,0 +1,25 @@
+# GitHub Pages 설정 (Jekyll 자동 빌드)
+title: 돌담
+description: 인증된 돌싱만의 익명 커뮤니티
+theme: minima
+lang: ko
+
+# 프로젝트 페이지 (https://scw999.github.io/doldam_app/)
+baseurl: "/doldam_app"
+url: "https://scw999.github.io"
+
+# 마크다운 파서
+markdown: kramdown
+kramdown:
+  syntax_highlighter: rouge
+  input: GFM
+
+# 빌드 제외
+exclude:
+  - README.md
+  - .gitignore
+
+# 헤더 메뉴
+header_pages:
+  - legal/privacy.md
+  - legal/terms.md
