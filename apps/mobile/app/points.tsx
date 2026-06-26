@@ -102,7 +102,16 @@ export default function PointsScreen() {
 
       {/* 포인트 구매 */}
       <View style={{ paddingHorizontal: 20, marginBottom: 12 }}>
-        <Text style={[typography.h3, { color: colors.text, marginBottom: 10 }]}>포인트 충전</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+          <Text style={[typography.h3, { color: colors.text }]}>포인트 충전</Text>
+          <View style={{
+            backgroundColor: colors.tag,
+            paddingHorizontal: 8, paddingVertical: 2,
+            borderRadius: radius.full,
+          }}>
+            <Text style={{ fontSize: 10, color: colors.textSub, fontWeight: '600' }}>스토어 출시 후 오픈</Text>
+          </View>
+        </View>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
           {PRODUCTS.map((p) => (
             <Pressable

@@ -152,7 +152,7 @@ export default function BoardScreen() {
                 이 주제로 대화하고 싶다면?
               </Text>
               <Text style={{ fontSize: 11, color: colors.textSub, marginTop: 2 }}>
-                6~8명 소그룹 · 3일 후 자동 종료
+                4명 소그룹 · 3일 후 자동 종료
               </Text>
             </View>
             <Pressable

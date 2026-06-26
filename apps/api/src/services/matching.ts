@@ -54,7 +54,7 @@ export async function enqueueForMatch(env: Env, userId: string): Promise<void> {
   await writeQueue(env, key, list);
 }
 
-const MIXED_EACH = Math.floor(ROOM.MIN_MEMBERS / 2); // 3M + 3F
+const MIXED_EACH = Math.floor(ROOM.MIN_MEMBERS / 2); // 4명 방 기준 2M + 2F
 
 export async function tryMatch(env: Env, userId: string): Promise<string | null> {
   const user = await env.DOLDAM_DB

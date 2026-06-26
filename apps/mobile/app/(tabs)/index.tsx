@@ -75,7 +75,7 @@ export default function HomeScreen() {
     ]);
     const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
     const todayItem = moodRes?.items[0];
-    const newMoodKey = todayItem?.created_at >= todayStart.getTime() ? todayItem.mood : null;
+    const newMoodKey = todayItem && todayItem.created_at >= todayStart.getTime() ? todayItem.mood : null;
     if (meRes) setMe(meRes);
     if (pts) setBalance(pts.balance);
     if (votes) setTopVotes(votes.items);

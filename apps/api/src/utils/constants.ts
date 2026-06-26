@@ -14,8 +14,8 @@ export const POINTS = {
 } as const;
 
 export const ROOM = {
-  MIN_MEMBERS: 6,
-  MAX_MEMBERS: 8,
+  MIN_MEMBERS: 4,           // 매칭 최소 인원 (혼성 2M+2F 또는 동성 4명)
+  MAX_MEMBERS: 4,           // 방 정원 (소수 깊은 대화 우선)
   LIFESPAN_HOURS: 72,       // 3일 자동 폭파
   KEEP_VOTE_THRESHOLD: 0.6, // 60% 찬성 시 유지 (레거시 호환)
   VOTE_DEADLINE_HOURS: 24,          // 투표 완료 시점 (방 생성 후 24시간)

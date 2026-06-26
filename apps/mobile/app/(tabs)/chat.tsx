@@ -45,7 +45,7 @@ export default function ChatScreen() {
     try {
       await api.post('/rooms/match', {});
       await load();
-      Alert.alert('매칭 대기 중', '6명이 모이면 자동으로 방이 열려요');
+      Alert.alert('매칭 대기 중', '4명이 모이면 자동으로 방이 열려요');
     } catch (e) {
       const msg = (e as Error).message === 'already_in_room'
         ? '이미 참여 중인 채팅방이 있어요. 방이 끝난 뒤 다시 신청해주세요.'
@@ -71,7 +71,7 @@ export default function ChatScreen() {
       router.push(`/room/${id}`);
     } catch (e) {
       const msg = (e as Error).message === 'room_full'
-        ? '방 정원(8명)이 가득 찼어요.'
+        ? '방 정원(4명)이 가득 찼어요.'
         : (e as Error).message;
       Alert.alert('실패', msg);
     }
@@ -154,7 +154,7 @@ export default function ChatScreen() {
               <View style={{ flex: 1 }}>
                 <Text style={{ fontSize: 14, fontWeight: '700', color: colors.primaryDark }}>매칭 대기 중...</Text>
                 <Text style={{ fontSize: 12, color: colors.textSub, marginTop: 3 }}>
-                  현재 {queueStatus.queueSize}명 대기 · 6명이 모이면 자동 시작
+                  현재 {queueStatus.queueSize}명 대기 · 4명이 모이면 자동 시작
                 </Text>
               </View>
               <Pressable
@@ -177,7 +177,7 @@ export default function ChatScreen() {
               fontSize: 19, fontWeight: '700', color: '#fff',
               letterSpacing: -0.5, lineHeight: 26, marginBottom: 8,
             }}>
-              6~8명이 모이는{'\n'}작은 소그룹, 3일
+              4명이 모이는{'\n'}작은 소그룹, 3일
             </Text>
             <Text style={{ fontSize: 13, color: 'rgba(255,255,255,0.92)', lineHeight: 21, marginBottom: 20 }}>
               연령·성별·지역이 비슷한 사람들과{'\n'}
