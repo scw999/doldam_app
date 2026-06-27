@@ -386,7 +386,6 @@ a:focus-visible, button:focus-visible, summary:focus-visible, input:focus-visibl
 .verify-flow {
   display: flex; align-items: center; justify-content: center;
   gap: var(--s-3);
-  flex-wrap: wrap;
   margin: 0 auto var(--s-6);
 }
 .verify-step {
@@ -419,49 +418,14 @@ a:focus-visible, button:focus-visible, summary:focus-visible, input:focus-visibl
   margin: 0 4px;
 }
 .verify-display {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: var(--s-7);
-  align-items: center;
-  max-width: 880px;
+  display: flex;
+  justify-content: center;
   margin: 0 auto;
 }
 .verify-phone-main {
-  max-width: 320px;
+  max-width: 380px;
   border-radius: 32px;
   box-shadow: var(--shadow-raised);
-  justify-self: end;
-}
-.verify-metrics {
-  display: flex; flex-direction: column;
-  gap: var(--s-3);
-}
-.metric-card {
-  background: var(--surface);
-  border: 1px solid var(--rule);
-  padding: var(--s-4) var(--s-5);
-  border-radius: var(--r-md);
-  text-align: left;
-}
-.metric-num {
-  font-family: 'Noto Serif KR', serif;
-  font-size: 36px;
-  font-weight: 700;
-  color: var(--primary);
-  line-height: 1;
-  margin-bottom: var(--s-1);
-  letter-spacing: -0.02em;
-}
-.metric-unit {
-  font-size: 18px;
-  font-weight: 500;
-  color: var(--primary-deep);
-  margin-left: 2px;
-}
-.metric-label {
-  font-size: 13px;
-  color: var(--ink-soft);
-  font-weight: 500;
 }
 
 /* Variant C: 채팅 — 가짜 채팅 preview 카드 (asymmetric 2-column) */
@@ -1010,13 +974,23 @@ footer {
     grid-template-columns: 1fr;
     gap: var(--s-5);
   }
+  /* Verify flow: 모바일에선 세로 스택 (1줄 wrap 어색함 방지) */
+  .verify-flow {
+    flex-direction: column;
+    gap: var(--s-2);
+  }
+  .verify-arrow {
+    transform: rotate(90deg);
+    margin: 2px 0;
+  }
+  .verify-step .v-pill {
+    min-width: 180px;
+    justify-content: center;
+  }
   .variant-phone.right .text { order: 1; }
   .variant-phone.right .phone-wrap { order: 2; }
   .variant-phone .phone-wrap img { max-width: 280px; }
-  .verify-flow { gap: var(--s-2); }
-  .verify-display { grid-template-columns: 1fr; gap: var(--s-5); }
-  .verify-phone-main { max-width: 280px; justify-self: center; }
-  .verify-metrics { max-width: 320px; margin: 0 auto; }
+  .verify-phone-main { max-width: 300px; }
   .mood-grid { grid-template-columns: repeat(5, 1fr); max-width: 100%; }
   .footer-inner { grid-template-columns: 1fr 1fr; gap: var(--s-5); }
   .footer-brand { grid-column: 1 / -1; }
