@@ -200,6 +200,11 @@ a:focus-visible, button:focus-visible, summary:focus-visible, input:focus-visibl
   width: auto;
   display: block;
 }
+/* Google PNG는 상하 12% 투명 패딩 → 시각적 보정 (Apple과 같은 컨텐츠 높이) */
+.store-google img {
+  height: 73px;
+  margin: -8px 0;
+}
 .cta-note {
   margin-top: var(--s-5);
   font-size: 12px;
@@ -308,11 +313,6 @@ a:focus-visible, button:focus-visible, summary:focus-visible, input:focus-visibl
 .feature-eyebrow .num {
   color: var(--primary);
   font-weight: 700;
-}
-.feature-eyebrow .rule {
-  flex: 1;
-  height: 1px;
-  background: var(--rule);
 }
 .feature-text h3 {
   font-size: clamp(26px, 4.2vw, 38px);
@@ -424,16 +424,9 @@ a:focus-visible, button:focus-visible, summary:focus-visible, input:focus-visibl
   flex-wrap: wrap;
 }
 .verify-phone-main {
-  max-width: 340px;
+  max-width: 380px;
   border-radius: 32px;
   box-shadow: var(--shadow-raised);
-}
-.verify-phone-aside {
-  max-width: 280px;
-  border-radius: 28px;
-  box-shadow: var(--shadow-card);
-  border: 1px solid var(--rule);
-  transform: translateY(28px) rotate(-2.5deg);
 }
 
 /* Variant C: 채팅 — 가짜 채팅 preview 카드 */
@@ -993,7 +986,6 @@ footer {
   .variant-phone.right .phone-wrap { order: 2; }
   .variant-phone .phone-wrap img { max-width: 280px; }
   .verify-flow { gap: var(--s-2); }
-  .verify-phone-aside { display: none; }
   .mood-grid { grid-template-columns: repeat(5, 1fr); max-width: 100%; }
   .footer-inner { grid-template-columns: 1fr 1fr; gap: var(--s-5); }
   .footer-brand { grid-column: 1 / -1; }
@@ -1002,6 +994,7 @@ footer {
 
 @media (max-width: 480px) {
   .store-link { height: 48px; }
+  .store-google img { height: 63px; margin: -7px 0; }
   .footer-inner { grid-template-columns: 1fr; }
   .mood-grid { grid-template-columns: repeat(3, 1fr); }
 }
