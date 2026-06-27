@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>개인정보 처리방침 — 돌담</title>
+  <meta name="description" content="돌담 개인정보 처리방침 — 시행일 2026년 7월 1일" />
+  <meta name="theme-color" content="#C4956A" />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" as="style" crossorigin
+        href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css" />
+
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+
+<header class="nav">
+  <div class="nav-inner">
+    <a href="/" class="brand"><span class="emoji">🪨</span>돌담</a>
+    <nav class="nav-links">
+      <a href="/#features">기능</a>
+      <a href="/legal/privacy.html">개인정보</a>
+      <a href="/legal/terms.html">약관</a>
+    </nav>
+  </div>
+</header>
+
+<main class="legal-container">
+  <a href="/" class="back">← 홈으로</a>
+  <h1>개인정보 처리방침</h1>
+  <span class="effective">최종 개정일: 2026년 6월 27일 · 시행일: 2026년 7월 1일</span>
+
+  <p>돌담(이하 "서비스")은 정보통신망 이용촉진 및 정보보호 등에 관한 법률, 개인정보 보호법 등 관련 법령을 준수합니다. 본 처리방침은 이용자의 개인정보가 어떻게 수집·이용·보관·파기되는지 안내합니다.</p>
+
+  <hr/>
+
+  <h2>1. 수집하는 개인정보 항목 및 수집 방법</h2>
+
+  <h3>1-1. 수집 항목</h3>
+  <table>
+    <thead>
+      <tr><th>분류</th><th>항목</th><th>수집 시점</th><th>필수/선택</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><strong>본인확인</strong></td><td>휴대폰 번호 (SHA-256 해시 처리 후 저장, 원본 미보관)</td><td>가입 시</td><td>필수</td></tr>
+      <tr><td><strong>자격확인</strong></td><td>혼인관계증명서(상세) 이미지</td><td>가입 시</td><td>필수</td></tr>
+      <tr><td><strong>프로필</strong></td><td>닉네임(랜덤 자동 생성), 성별, 연령대, 거주 지역(시·도), 이혼 시점(년·월)</td><td>가입 시</td><td>필수</td></tr>
+      <tr><td><strong>프로필(선택)</strong></td><td>직업 카테고리, 자녀 여부, 양육 상태, 관심사, 자기소개</td><td>가입 후</td><td>선택</td></tr>
+      <tr><td><strong>활동 기록</strong></td><td>작성 글·댓글·투표·채팅 메시지, 포인트 거래 내역, 신고·차단 이력</td><td>서비스 이용 중</td><td>필수</td></tr>
+      <tr><td><strong>기기 정보</strong></td><td>푸시 알림 토큰(Expo), 운영체제, 앱 버전</td><td>앱 첫 실행 시</td><td>선택 (푸시 미수신 시 거부 가능)</td></tr>
+      <tr><td><strong>결제 정보</strong></td><td>(출시 후 활성화 예정) 결제 영수증, 상품 ID — 카드번호·계좌 정보는 수집하지 않음, 앱스토어 결제 시스템 이용</td><td>결제 시</td><td>선택</td></tr>
+    </tbody>
+  </table>
+
+  <h3>1-2. 수집하지 않는 항목</h3>
+  <p>다음 정보는 <strong>일체 수집·저장하지 않습니다</strong>:</p>
+  <ul>
+    <li>휴대폰 번호 원본 (해시값만 저장)</li>
+    <li>이름, 주민등록번호 (혼인관계증명서에서 검토용으로만 사용 후 즉시 삭제)</li>
+    <li>정확한 위치 정보 (GPS) — 시·도 수준만 수집</li>
+    <li>통화 기록·문자·연락처</li>
+    <li>카메라·갤러리 권한은 증명서·프로필 사진 업로드 시에만 요청, 자동 접근 없음</li>
+  </ul>
+
+  <h3>1-3. 수집 방법</h3>
+  <ul>
+    <li>회원가입 단계에서 이용자가 직접 입력 또는 업로드</li>
+    <li>서비스 이용 과정에서 자동 기록 (글 작성, 채팅, 신고 등)</li>
+    <li>푸시 알림 발송을 위해 Expo Notifications SDK가 자동 발급한 토큰</li>
+  </ul>
+
+  <hr/>
+
+  <h2>2. 개인정보의 이용 목적</h2>
+  <table>
+    <thead><tr><th>목적</th><th>사용 항목</th></tr></thead>
+    <tbody>
+      <tr><td>가입자 신원 확인 (이혼 경험자 자격 검증)</td><td>휴대폰 번호 해시, 혼인관계증명서</td></tr>
+      <tr><td>익명 활동 환경 제공</td><td>닉네임, 성별, 연령대, 지역</td></tr>
+      <tr><td>서비스 매칭(소그룹 채팅)</td><td>성별, 연령대, 지역, 관심사</td></tr>
+      <tr><td>부정 이용 방지 및 신고 처리</td><td>활동 기록, 신고 이력</td></tr>
+      <tr><td>푸시 알림 발송</td><td>푸시 토큰</td></tr>
+      <tr><td>포인트 적립·소비 관리</td><td>활동 기록, 포인트 거래 내역</td></tr>
+      <tr><td>법령상 의무 이행</td><td>신고·차단 이력 (통신비밀보호법 등)</td></tr>
+    </tbody>
+  </table>
+
+  <hr/>
+
+  <h2>3. 개인정보 보유 및 이용 기간</h2>
+  <table>
+    <thead><tr><th>항목</th><th>보유 기간</th></tr></thead>
+    <tbody>
+      <tr><td>회원 정보 (해시·닉네임·프로필)</td><td>회원 탈퇴 시까지</td></tr>
+      <tr><td>혼인관계증명서 이미지</td><td>검토 완료 후 <strong>즉시 삭제</strong>, 미완료 시 업로드 후 <strong>최대 7일</strong></td></tr>
+      <tr><td>채팅 메시지</td><td>90일 (그 후 자동 정리)</td></tr>
+      <tr><td>포인트 거래 내역</td><td>5년 (전자상거래법)</td></tr>
+      <tr><td>결제 영수증</td><td>5년 (전자상거래법)</td></tr>
+      <tr><td>신고·차단 이력</td><td>회원 탈퇴 시까지 (어뷰징 방지)</td></tr>
+      <tr><td>푸시 알림 토큰</td><td>회원 탈퇴 또는 토큰 비활성 시까지</td></tr>
+      <tr><td>OTP(인증번호)</td><td>발송 후 <strong>5분</strong> (자동 만료)</td></tr>
+    </tbody>
+  </table>
+
+  <h3>회원 탈퇴 시 처리</h3>
+  <p>회원이 직접 탈퇴를 요청하면 다음과 같이 처리됩니다:</p>
+  <ul>
+    <li><strong>즉시 삭제</strong>: 휴대폰 번호 해시, 자기소개·관심사·직업·자녀 정보, 푸시 알림 토큰, 알림 내역, 차단 이력, 프로필 열람 이력</li>
+    <li><strong>익명 보존</strong>: 작성 글·댓글·투표·채팅 메시지는 다른 사용자의 대화 맥락 보존을 위해 유지하되, 작성자명은 "(탈퇴한 회원)"으로 표시되며 본인과 연결되지 않습니다</li>
+    <li><strong>회계상 보존</strong>: 포인트·결제 거래 내역은 관계 법령(전자상거래법, 국세기본법)에 따라 5년간 보관</li>
+  </ul>
+
+  <hr/>
+
+  <h2>4. 개인정보 제3자 제공</h2>
+  <p>서비스는 원칙적으로 이용자의 개인정보를 <strong>외부에 제공하지 않습니다</strong>.</p>
+  <p>다만 다음의 경우 예외로 합니다:</p>
+  <table>
+    <thead><tr><th>수령자</th><th>제공 항목</th><th>제공 목적</th></tr></thead>
+    <tbody>
+      <tr><td>법령에 따른 수사기관</td><td>활동 기록, 신고 이력</td><td>법원의 영장 또는 법령에 근거한 적법한 요청 시</td></tr>
+    </tbody>
+  </table>
+
+  <hr/>
+
+  <h2>5. 개인정보 처리 위탁</h2>
+  <p>서비스 운영을 위해 일부 업무를 외부에 위탁하고 있습니다.</p>
+  <table>
+    <thead><tr><th>수탁자</th><th>위탁 업무</th><th>보유 기간</th><th>국외 이전</th></tr></thead>
+    <tbody>
+      <tr><td>Cloudflare, Inc.</td><td>서버 호스팅, 데이터베이스(D1), 파일 저장(R2), 푸시 게이트웨이</td><td>서비스 제공 기간</td><td>미국·아시아 지역</td></tr>
+      <tr><td>Expo</td><td>푸시 알림 발송</td><td>발송 즉시</td><td>미국</td></tr>
+      <tr><td><strong>(출시 직전 활성화 예정)</strong> 다날 / 알리고 등 SMS 사업자</td><td>휴대폰 인증번호 발송</td><td>발송 즉시</td><td>국내</td></tr>
+      <tr><td><strong>(출시 후 활성화 예정)</strong> Apple Inc. / Google LLC</td><td>인앱결제 영수증 처리</td><td>결제 처리 기간</td><td>미국</td></tr>
+      <tr><td><strong>(출시 후 활성화 예정)</strong> Anthropic</td><td>AI 콘텐츠 필터링 (개인정보 노출 방지)</td><td>처리 즉시</td><td>미국</td></tr>
+    </tbody>
+  </table>
+  <p>이용자의 개인정보가 국외로 이전되는 경우 본 처리방침을 통해 고지합니다.</p>
+
+  <hr/>
+
+  <h2>6. 이용자의 권리와 행사 방법</h2>
+  <p>이용자는 언제든지 다음 권리를 행사할 수 있습니다:</p>
+  <ul>
+    <li><strong>열람</strong>: 마이페이지 → 프로필 편집에서 자신의 정보 조회</li>
+    <li><strong>정정·삭제</strong>: 닉네임 변경(월 3회), 자기소개·관심사·직업·자녀 정보 수정 또는 삭제</li>
+    <li><strong>처리 정지·동의 철회</strong>: 마이페이지 → 알림 설정에서 푸시 수신 중단</li>
+    <li><strong>차단 관리</strong>: 마이페이지 → 차단한 사용자 메뉴에서 차단·해제</li>
+    <li><strong>탈퇴</strong>: 마이페이지 → 탈퇴하기 메뉴에서 직접 탈퇴 (즉시 처리)</li>
+  </ul>
+  <p>위 모든 권리는 앱 내에서 즉시 처리되며 별도 신청 절차가 없습니다. 권리 행사가 어려운 경우 아래 문의처로 연락해 주십시오.</p>
+
+  <hr/>
+
+  <h2>7. 개인정보 파기 절차 및 방법</h2>
+  <ul>
+    <li><strong>파기 절차</strong>: 보유 기간 경과 또는 이용자 요청 시 즉시 파기</li>
+    <li><strong>파기 방법</strong>:
+      <ul>
+        <li>전자적 파일: 복구 불가능한 방법으로 영구 삭제 (Cloudflare D1/R2의 삭제 API 호출)</li>
+        <li>출력물: 파쇄 또는 소각 (해당 사항 없음 — 서비스는 종이 출력물을 보유하지 않음)</li>
+      </ul>
+    </li>
+  </ul>
+
+  <hr/>
+
+  <h2>8. 개인정보의 안전성 확보 조치</h2>
+  <p>서비스는 다음과 같은 기술적·관리적 조치를 시행합니다:</p>
+  <ul>
+    <li><strong>휴대폰 번호 해시 처리</strong>: 원본 번호는 어디에도 저장되지 않으며 SHA-256 해시값만 사용</li>
+    <li><strong>혼인관계증명서 즉시 삭제</strong>: 검토 완료 직후 원본 파일을 저장소에서 영구 삭제</li>
+    <li><strong>전송 구간 암호화</strong>: 모든 통신은 HTTPS/TLS로 암호화</li>
+    <li><strong>저장 구간 암호화</strong>: Cloudflare D1·R2의 기본 암호화 적용</li>
+    <li><strong>접근 통제</strong>: 관리자 페이지는 별도 토큰 인증 후 접근 가능, 접근 기록 보관</li>
+    <li><strong>세션 토큰 유효기간</strong>: 30일 자동 만료</li>
+    <li><strong>레이트리밋</strong>: 인증번호 발송 60초 간격, 시간당 5회 제한</li>
+    <li><strong>콘텐츠 필터링</strong>: 키워드 기반 개인정보 노출 방지 (전화번호·주민번호 패턴)</li>
+  </ul>
+
+  <hr/>
+
+  <h2>9. 아동의 개인정보 보호</h2>
+  <p>본 서비스는 <strong>만 19세 이상</strong>의 이혼 경험이 있는 성인만 가입할 수 있습니다. 만 18세 미만 청소년은 가입할 수 없으며, 가입 시 제출되는 혼인관계증명서를 통해 자격을 확인합니다. 미성년자임이 확인되면 즉시 가입을 거부하며 관련 정보를 파기합니다.</p>
+
+  <hr/>
+
+  <h2>10. 자동 수집 도구의 설치·운영 및 거부</h2>
+  <p>서비스는 다음 자동 수집 도구를 사용합니다:</p>
+  <ul>
+    <li><strong>Expo Push Token</strong>: 푸시 알림 발송용. 앱 설정 → 알림 권한 해제로 수집 거부 가능</li>
+    <li><strong>에러 로그</strong>: 앱 충돌 시 익명 진단 정보. 개인 식별 정보 포함하지 않음</li>
+  </ul>
+  <p>쿠키 등 웹 트래커는 사용하지 않습니다.</p>
+
+  <hr/>
+
+  <h2>11. 개인정보 보호책임자 및 문의</h2>
+  <ul>
+    <li><strong>개인정보 보호책임자</strong>: (이름 기재)</li>
+    <li><strong>문의 이메일</strong>: <a href="mailto:support@doldam.app">support@doldam.app</a></li>
+    <li><strong>응답 시간</strong>: 영업일 기준 3일 이내</li>
+  </ul>
+
+  <p>권리 침해에 대한 신고·상담은 아래 기관에 문의하실 수 있습니다:</p>
+  <ul>
+    <li>개인정보침해신고센터 (<a href="https://privacy.kisa.or.kr" target="_blank" rel="noopener">privacy.kisa.or.kr</a> / 국번없이 118)</li>
+    <li>개인정보분쟁조정위원회 (<a href="https://kopico.go.kr" target="_blank" rel="noopener">kopico.go.kr</a> / 1833-6972)</li>
+    <li>대검찰청 사이버수사과 (<a href="https://spo.go.kr" target="_blank" rel="noopener">spo.go.kr</a> / 02-3480-3573)</li>
+    <li>경찰청 사이버수사국 (<a href="https://ecrm.police.go.kr" target="_blank" rel="noopener">ecrm.police.go.kr</a> / 국번없이 182)</li>
+  </ul>
+
+  <hr/>
+
+  <h2>12. 처리방침의 변경</h2>
+  <p>본 처리방침은 법령·서비스 정책의 변경에 따라 개정될 수 있습니다. 변경 시 시행 7일 전 앱 내 공지로 고지하며, 중대한 변경의 경우 30일 전 고지합니다.</p>
+  <table>
+    <thead><tr><th>버전</th><th>시행일</th><th>주요 변경</th></tr></thead>
+    <tbody><tr><td>1.0</td><td>2026-07-01</td><td>최초 시행</td></tr></tbody>
+  </table>
+</main>
+
+<footer>
+  <div class="footer-inner">
+    <div class="footer-brand">
+      <a href="/" class="brand"><span class="emoji">🪨</span>돌담</a>
+      <p>이혼이라는 큰 일을 겪고도 다시 일어선 사람들이 서로의 돌이 되어 단단한 담을 쌓아가는 곳.</p>
+    </div>
+    <div class="footer-col">
+      <h5>정책</h5>
+      <ul>
+        <li><a href="/legal/privacy.html">개인정보 처리방침</a></li>
+        <li><a href="/legal/terms.html">이용약관</a></li>
+        <li><a href="mailto:support@doldam.app">support@doldam.app</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="footer-bottom">© 2026 돌담 (Doldam). All rights reserved.</div>
+</footer>
+
+</body>
+</html>
