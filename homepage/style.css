@@ -215,7 +215,7 @@ a:focus-visible, button:focus-visible, summary:focus-visible, input:focus-visibl
 /* ──────────────── Promise (수평 흐름) ──────────────── */
 .promises {
   max-width: 1160px;
-  margin: var(--s-8) auto 0;
+  margin: var(--s-8) auto var(--s-9);
   padding: 0 var(--s-5);
 }
 .promise-flow {
@@ -418,31 +418,59 @@ a:focus-visible, button:focus-visible, summary:focus-visible, input:focus-visibl
   font-size: 16px;
   margin: 0 4px;
 }
-.verify-phones {
-  display: flex; justify-content: center; align-items: flex-end;
-  gap: var(--s-6);
-  flex-wrap: wrap;
-}
-.verify-phone-main {
-  max-width: 380px;
-  border-radius: 32px;
-  box-shadow: var(--shadow-raised);
-}
-
-/* Variant C: 채팅 — 가짜 채팅 preview 카드 */
-.variant-chat {
+.verify-display {
   display: grid;
-  grid-template-columns: 1fr;
-  gap: var(--s-6);
-  max-width: 760px;
+  grid-template-columns: auto 1fr;
+  gap: var(--s-7);
+  align-items: center;
+  max-width: 880px;
   margin: 0 auto;
 }
-.chat-text { text-align: center; }
-.chat-text h3 {
-  max-width: 100%;
-  margin-left: auto; margin-right: auto;
+.verify-phone-main {
+  max-width: 320px;
+  border-radius: 32px;
+  box-shadow: var(--shadow-raised);
+  justify-self: end;
 }
-.chat-text p { margin-left: auto; margin-right: auto; }
+.verify-metrics {
+  display: flex; flex-direction: column;
+  gap: var(--s-3);
+}
+.metric-card {
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  padding: var(--s-4) var(--s-5);
+  border-radius: var(--r-md);
+  text-align: left;
+}
+.metric-num {
+  font-family: 'Noto Serif KR', serif;
+  font-size: 36px;
+  font-weight: 700;
+  color: var(--primary);
+  line-height: 1;
+  margin-bottom: var(--s-1);
+  letter-spacing: -0.02em;
+}
+.metric-unit {
+  font-size: 18px;
+  font-weight: 500;
+  color: var(--primary-deep);
+  margin-left: 2px;
+}
+.metric-label {
+  font-size: 13px;
+  color: var(--ink-soft);
+  font-weight: 500;
+}
+
+/* Variant C: 채팅 — 가짜 채팅 preview 카드 (asymmetric 2-column) */
+.variant-chat {
+  display: grid;
+  grid-template-columns: 1fr 1.1fr;
+  gap: var(--s-7);
+  align-items: center;
+}
 .chat-preview {
   background: var(--surface);
   border: 1px solid var(--rule);
@@ -789,7 +817,7 @@ footer {
 .footer-inner {
   max-width: 1080px; margin: 0 auto;
   display: grid;
-  grid-template-columns: 1.5fr 1fr 1fr 1fr;
+  grid-template-columns: 2fr 1fr 1fr;
   gap: var(--s-7);
 }
 .footer-brand .brand {
@@ -826,7 +854,7 @@ footer {
   border-top: 1px solid var(--rule);
   font-size: 11px;
   color: var(--ink-muted);
-  display: flex; justify-content: space-between;
+  text-align: center;
   letter-spacing: 0.04em;
 }
 
@@ -978,7 +1006,7 @@ footer {
   .promise-step + .promise-step { border-left: none; }
   .promise-step:nth-child(3) { border-top: 1px solid var(--rule-soft); padding-top: var(--s-5); }
   .promise-step:nth-child(4) { border-top: 1px solid var(--rule-soft); padding-top: var(--s-5); }
-  .variant-phone, .variant-vote, .variant-rebuild, .variant-mood {
+  .variant-phone, .variant-vote, .variant-rebuild, .variant-mood, .variant-chat {
     grid-template-columns: 1fr;
     gap: var(--s-5);
   }
@@ -986,10 +1014,12 @@ footer {
   .variant-phone.right .phone-wrap { order: 2; }
   .variant-phone .phone-wrap img { max-width: 280px; }
   .verify-flow { gap: var(--s-2); }
+  .verify-display { grid-template-columns: 1fr; gap: var(--s-5); }
+  .verify-phone-main { max-width: 280px; justify-self: center; }
+  .verify-metrics { max-width: 320px; margin: 0 auto; }
   .mood-grid { grid-template-columns: repeat(5, 1fr); max-width: 100%; }
   .footer-inner { grid-template-columns: 1fr 1fr; gap: var(--s-5); }
   .footer-brand { grid-column: 1 / -1; }
-  .footer-bottom { flex-direction: column; gap: var(--s-2); text-align: center; }
 }
 
 @media (max-width: 480px) {
