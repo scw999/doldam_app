@@ -133,21 +133,22 @@ a:focus-visible, button:focus-visible, summary:focus-visible, input:focus-visibl
 }
 .nav-links a:hover { color: var(--ink); text-decoration: none; }
 
-/* ──────────────── Hero (masthead 스타일) ──────────────── */
+/* ──────────────── Hero (masthead 스타일, 가운데 정렬) ──────────────── */
 .hero {
   max-width: 1080px;
   margin: 0 auto;
   padding: var(--s-9) var(--s-5) var(--s-8);
   border-bottom: 1px solid var(--rule);
+  text-align: center;
 }
 .hero-meta {
-  display: flex; gap: var(--s-3);
+  display: inline-flex; gap: var(--s-3);
   font-size: 11px;
   color: var(--ink-muted);
   text-transform: uppercase;
   letter-spacing: 0.12em;
   margin-bottom: var(--s-6);
-  padding-bottom: var(--s-3);
+  padding: 0 var(--s-4) var(--s-3);
   border-bottom: 1px solid var(--rule-soft);
 }
 .hero-meta .dot { color: var(--primary); }
@@ -155,39 +156,40 @@ a:focus-visible, button:focus-visible, summary:focus-visible, input:focus-visibl
   font-size: clamp(40px, 7vw, 72px);
   line-height: 1.05;
   letter-spacing: -0.035em;
-  margin-bottom: var(--s-5);
+  margin: 0 auto var(--s-5);
   max-width: 16ch;
 }
 .hero h1 .accent {
   color: var(--primary);
-  position: relative;
   display: inline-block;
-  font-style: italic;
-  font-weight: 500;
+  font-weight: 700;
 }
 .hero-sub {
   font-size: clamp(16px, 2.4vw, 19px);
   color: var(--ink-soft);
   line-height: 1.6;
   max-width: 52ch;
-  margin-bottom: var(--s-7);
+  margin: 0 auto var(--s-7);
 }
 .hero-sub .lede {
   font-weight: 600;
   color: var(--ink);
 }
 
-/* Store row — 진짜 배지 같은 높이로 */
+/* Store row — 같은 크기 박스에 contain (시각적 동일) */
 .store-row {
   display: flex; gap: var(--s-3);
   align-items: center;
   flex-wrap: wrap;
+  justify-content: center;
 }
 .store-link {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
+  width: 180px;
   height: 56px;
-  opacity: 0.7;
+  opacity: 0.78;
   cursor: not-allowed;
   transition: opacity .2s, transform .2s;
 }
@@ -196,8 +198,11 @@ a:focus-visible, button:focus-visible, summary:focus-visible, input:focus-visibl
   transform: translateY(-1px);
 }
 .store-link img {
-  height: 56px;
+  max-width: 100%;
+  max-height: 100%;
   width: auto;
+  height: auto;
+  object-fit: contain;
   display: block;
 }
 .cta-note {
@@ -323,8 +328,7 @@ a:focus-visible, button:focus-visible, summary:focus-visible, input:focus-visibl
 }
 .feature-text h3 .accent {
   color: var(--primary);
-  font-style: italic;
-  font-weight: 500;
+  font-weight: 700;
 }
 .feature-text p {
   font-size: 16px;
@@ -376,7 +380,7 @@ a:focus-visible, button:focus-visible, summary:focus-visible, input:focus-visibl
   color: var(--ink);
   margin-bottom: var(--s-5);
 }
-.verify-pullquote .accent { color: var(--primary); font-style: italic; }
+.verify-pullquote .accent { color: var(--primary); font-weight: 700; }
 .verify-body {
   font-size: 15px;
   color: var(--ink-soft);
@@ -1002,7 +1006,7 @@ footer {
 }
 
 @media (max-width: 480px) {
-  .store-link, .store-link img { height: 48px; }
+  .store-link { width: 160px; height: 48px; }
   .footer-inner { grid-template-columns: 1fr; }
   .mood-grid { grid-template-columns: repeat(3, 1fr); }
 }
