@@ -97,9 +97,19 @@ input:focus-visible {
 .brand {
   font-family: 'Noto Serif KR', serif;
   font-weight: 700; font-size: 19px; color: var(--text);
-  display: inline-flex; align-items: center; gap: 8px;
+  display: inline-flex; align-items: center; gap: 10px;
 }
 .brand .emoji { font-size: 22px; }
+.brand-logo {
+  width: 30px; height: 30px;
+  border-radius: 8px;
+  object-fit: cover;
+  display: block;
+}
+.footer-brand .brand-logo {
+  width: 36px; height: 36px;
+  border-radius: 9px;
+}
 .nav-links { display: flex; gap: 26px; align-items: center; }
 .nav-links a {
   font-size: 14px; color: var(--text-sub); font-weight: 500;
@@ -148,46 +158,29 @@ input:focus-visible {
   line-height: 1.75;
 }
 
-/* Hero CTA — 이메일 주 + 스토어 disabled */
-.notify-form {
-  display: inline-flex;
-  background: var(--card);
-  border: 1px solid var(--border-strong);
-  border-radius: var(--r-full);
-  padding: 6px 6px 6px 22px;
-  align-items: center;
-  gap: 8px;
-  max-width: 100%;
-  box-shadow: var(--shadow-card);
-}
-.notify-form input {
-  border: none; background: transparent; outline: none;
-  font: inherit; color: var(--text);
-  font-size: 14px; min-width: 200px;
-  font-family: inherit;
-}
-.notify-form input::placeholder { color: var(--text-light); }
-.notify-btn {
-  background: var(--primary); color: #fff;
-  border: none; padding: 10px 20px;
-  border-radius: var(--r-full); cursor: pointer;
-  font-size: 14px; font-weight: 600;
-  transition: background .15s, transform .15s;
-  font-family: inherit;
-}
-.notify-btn:hover { background: var(--primary-dark); transform: translateY(-1px); }
-
 .store-row {
-  display: flex; gap: 10px; justify-content: center;
-  margin-top: 18px; flex-wrap: wrap;
+  display: flex; gap: 12px; justify-content: center;
+  margin-top: 8px; flex-wrap: wrap;
+  align-items: center;
 }
-.store-badge {
-  display: inline-flex; align-items: center; gap: 8px;
-  padding: 8px 16px; border-radius: var(--r-md);
-  background: transparent; border: 1px dashed var(--text-light);
-  font-size: 12px; color: var(--text-sub);
+.store-link {
+  display: inline-block;
+  opacity: 0.78;
+  transition: opacity .15s, transform .15s;
+  cursor: not-allowed;
 }
-.cta-note { margin-top: 14px; font-size: 12px; color: var(--text-light); }
+.store-link:hover {
+  opacity: 1;
+  transform: translateY(-2px);
+}
+.store-link img {
+  height: 52px; width: auto;
+  display: block;
+}
+.cta-note {
+  margin-top: 16px; font-size: 12px; color: var(--text-light);
+}
+.cta-note a { color: var(--primary-dark); }
 
 /* ──────────────── Promise (수평 흐름) ──────────────── */
 .promises {
@@ -369,6 +362,30 @@ input:focus-visible {
   box-shadow: var(--shadow-card);
   border: 1px solid var(--border);
   vertical-align: middle;
+}
+.verify-phones {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 28px;
+  margin-top: 12px;
+  flex-wrap: wrap;
+}
+.verify-phone-main {
+  width: 100%;
+  max-width: 320px;
+  border-radius: 28px;
+  box-shadow: var(--shadow-raised);
+  display: block;
+}
+.verify-phone-aside {
+  width: 100%;
+  max-width: 260px;
+  border-radius: 24px;
+  box-shadow: var(--shadow-card);
+  display: block;
+  transform: translateY(20px) rotate(-2deg);
+  border: 1px solid var(--border);
 }
 
 /* ─── Variant C: 채팅 버블 (전체 너비, 폰 mockup 없음) ─── */
@@ -860,8 +877,8 @@ footer {
 }
 
 @media (max-width: 480px) {
-  .notify-form { display: flex; flex-direction: column; padding: 8px; border-radius: var(--r-lg); }
-  .notify-form input { min-width: 0; width: 100%; padding: 10px 6px; }
-  .notify-btn { width: 100%; border-radius: var(--r-md); }
+  .store-link img { height: 44px; }
+  .verify-phone-main { max-width: 280px; }
+  .verify-phone-aside { display: none; }
   .footer-inner { grid-template-columns: 1fr; }
 }

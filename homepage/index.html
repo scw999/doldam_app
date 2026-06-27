@@ -27,7 +27,7 @@
 
 <header class="nav">
   <div class="nav-inner">
-    <a href="/" class="brand"><span class="emoji">🪨</span>돌담</a>
+    <a href="/" class="brand"><img src="/img/app-icon.png" class="brand-logo" alt="" />돌담</a>
     <nav class="nav-links" aria-label="주요 메뉴">
       <a href="#features">기능</a>
       <a href="#safety">안전</a>
@@ -41,23 +41,22 @@
 
 <!-- ──────────────── Hero ──────────────── -->
 <section class="hero">
-  <span class="hero-eyebrow">🪨 인증된 돌싱만의 공간</span>
+  <span class="hero-eyebrow">인증된 돌싱만의 공간</span>
   <h1>혼자가 <span class="accent">아니었어요</span></h1>
   <p class="hero-sub">
     혼인관계증명서로 자격을 확인한 회원만 모이는 익명 커뮤니티.<br/>
     같은 시간을 지나온 사람들과 안전하게 대화하세요.
   </p>
 
-  <form class="notify-form" action="mailto:support@doldam.app" method="get" enctype="text/plain" aria-label="이메일 알림 신청">
-    <input type="email" name="subject" placeholder="이메일을 입력하세요" required />
-    <button type="submit" class="notify-btn">출시 알림 받기</button>
-  </form>
-
   <div class="store-row">
-    <span class="store-badge">🤖 Google Play · 곧 출시</span>
-    <span class="store-badge">🍎 App Store · 곧 출시</span>
+    <a href="#" class="store-link" aria-disabled="true" aria-label="Google Play — 곧 출시">
+      <img src="/img/google-play-badge.png" alt="Google Play에서 받기" />
+    </a>
+    <a href="#" class="store-link" aria-disabled="true" aria-label="App Store — 곧 출시">
+      <img src="/img/app-store-badge.svg" alt="Download on the App Store" />
+    </a>
   </div>
-  <p class="cta-note">베타 테스터 모집 중 · 사전 신청은 위 이메일로</p>
+  <p class="cta-note">곧 출시 · 문의는 <a href="mailto:support@doldam.app">support@doldam.app</a></p>
 </section>
 
 <!-- ──────────────── Promise (수평 흐름) ──────────────── -->
@@ -128,12 +127,17 @@
       </div>
     </div>
 
-    <!-- ② 검증 — 큰 인용구 + 검증 단계 다이어그램 + 작은 폰 (Variant B) -->
+    <!-- ② 검증 — 큰 인용구 + 검증 단계 다이어그램 + 폰 mockup 2개 (Variant B) -->
     <div class="feature-row variant-quote reveal">
       <div class="big-quote">
-        프로필 옆 작은 ✓는<br/>
-        매번 운영자가 직접 확인한 것입니다
+        자격이 확인된<br/>
+        사람들만의 공간
       </div>
+
+      <p style="font-size:15px; color:var(--text-sub); margin-bottom:32px; line-height:1.8; max-width:540px; margin-left:auto; margin-right:auto;">
+        혼인관계증명서로 자격을 확인한 회원만 가입할 수 있습니다.<br/>
+        검토 완료 직후 원본은 서버에서 영구 삭제됩니다.
+      </p>
 
       <div class="verify-flow" role="list" aria-label="검증 단계">
         <div class="verify-step" role="listitem">
@@ -154,16 +158,14 @@
           <div class="v-icon" aria-hidden="true">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4-4"/></svg>
           </div>
-          <div class="v-label">담당자 검토</div>
+          <div class="v-label">자격 검토</div>
         </div>
       </div>
 
-      <p style="font-size:14px; color:var(--text-sub); margin-bottom:24px; line-height:1.75; max-width:520px; margin-left:auto; margin-right:auto;">
-        OCR 자동검증이 아니라 사람이 매번 본다는 약속.<br/>
-        검토 직후 원본은 서버에서 영구 삭제됩니다.
-      </p>
-
-      <img src="/img/02_verified.png" alt="본인 인증 화면" class="mini-phone" loading="lazy" />
+      <div class="verify-phones">
+        <img src="/img/02_verified.png" alt="본인 인증 화면 — 검토 중" class="verify-phone-main" loading="lazy" />
+        <img src="/img/01_hook.png" alt="인증된 회원들의 게시판" class="verify-phone-aside" loading="lazy" />
+      </div>
     </div>
 
     <!-- ③ 채팅 — 가짜 채팅 버블 미리보기 (Variant C) -->
@@ -423,7 +425,7 @@
       <details>
         <summary>출시는 언제인가요?</summary>
         <div class="faq-answer">
-          현재 베타 준비 중입니다. 정식 출시 알림을 받고 싶으시면 페이지 상단의 이메일 신청을 이용해 주세요. 베타 참여 문의는 support@doldam.app으로 보내주시면 됩니다.
+          현재 출시 준비 중입니다. 정식 출시 시점에 Google Play와 App Store에서 다운로드하실 수 있어요. 문의는 <a href="mailto:support@doldam.app">support@doldam.app</a>으로 보내주시면 됩니다.
         </div>
       </details>
     </div>
@@ -436,7 +438,7 @@
 <footer>
   <div class="footer-inner">
     <div class="footer-brand">
-      <a href="/" class="brand"><span class="emoji">🪨</span>돌담</a>
+      <a href="/" class="brand"><img src="/img/app-icon.png" class="brand-logo" alt="" />돌담</a>
       <p>이혼이라는 큰 일을 겪고도 다시 일어선 사람들이 서로의 돌이 되어 단단한 담을 쌓아가는 곳.</p>
     </div>
     <div class="footer-col">
@@ -458,7 +460,6 @@
       <h5>문의</h5>
       <ul>
         <li><a href="mailto:support@doldam.app">support@doldam.app</a></li>
-        <li><a href="mailto:support@doldam.app?subject=베타%20테스터%20신청">베타 신청</a></li>
       </ul>
     </div>
   </div>
