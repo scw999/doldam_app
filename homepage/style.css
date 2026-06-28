@@ -165,16 +165,30 @@ a:focus-visible, button:focus-visible, summary:focus-visible, input:focus-visibl
   display: inline-block;
   font-weight: 700;
 }
+/* 정체성 한 줄 — h1과 sub 사이 핵심 메시지 */
+.hero-tag {
+  font-family: 'Noto Serif KR', serif;
+  font-size: clamp(18px, 2.6vw, 22px);
+  font-weight: 500;
+  color: var(--ink);
+  line-height: 1.55;
+  max-width: 38ch;
+  margin: 0 auto var(--s-5);
+  word-break: keep-all;
+  letter-spacing: -0.015em;
+}
+.hero-tag strong {
+  color: var(--primary-deep);
+  font-weight: 700;
+}
+
 .hero-sub {
-  font-size: clamp(16px, 2.4vw, 19px);
+  font-size: clamp(15px, 2.2vw, 17px);
   color: var(--ink-soft);
-  line-height: 1.6;
+  line-height: 1.65;
   max-width: 52ch;
   margin: 0 auto var(--s-7);
-}
-.hero-sub .lede {
-  font-weight: 600;
-  color: var(--ink);
+  word-break: keep-all;
 }
 
 /* Store row — 같은 크기 박스에 contain (시각적 동일) */
