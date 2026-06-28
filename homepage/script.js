@@ -40,50 +40,32 @@
       delay: 800,
     });
 
-    // 캠프파이어 불꽃 — 따뜻한 빛이 천천히 호흡
+    // 돌담 ring — 페이지 로드 시 부드러운 fade-in (가운데 → 양 끝 순서로 자리잡음)
+    const stones = document.querySelectorAll('.hero-stone');
+    stones.forEach((s) => { s.style.opacity = '0'; });
     anime({
-      targets: '.hero-fire',
-      scale: [0.96, 1.06],
-      opacity: [0.8, 1, 0.8],
-      duration: 5000,
-      easing: 'easeInOutSine',
-      direction: 'alternate',
-      loop: true,
+      targets: '.hero-stone',
+      opacity: [0, 1],
+      scale: [0.7, 1],
+      duration: 1100,
+      easing: 'easeOutCubic',
+      delay: anime.stagger(70, { from: 'center' }),
     });
 
-    // 돌담 — 페이지 로드 시 부드러운 fade-in (top·bottom 각각 양 끝 → 가운데 순서)
-    const stoneGroups = [
-      document.querySelectorAll('.hero-stones-top .hero-stone'),
-      document.querySelectorAll('.hero-stones-bottom .hero-stone'),
-    ];
-    stoneGroups.forEach((stones) => {
-      stones.forEach((s) => { s.style.opacity = '0'; });
-      if (!stones.length) return;
-      anime({
-        targets: stones,
-        opacity: [0, 1],
-        translateY: (el) => el.closest('.hero-stones-top') ? [-12, 0] : [12, 0],
-        duration: 1200,
-        easing: 'easeOutCubic',
-        delay: anime.stagger(120, { from: 'center', direction: 'reverse' }),
-      });
-    });
-
-    // Fade-in 끝난 후 천천히 호흡 — 위 돌은 살짝 위로, 아래 돌은 살짝 아래로
+    // Fade-in 끝난 후 잔잔한 스케일 호흡 (각자 다른 속도)
     setTimeout(() => {
-      document.querySelectorAll('.hero-stone').forEach((stone, i) => {
-        const isTop = stone.closest('.hero-stones-top');
+      stones.forEach((stone, i) => {
         anime({
           targets: stone,
-          translateY: [0, isTop ? 3 : -3],
-          duration: 4500 + (i % 4) * 600,  // 4.5~6.3s 매우 느림
-          delay: i * 200,
+          scale: [1, 1.03],
+          duration: 5000 + (i % 5) * 600,  // 5~7.4s 매우 느림
+          delay: i * 180,
           easing: 'easeInOutSine',
           direction: 'alternate',
           loop: true,
         });
       });
-    }, 2000);
+    }, 1600);
 
     // Hero 콘텐츠 순차 등장
     anime.timeline({ easing: 'easeOutCubic' })

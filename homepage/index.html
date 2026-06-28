@@ -46,36 +46,41 @@
   <div class="hero-glow hero-glow-2" aria-hidden="true"></div>
   <div class="hero-glow hero-glow-3" aria-hidden="true"></div>
 
-  <!-- 돌담 — Hero 콘텐츠를 위에서도 안아주는 돌 cradle (inverted) -->
-  <div class="hero-stones hero-stones-top" aria-hidden="true">
-    <svg class="hero-stones-svg" viewBox="0 0 1600 180" preserveAspectRatio="xMidYStart meet">
+  <!-- 돌담 ring — Hero 콘텐츠를 동그랗게 둘러싸는 12개 돌 (타원 perimeter) -->
+  <div class="hero-stones-ring" aria-hidden="true">
+    <svg viewBox="0 0 1600 800" preserveAspectRatio="xMidYMid slice">
       <defs>
-        <radialGradient id="stoneA-top" cx="38%" cy="28%">
+        <radialGradient id="ringStoneA" cx="38%" cy="28%">
           <stop offset="0%" stop-color="#F1E5D0"/>
           <stop offset="60%" stop-color="#D8C2A0"/>
           <stop offset="100%" stop-color="#B89876"/>
         </radialGradient>
-        <radialGradient id="stoneB-top" cx="35%" cy="30%">
+        <radialGradient id="ringStoneB" cx="35%" cy="30%">
           <stop offset="0%" stop-color="#EBDDC4"/>
           <stop offset="65%" stop-color="#C9B08A"/>
           <stop offset="100%" stop-color="#A88E68"/>
         </radialGradient>
-        <filter id="stoneShadow-top" x="-50%" y="-50%" width="200%" height="200%">
+        <filter id="ringStoneShadow" x="-50%" y="-50%" width="200%" height="200%">
           <feGaussianBlur in="SourceAlpha" stdDeviation="3"/>
           <feOffset dy="3"/>
           <feComponentTransfer><feFuncA type="linear" slope="0.22"/></feComponentTransfer>
           <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
         </filter>
       </defs>
-      <!-- 7개 돌, inverted cradle (가운데가 가장 아래로 처짐 = 콘텐츠 쪽으로 안아줌) -->
-      <g filter="url(#stoneShadow-top)">
-        <ellipse class="hero-stone" cx="110"  cy="44"  rx="62" ry="36" fill="url(#stoneA-top)" transform="rotate(2 110 44)"/>
-        <ellipse class="hero-stone" cx="345"  cy="68"  rx="66" ry="40" fill="url(#stoneB-top)" transform="rotate(-3 345 68)"/>
-        <ellipse class="hero-stone" cx="580"  cy="96"  rx="70" ry="42" fill="url(#stoneA-top)" transform="rotate(2 580 96)"/>
-        <ellipse class="hero-stone" cx="800"  cy="116" rx="74" ry="44" fill="url(#stoneB-top)" transform="rotate(-1 800 116)"/>
-        <ellipse class="hero-stone" cx="1020" cy="96"  rx="70" ry="42" fill="url(#stoneA-top)" transform="rotate(1 1020 96)"/>
-        <ellipse class="hero-stone" cx="1255" cy="68"  rx="66" ry="40" fill="url(#stoneB-top)" transform="rotate(-2 1255 68)"/>
-        <ellipse class="hero-stone" cx="1490" cy="44"  rx="62" ry="36" fill="url(#stoneA-top)" transform="rotate(3 1490 44)"/>
+      <!-- 타원 perimeter 12개 돌 (중심 800,400 / 가로반지름 720 / 세로반지름 350) -->
+      <g filter="url(#ringStoneShadow)">
+        <ellipse class="hero-stone" cx="1520" cy="400" rx="68" ry="42" fill="url(#ringStoneA)" transform="rotate(-2 1520 400)"/>
+        <ellipse class="hero-stone" cx="1424" cy="575" rx="62" ry="38" fill="url(#ringStoneB)" transform="rotate(3 1424 575)"/>
+        <ellipse class="hero-stone" cx="1160" cy="703" rx="62" ry="38" fill="url(#ringStoneA)" transform="rotate(-1 1160 703)"/>
+        <ellipse class="hero-stone" cx="800"  cy="750" rx="68" ry="42" fill="url(#ringStoneB)" transform="rotate(2 800 750)"/>
+        <ellipse class="hero-stone" cx="440"  cy="703" rx="62" ry="38" fill="url(#ringStoneA)" transform="rotate(-3 440 703)"/>
+        <ellipse class="hero-stone" cx="176"  cy="575" rx="62" ry="38" fill="url(#ringStoneB)" transform="rotate(1 176 575)"/>
+        <ellipse class="hero-stone" cx="80"   cy="400" rx="68" ry="42" fill="url(#ringStoneA)" transform="rotate(-2 80 400)"/>
+        <ellipse class="hero-stone" cx="176"  cy="225" rx="62" ry="38" fill="url(#ringStoneB)" transform="rotate(2 176 225)"/>
+        <ellipse class="hero-stone" cx="440"  cy="97"  rx="62" ry="38" fill="url(#ringStoneA)" transform="rotate(-1 440 97)"/>
+        <ellipse class="hero-stone" cx="800"  cy="50"  rx="68" ry="42" fill="url(#ringStoneB)" transform="rotate(3 800 50)"/>
+        <ellipse class="hero-stone" cx="1160" cy="97"  rx="62" ry="38" fill="url(#ringStoneA)" transform="rotate(-2 1160 97)"/>
+        <ellipse class="hero-stone" cx="1424" cy="225" rx="62" ry="38" fill="url(#ringStoneB)" transform="rotate(2 1424 225)"/>
       </g>
     </svg>
   </div>
@@ -106,48 +111,6 @@
   </div>
 </section>
 
-<!-- 돌담 캠프파이어 — 안아주는 돌 arc + 가운데 불꽃 글로우 (bottom) -->
-<div class="hero-stones hero-stones-bottom" aria-hidden="true">
-  <svg class="hero-stones-svg" viewBox="0 0 1600 240" preserveAspectRatio="xMidYEnd meet">
-    <defs>
-      <radialGradient id="stoneA" cx="38%" cy="28%">
-        <stop offset="0%" stop-color="#F1E5D0"/>
-        <stop offset="60%" stop-color="#D8C2A0"/>
-        <stop offset="100%" stop-color="#B89876"/>
-      </radialGradient>
-      <radialGradient id="stoneB" cx="35%" cy="30%">
-        <stop offset="0%" stop-color="#EBDDC4"/>
-        <stop offset="65%" stop-color="#C9B08A"/>
-        <stop offset="100%" stop-color="#A88E68"/>
-      </radialGradient>
-      <radialGradient id="fireGlow" cx="50%" cy="60%">
-        <stop offset="0%" stop-color="rgba(216, 144, 88, 0.4)"/>
-        <stop offset="40%" stop-color="rgba(196, 149, 106, 0.2)"/>
-        <stop offset="100%" stop-color="transparent"/>
-      </radialGradient>
-      <filter id="stoneShadow" x="-50%" y="-50%" width="200%" height="200%">
-        <feGaussianBlur in="SourceAlpha" stdDeviation="3"/>
-        <feOffset dy="3"/>
-        <feComponentTransfer><feFuncA type="linear" slope="0.22"/></feComponentTransfer>
-        <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
-      </filter>
-    </defs>
-
-    <!-- 캠프파이어 불꽃 (돌 가운데 따뜻한 빛) -->
-    <ellipse class="hero-fire" cx="800" cy="120" rx="360" ry="80" fill="url(#fireGlow)"/>
-
-    <!-- 7개 돌, 명확한 cradle arc (양 끝 낮고 가운데 가장 높음) -->
-    <g filter="url(#stoneShadow)">
-      <ellipse class="hero-stone" cx="110"  cy="170" rx="62" ry="36" fill="url(#stoneA)" transform="rotate(-3 110 170)"/>
-      <ellipse class="hero-stone" cx="345"  cy="148" rx="66" ry="40" fill="url(#stoneB)" transform="rotate(2 345 148)"/>
-      <ellipse class="hero-stone" cx="580"  cy="128" rx="70" ry="42" fill="url(#stoneA)" transform="rotate(-2 580 128)"/>
-      <ellipse class="hero-stone" cx="800"  cy="118" rx="74" ry="44" fill="url(#stoneB)" transform="rotate(1 800 118)"/>
-      <ellipse class="hero-stone" cx="1020" cy="128" rx="70" ry="42" fill="url(#stoneA)" transform="rotate(-1 1020 128)"/>
-      <ellipse class="hero-stone" cx="1255" cy="148" rx="66" ry="40" fill="url(#stoneB)" transform="rotate(3 1255 148)"/>
-      <ellipse class="hero-stone" cx="1490" cy="170" rx="62" ry="36" fill="url(#stoneA)" transform="rotate(-2 1490 170)"/>
-    </g>
-  </svg>
-</div>
 </div>
 
 <!-- ──────────────── 공감 (현실 문제 → 우리만의 해결책) ──────────────── -->

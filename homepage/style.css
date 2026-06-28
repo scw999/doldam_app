@@ -145,6 +145,12 @@ a:focus-visible, button:focus-visible, summary:focus-visible, input:focus-visibl
   overflow: hidden;
   isolation: isolate;
   background: var(--bg);
+  /* SVG ring(2:1)에 맞춰 min-height — 너무 납작하지 않게 */
+  min-height: clamp(560px, 50vw, 820px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-bottom: 1px solid var(--rule);
 }
 /* 따뜻한 글로우 — anime.js로 펄스 애니메이션 (3개 블롭) */
 .hero-glow {
@@ -178,19 +184,17 @@ a:focus-visible, button:focus-visible, summary:focus-visible, input:focus-visibl
   background: radial-gradient(circle, rgba(196, 149, 106, 0.28) 0%, transparent 70%);
 }
 
-/* ─── 돌담 캠프파이어 — Hero 콘텐츠를 위아래에서 안아주는 돌 cradle ─── */
-.hero-stones {
+/* ─── 돌담 ring — Hero 콘텐츠를 12개 돌이 동그랗게 둘러쌈 ─── */
+.hero-stones-ring {
   position: absolute;
-  left: 0;
-  right: 0;
+  inset: 0;
   pointer-events: none;
   z-index: 0;
+  overflow: hidden;
 }
-.hero-stones-bottom { bottom: 0; }
-.hero-stones-top    { top: 0; }
-.hero-stones-svg {
+.hero-stones-ring svg {
   width: 100%;
-  height: auto;
+  height: 100%;
   display: block;
 }
 .hero-stone {
@@ -198,12 +202,6 @@ a:focus-visible, button:focus-visible, summary:focus-visible, input:focus-visibl
   transform-box: fill-box;
   will-change: transform;
 }
-.hero-fire {
-  will-change: transform, opacity;
-}
-/* Hero padding: top 돌을 위한 공간 + bottom 돌을 위한 공간 */
-.hero { padding-bottom: var(--s-9); }
-
 /* hero 콘텐츠는 돌담 위에 보이도록 */
 .hero > * { position: relative; z-index: 1; }
 
@@ -214,11 +212,10 @@ a:focus-visible, button:focus-visible, summary:focus-visible, input:focus-visibl
   }
 }
 .hero {
+  flex: 0 0 auto;
   max-width: 1080px;
-  margin: 0 auto;
-  /* top: 돌담 cradle 위 + 공간, bottom: 동일하게 돌담 cradle 위 */
-  padding: clamp(90px, 15vw, 220px) var(--s-5) var(--s-8);
-  border-bottom: 1px solid var(--rule);
+  /* ring 안쪽에 콘텐츠 — 좌우는 ring 측면 돌과 거리 두기, 위아래는 flex로 가운데 정렬됨 */
+  padding: var(--s-5) clamp(60px, 8vw, 140px);
   text-align: center;
   position: relative;
 }
@@ -1039,7 +1036,7 @@ footer {
 @media (max-width: 768px) {
   .nav-links { gap: var(--s-3); }
   .nav-links a { font-size: 12px; }
-  .hero { padding: clamp(80px, 18vw, 140px) var(--s-4) var(--s-6); }
+  .hero { padding: var(--s-4) clamp(40px, 10vw, 80px); }
   .promise-flow {
     grid-template-columns: repeat(2, 1fr);
     gap: var(--s-5) 0;
@@ -1088,5 +1085,5 @@ footer {
     max-width: 100%;
   }
   /* 모바일 hero 폰트 크기 살짝 줄임 */
-  .hero { padding: clamp(70px, 22vw, 110px) var(--s-4) var(--s-8); }
+  .hero { padding: var(--s-3) var(--s-4); }
 }
