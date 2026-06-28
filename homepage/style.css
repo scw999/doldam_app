@@ -134,12 +134,42 @@ a:focus-visible, button:focus-visible, summary:focus-visible, input:focus-visibl
 .nav-links a:hover { color: var(--ink); text-decoration: none; }
 
 /* ──────────────── Hero (masthead 스타일, 가운데 정렬) ──────────────── */
+.hero-section {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  background: var(--bg);
+}
+/* 따뜻한 글로우 - 양옆 부드러운 색감 */
+.hero-section::before {
+  content: '';
+  position: absolute;
+  top: -10%;
+  left: -8%;
+  width: 45%;
+  aspect-ratio: 1;
+  background: radial-gradient(circle, var(--primary-tint) 0%, transparent 65%);
+  z-index: -1;
+  filter: blur(20px);
+}
+.hero-section::after {
+  content: '';
+  position: absolute;
+  bottom: -15%;
+  right: -10%;
+  width: 50%;
+  aspect-ratio: 1;
+  background: radial-gradient(circle, var(--primary-faint) 0%, transparent 60%);
+  z-index: -1;
+  filter: blur(30px);
+}
 .hero {
   max-width: 1080px;
   margin: 0 auto;
   padding: var(--s-9) var(--s-5) var(--s-8);
   border-bottom: 1px solid var(--rule);
   text-align: center;
+  position: relative;
 }
 .hero-meta {
   display: inline-flex; gap: var(--s-3);
