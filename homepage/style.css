@@ -219,16 +219,10 @@ a:focus-visible, button:focus-visible, summary:focus-visible, input:focus-visibl
   width: auto;
   display: block;
 }
-/* Google PNG는 상하 12% 투명 패딩 → 시각적 보정 (Apple과 같은 컨텐츠 높이) */
+/* Google EN PNG는 상하 16.5% 투명 패딩 → 시각적 보정 (Apple과 같은 컨텐츠 높이) */
 .store-google img {
-  height: 73px;
-  margin: -8px 0;
-}
-.cta-note {
-  margin-top: var(--s-5);
-  font-size: 12px;
-  color: var(--ink-muted);
-  letter-spacing: 0.04em;
+  height: 84px;
+  margin: -14px 0;
 }
 
 /* ──────────────── Empathy (현실 문제 → 우리만의 해결책) ──────────────── */
@@ -1062,7 +1056,7 @@ footer {
 
 @media (max-width: 480px) {
   .store-link { height: 48px; }
-  .store-google img { height: 63px; margin: -7px 0; }
+  .store-google img { height: 72px; margin: -12px 0; }
   .footer-inner { grid-template-columns: 1fr; }
   .mood-grid { grid-template-columns: repeat(3, 1fr); }
 }
