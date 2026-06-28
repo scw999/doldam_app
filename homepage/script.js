@@ -51,27 +51,33 @@
       loop: true,
     });
 
-    // 돌담 — 페이지 로드 시 부드러운 fade-in (양 끝 → 가운데 순서)
-    const stones = document.querySelectorAll('.hero-stone');
-    stones.forEach((s) => { s.style.opacity = '0'; });
-
-    anime({
-      targets: '.hero-stone',
-      opacity: [0, 1],
-      translateY: [12, 0],
-      duration: 1200,
-      easing: 'easeOutCubic',
-      delay: anime.stagger(120, { from: 'center', direction: 'reverse' }),
+    // 돌담 — 페이지 로드 시 부드러운 fade-in (top·bottom 각각 양 끝 → 가운데 순서)
+    const stoneGroups = [
+      document.querySelectorAll('.hero-stones-top .hero-stone'),
+      document.querySelectorAll('.hero-stones-bottom .hero-stone'),
+    ];
+    stoneGroups.forEach((stones) => {
+      stones.forEach((s) => { s.style.opacity = '0'; });
+      if (!stones.length) return;
+      anime({
+        targets: stones,
+        opacity: [0, 1],
+        translateY: (el) => el.closest('.hero-stones-top') ? [-12, 0] : [12, 0],
+        duration: 1200,
+        easing: 'easeOutCubic',
+        delay: anime.stagger(120, { from: 'center', direction: 'reverse' }),
+      });
     });
 
-    // Fade-in 끝난 후 천천히 호흡 (각자 다른 속도)
+    // Fade-in 끝난 후 천천히 호흡 — 위 돌은 살짝 위로, 아래 돌은 살짝 아래로
     setTimeout(() => {
-      stones.forEach((stone, i) => {
+      document.querySelectorAll('.hero-stone').forEach((stone, i) => {
+        const isTop = stone.closest('.hero-stones-top');
         anime({
           targets: stone,
-          translateY: [0, -3],
+          translateY: [0, isTop ? 3 : -3],
           duration: 4500 + (i % 4) * 600,  // 4.5~6.3s 매우 느림
-          delay: i * 250,
+          delay: i * 200,
           easing: 'easeInOutSine',
           direction: 'alternate',
           loop: true,
