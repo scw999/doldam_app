@@ -817,21 +817,25 @@ summary {
   color: var(--ink);
   cursor: pointer;
   list-style: none;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+  display: block;
+  padding-right: 36px;
+  position: relative;
   font-family: 'Noto Serif KR', serif;
   letter-spacing: -0.015em;
-  padding-right: 4px;
+  line-height: 1.45;
 }
 summary::-webkit-details-marker { display: none; }
 summary::after {
   content: '+';
+  position: absolute;
+  right: 4px;
+  top: 0;
   font-size: 24px;
   color: var(--ink-muted);
   font-weight: 300;
   transition: transform .2s, color .2s;
   font-family: 'Pretendard', sans-serif;
+  line-height: 1.4;
 }
 details[open] summary::after {
   content: '−';
