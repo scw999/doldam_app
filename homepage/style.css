@@ -87,6 +87,9 @@ img { max-width: 100%; display: block; }
   letter-spacing: 0.04em;
 }
 
+/* 줄바꿈 금지 — 한국어 의존명사 구문 (여섯 개, 할 수 있는 등) 묶기 */
+.nowrap { white-space: nowrap; }
+
 /* :focus-visible 일관 */
 *:focus { outline: none; }
 a:focus-visible, button:focus-visible, summary:focus-visible, input:focus-visible {
