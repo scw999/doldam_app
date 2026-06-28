@@ -46,47 +46,6 @@
   <div class="hero-glow hero-glow-2" aria-hidden="true"></div>
   <div class="hero-glow hero-glow-3" aria-hidden="true"></div>
 
-  <!-- 돌담 ring — Hero 콘텐츠를 동그랗게 둘러싸는 12개 돌 (타원 perimeter) -->
-  <div class="hero-stones-ring" aria-hidden="true">
-    <svg viewBox="0 0 1600 800" preserveAspectRatio="xMidYMid slice">
-      <defs>
-        <radialGradient id="ringStoneA" cx="38%" cy="28%">
-          <stop offset="0%" stop-color="#F1E5D0"/>
-          <stop offset="60%" stop-color="#D8C2A0"/>
-          <stop offset="100%" stop-color="#B89876"/>
-        </radialGradient>
-        <radialGradient id="ringStoneB" cx="35%" cy="30%">
-          <stop offset="0%" stop-color="#EBDDC4"/>
-          <stop offset="65%" stop-color="#C9B08A"/>
-          <stop offset="100%" stop-color="#A88E68"/>
-        </radialGradient>
-        <filter id="ringStoneShadow" x="-50%" y="-50%" width="200%" height="200%">
-          <feGaussianBlur in="SourceAlpha" stdDeviation="3"/>
-          <feOffset dy="3"/>
-          <feComponentTransfer><feFuncA type="linear" slope="0.22"/></feComponentTransfer>
-          <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
-        </filter>
-      </defs>
-      <!-- 타원 perimeter 12개 돌 (중심 800,400 / 가로반지름 720 / 세로반지름 350)
-           호 길이 균등 분배 — 각도 0°, 36.7°, 63°, 90°, 117°, 143.3°, 180°, 216.7°, 243°, 270°, 297°, 323.3°
-           ellipse 둘레는 위치마다 ds/dθ가 다르므로, 균등 시각감 위해 단순 30°가 아닌 호 길이 균등 분배 -->
-      <g filter="url(#ringStoneShadow)">
-        <ellipse class="hero-stone" cx="1520" cy="400" rx="68" ry="42" fill="url(#ringStoneA)" transform="rotate(-2 1520 400)"/>
-        <ellipse class="hero-stone" cx="1377" cy="609" rx="62" ry="38" fill="url(#ringStoneB)" transform="rotate(3 1377 609)"/>
-        <ellipse class="hero-stone" cx="1127" cy="712" rx="62" ry="38" fill="url(#ringStoneA)" transform="rotate(-1 1127 712)"/>
-        <ellipse class="hero-stone" cx="800"  cy="750" rx="68" ry="42" fill="url(#ringStoneB)" transform="rotate(2 800 750)"/>
-        <ellipse class="hero-stone" cx="473"  cy="712" rx="62" ry="38" fill="url(#ringStoneA)" transform="rotate(-3 473 712)"/>
-        <ellipse class="hero-stone" cx="223"  cy="609" rx="62" ry="38" fill="url(#ringStoneB)" transform="rotate(1 223 609)"/>
-        <ellipse class="hero-stone" cx="80"   cy="400" rx="68" ry="42" fill="url(#ringStoneA)" transform="rotate(-2 80 400)"/>
-        <ellipse class="hero-stone" cx="223"  cy="191" rx="62" ry="38" fill="url(#ringStoneB)" transform="rotate(2 223 191)"/>
-        <ellipse class="hero-stone" cx="473"  cy="88"  rx="62" ry="38" fill="url(#ringStoneA)" transform="rotate(-1 473 88)"/>
-        <ellipse class="hero-stone" cx="800"  cy="50"  rx="68" ry="42" fill="url(#ringStoneB)" transform="rotate(3 800 50)"/>
-        <ellipse class="hero-stone" cx="1127" cy="88"  rx="62" ry="38" fill="url(#ringStoneA)" transform="rotate(-2 1127 88)"/>
-        <ellipse class="hero-stone" cx="1377" cy="191" rx="62" ry="38" fill="url(#ringStoneB)" transform="rotate(2 1377 191)"/>
-      </g>
-    </svg>
-  </div>
-
 <section class="hero">
   <div class="hero-meta mono">
     <span>돌싱 전용 인증 커뮤니티</span>

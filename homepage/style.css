@@ -145,11 +145,6 @@ a:focus-visible, button:focus-visible, summary:focus-visible, input:focus-visibl
   overflow: hidden;
   isolation: isolate;
   background: var(--bg);
-  /* SVG ring(2:1)에 맞춰 hero-section을 같은 비율로 — 측면 돌 안 잘림 */
-  min-height: clamp(500px, 50vw, 760px);
-  display: grid;
-  place-items: center;
-  border-bottom: 1px solid var(--rule);
 }
 /* 따뜻한 글로우 — anime.js로 펄스 애니메이션 (3개 블롭) */
 .hero-glow {
@@ -183,26 +178,6 @@ a:focus-visible, button:focus-visible, summary:focus-visible, input:focus-visibl
   background: radial-gradient(circle, rgba(196, 149, 106, 0.28) 0%, transparent 70%);
 }
 
-/* ─── 돌담 ring — Hero 콘텐츠를 12개 돌이 동그랗게 둘러쌈 ─── */
-.hero-stones-ring {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  z-index: 0;
-  overflow: hidden;
-}
-.hero-stones-ring svg {
-  width: 100%;
-  height: 100%;
-  display: block;
-}
-.hero-stone {
-  transform-origin: center;
-  transform-box: fill-box;
-  will-change: transform;
-}
-/* hero 콘텐츠는 돌담 위에 보이도록 */
-.hero > * { position: relative; z-index: 1; }
 
 /* Hero entrance — JS가 채워줌, reduced-motion이면 즉시 표시 */
 @media (prefers-reduced-motion: no-preference) {
@@ -211,13 +186,12 @@ a:focus-visible, button:focus-visible, summary:focus-visible, input:focus-visibl
   }
 }
 .hero {
-  /* grid place-items로 hero-section 중앙에 자동 정렬 — 측면 padding은 ring 측면 돌과 콘텐츠 거리 확보 */
   max-width: 1080px;
-  width: 100%;
-  padding: var(--s-5) clamp(40px, 8vw, 140px);
+  margin: 0 auto;
+  padding: var(--s-9) var(--s-5) var(--s-8);
+  border-bottom: 1px solid var(--rule);
   text-align: center;
   position: relative;
-  z-index: 1;
 }
 .hero-meta {
   display: inline-flex; gap: var(--s-3);
@@ -1036,7 +1010,7 @@ footer {
 @media (max-width: 768px) {
   .nav-links { gap: var(--s-3); }
   .nav-links a { font-size: 12px; }
-  .hero { padding: var(--s-4) clamp(30px, 8vw, 60px); }
+  .hero { padding: var(--s-7) var(--s-4) var(--s-6); }
   .promise-flow {
     grid-template-columns: repeat(2, 1fr);
     gap: var(--s-5) 0;
@@ -1085,5 +1059,5 @@ footer {
     max-width: 100%;
   }
   /* 모바일 hero 폰트 크기 살짝 줄임 */
-  .hero { padding: var(--s-3) var(--s-4); }
+  .hero { padding: var(--s-7) var(--s-4) var(--s-8); }
 }

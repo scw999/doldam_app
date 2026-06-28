@@ -40,33 +40,6 @@
       delay: 800,
     });
 
-    // 돌담 ring — 페이지 로드 시 부드러운 fade-in (가운데 → 양 끝 순서로 자리잡음)
-    const stones = document.querySelectorAll('.hero-stone');
-    stones.forEach((s) => { s.style.opacity = '0'; });
-    anime({
-      targets: '.hero-stone',
-      opacity: [0, 1],
-      scale: [0.7, 1],
-      duration: 1100,
-      easing: 'easeOutCubic',
-      delay: anime.stagger(70, { from: 'center' }),
-    });
-
-    // Fade-in 끝난 후 잔잔한 스케일 호흡 (각자 다른 속도)
-    setTimeout(() => {
-      stones.forEach((stone, i) => {
-        anime({
-          targets: stone,
-          scale: [1, 1.03],
-          duration: 5000 + (i % 5) * 600,  // 5~7.4s 매우 느림
-          delay: i * 180,
-          easing: 'easeInOutSine',
-          direction: 'alternate',
-          loop: true,
-        });
-      });
-    }, 1600);
-
     // Hero 콘텐츠 순차 등장
     anime.timeline({ easing: 'easeOutCubic' })
       .add({
