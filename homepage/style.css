@@ -140,28 +140,42 @@ a:focus-visible, button:focus-visible, summary:focus-visible, input:focus-visibl
   isolation: isolate;
   background: var(--bg);
 }
-/* 따뜻한 글로우 - 양옆 부드러운 색감 */
-.hero-section::before {
-  content: '';
+/* 따뜻한 글로우 — anime.js로 펄스 애니메이션 (3개 블롭) */
+.hero-glow {
   position: absolute;
-  top: -10%;
-  left: -8%;
-  width: 45%;
-  aspect-ratio: 1;
-  background: radial-gradient(circle, var(--primary-tint) 0%, transparent 65%);
+  border-radius: 50%;
+  pointer-events: none;
   z-index: -1;
-  filter: blur(20px);
+  filter: blur(60px);
+  will-change: transform, opacity;
 }
-.hero-section::after {
-  content: '';
-  position: absolute;
-  bottom: -15%;
-  right: -10%;
+.hero-glow-1 {
+  top: -12%;
+  left: -10%;
   width: 50%;
   aspect-ratio: 1;
-  background: radial-gradient(circle, var(--primary-faint) 0%, transparent 60%);
-  z-index: -1;
-  filter: blur(30px);
+  background: radial-gradient(circle, rgba(184, 120, 76, 0.45) 0%, transparent 70%);
+}
+.hero-glow-2 {
+  bottom: -18%;
+  right: -12%;
+  width: 55%;
+  aspect-ratio: 1;
+  background: radial-gradient(circle, rgba(232, 213, 192, 0.7) 0%, transparent 65%);
+}
+.hero-glow-3 {
+  top: 30%;
+  right: 15%;
+  width: 25%;
+  aspect-ratio: 1;
+  background: radial-gradient(circle, rgba(196, 149, 106, 0.3) 0%, transparent 70%);
+}
+
+/* Hero entrance — JS가 채워줌, reduced-motion이면 즉시 표시 */
+@media (prefers-reduced-motion: no-preference) {
+  .hero-meta, .hero h1, .hero-tag, .hero-sub, .store-row {
+    opacity: 0;
+  }
 }
 .hero {
   max-width: 1080px;
