@@ -231,6 +231,49 @@ a:focus-visible, button:focus-visible, summary:focus-visible, input:focus-visibl
   letter-spacing: 0.04em;
 }
 
+/* ──────────────── Empathy (현실 문제 → 우리만의 해결책) ──────────────── */
+.empathy {
+  padding: var(--s-9) var(--s-5) var(--s-7);
+  max-width: 720px;
+  margin: 0 auto;
+  text-align: center;
+}
+.empathy-inner { max-width: 540px; margin: 0 auto; }
+.empathy-q {
+  font-family: 'Noto Serif KR', serif;
+  font-size: clamp(24px, 4vw, 36px);
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--ink);
+  margin-bottom: var(--s-3);
+  word-break: keep-all;
+  letter-spacing: -0.022em;
+}
+.empathy-pain {
+  font-size: clamp(15px, 2vw, 17px);
+  color: var(--ink-muted);
+  margin-bottom: var(--s-6);
+  font-style: normal;
+}
+.empathy-divider {
+  width: 40px;
+  height: 1px;
+  background: var(--primary);
+  margin: 0 auto var(--s-6);
+}
+.empathy-claim {
+  font-family: 'Noto Serif KR', serif;
+  font-size: clamp(17px, 2.4vw, 21px);
+  line-height: 1.85;
+  color: var(--ink);
+  word-break: keep-all;
+  letter-spacing: -0.015em;
+}
+.empathy-claim strong {
+  color: var(--primary);
+  font-weight: 700;
+}
+
 /* ──────────────── Promise (수평 흐름) ──────────────── */
 .promises {
   max-width: 1160px;
