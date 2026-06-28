@@ -146,23 +146,23 @@ a:focus-visible, button:focus-visible, summary:focus-visible, input:focus-visibl
   isolation: isolate;
   background-color: #0E0805;
 }
-/* 배경 사진 — 살짝 흐리고 약간 어둡게 (가독성) */
+/* 배경 사진 — 살짝만 흐리고 원본 밝기에 가깝게 (선명 + 밝게) */
 .hero-section::before {
   content: '';
   position: absolute;
-  inset: -12px;  /* blur 가장자리 잘림 방지 */
-  background: url('/img/hero-bg.png') center/cover no-repeat;
-  filter: blur(3px) brightness(0.78) saturate(0.95);
+  inset: -8px;
+  background: url('/img/hero-bg.webp') center/cover no-repeat;
+  filter: blur(1px) brightness(1.02) saturate(1.05);
   z-index: -2;
 }
-/* 어두운 오버레이 — vignette + 상하단 진하게 (텍스트 가독성 확보) */
+/* 어두운 오버레이 — 가벼운 vignette만 (이미지 잘 보이게 농도 낮춤) */
 .hero-section::after {
   content: '';
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(ellipse 70% 60% at center, rgba(10,6,2,0.18) 0%, rgba(10,6,2,0.55) 70%, rgba(10,6,2,0.78) 100%),
-    linear-gradient(180deg, rgba(10,6,2,0.45) 0%, transparent 25%, transparent 70%, rgba(10,6,2,0.55) 100%);
+    radial-gradient(ellipse 75% 65% at center, rgba(10,6,2,0.05) 0%, rgba(10,6,2,0.28) 70%, rgba(10,6,2,0.45) 100%),
+    linear-gradient(180deg, rgba(10,6,2,0.22) 0%, transparent 30%, transparent 75%, rgba(10,6,2,0.32) 100%);
   z-index: -1;
 }
 
@@ -183,13 +183,13 @@ a:focus-visible, button:focus-visible, summary:focus-visible, input:focus-visibl
 .hero-meta {
   display: inline-flex; gap: var(--s-3);
   font-size: 11px;
-  color: rgba(250, 246, 241, 0.78);
+  color: rgba(250, 246, 241, 0.92);
   text-transform: uppercase;
   letter-spacing: 0.12em;
   margin-bottom: var(--s-6);
   padding: 0 var(--s-4) var(--s-3);
-  border-bottom: 1px solid rgba(250, 246, 241, 0.22);
-  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.55);
+  border-bottom: 1px solid rgba(250, 246, 241, 0.3);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.85), 0 0 8px rgba(0, 0, 0, 0.5);
 }
 .hero-meta .dot { color: #F2B97D; }
 .hero h1 {
@@ -199,41 +199,52 @@ a:focus-visible, button:focus-visible, summary:focus-visible, input:focus-visibl
   margin: 0 auto var(--s-5);
   max-width: min(18ch, 100%);
   word-break: keep-all;
-  color: #FAF6F1;
-  text-shadow: 0 2px 16px rgba(0, 0, 0, 0.6), 0 1px 3px rgba(0, 0, 0, 0.5);
+  color: #FFFCF7;
+  /* 큰 글자: 글자 주변 어두운 후광으로 선명한 배경에서도 도드라짐 */
+  text-shadow:
+    0 2px 4px rgba(0, 0, 0, 0.95),
+    0 0 18px rgba(0, 0, 0, 0.7),
+    0 0 36px rgba(0, 0, 0, 0.45);
 }
 .hero h1 .accent {
-  color: #F2B97D;  /* 모닥불 불꽃 톤 */
+  color: #F4BD80;  /* 모닥불 불꽃 톤 */
   display: inline-block;
   font-weight: 700;
-  text-shadow: 0 2px 20px rgba(216, 120, 48, 0.45), 0 1px 4px rgba(0, 0, 0, 0.6);
+  text-shadow:
+    0 2px 4px rgba(0, 0, 0, 0.85),
+    0 0 22px rgba(216, 120, 48, 0.5),
+    0 0 36px rgba(0, 0, 0, 0.45);
 }
 /* 정체성 한 줄 — h1과 sub 사이 핵심 메시지 */
 .hero-tag {
   font-family: 'Noto Serif KR', serif;
   font-size: clamp(18px, 2.6vw, 22px);
   font-weight: 500;
-  color: #FAF6F1;
+  color: #FFFCF7;
   line-height: 1.55;
   max-width: 38ch;
   margin: 0 auto var(--s-5);
   word-break: keep-all;
   letter-spacing: -0.015em;
-  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.7), 0 1px 3px rgba(0, 0, 0, 0.5);
+  text-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.95),
+    0 0 14px rgba(0, 0, 0, 0.6);
 }
 .hero-tag strong {
-  color: #F2B97D;
+  color: #F4BD80;
   font-weight: 700;
 }
 
 .hero-sub {
   font-size: clamp(15px, 2.2vw, 17px);
-  color: rgba(250, 246, 241, 0.88);
+  color: rgba(255, 252, 247, 0.96);
   line-height: 1.65;
   max-width: 52ch;
   margin: 0 auto var(--s-7);
   word-break: keep-all;
-  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.7), 0 1px 2px rgba(0, 0, 0, 0.5);
+  text-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.95),
+    0 0 12px rgba(0, 0, 0, 0.55);
 }
 
 /* Store row — Apple/Google 공식 가이드라인 준수
