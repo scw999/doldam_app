@@ -73,7 +73,7 @@
 
 <!-- 돌담 캠프파이어 — 안아주는 돌 arc + 가운데 불꽃 글로우 -->
 <div class="hero-stones" aria-hidden="true">
-  <svg class="hero-stones-svg" viewBox="0 0 1200 220" preserveAspectRatio="xMidYEnd slice">
+  <svg class="hero-stones-svg" viewBox="0 0 1600 200" preserveAspectRatio="xMidYEnd meet">
     <defs>
       <radialGradient id="stoneA" cx="38%" cy="28%">
         <stop offset="0%" stop-color="#F1E5D0"/>
@@ -85,9 +85,9 @@
         <stop offset="65%" stop-color="#C9B08A"/>
         <stop offset="100%" stop-color="#A88E68"/>
       </radialGradient>
-      <radialGradient id="fireGlow" cx="50%" cy="55%">
-        <stop offset="0%" stop-color="rgba(216, 144, 88, 0.45)"/>
-        <stop offset="40%" stop-color="rgba(196, 149, 106, 0.22)"/>
+      <radialGradient id="fireGlow" cx="50%" cy="60%">
+        <stop offset="0%" stop-color="rgba(216, 144, 88, 0.4)"/>
+        <stop offset="40%" stop-color="rgba(196, 149, 106, 0.2)"/>
         <stop offset="100%" stop-color="transparent"/>
       </radialGradient>
       <filter id="stoneShadow" x="-50%" y="-50%" width="200%" height="200%">
@@ -98,22 +98,18 @@
       </filter>
     </defs>
 
-    <!-- 캠프파이어 불꽃 (돌 중앙 따뜻한 빛) -->
-    <ellipse class="hero-fire" cx="600" cy="158" rx="320" ry="78" fill="url(#fireGlow)"/>
+    <!-- 캠프파이어 불꽃 (돌 가운데 따뜻한 빛) -->
+    <ellipse class="hero-fire" cx="800" cy="120" rx="360" ry="80" fill="url(#fireGlow)"/>
 
-    <!-- 11개 돌, 부드러운 cradle arc -->
+    <!-- 7개 돌, 명확한 cradle arc (양 끝 낮고 가운데 가장 높음) -->
     <g filter="url(#stoneShadow)">
-      <ellipse class="hero-stone" cx="55"   cy="178" rx="48" ry="28" fill="url(#stoneA)" transform="rotate(-3 55 178)"/>
-      <ellipse class="hero-stone" cx="170"  cy="166" rx="52" ry="30" fill="url(#stoneB)" transform="rotate(2 170 166)"/>
-      <ellipse class="hero-stone" cx="290"  cy="155" rx="50" ry="32" fill="url(#stoneA)" transform="rotate(-2 290 155)"/>
-      <ellipse class="hero-stone" cx="408"  cy="146" rx="54" ry="30" fill="url(#stoneB)" transform="rotate(3 408 146)"/>
-      <ellipse class="hero-stone" cx="525"  cy="141" rx="56" ry="32" fill="url(#stoneA)" transform="rotate(-1 525 141)"/>
-      <ellipse class="hero-stone" cx="600"  cy="139" rx="44" ry="26" fill="url(#stoneB)" transform="rotate(2 600 139)"/>
-      <ellipse class="hero-stone" cx="675"  cy="141" rx="56" ry="32" fill="url(#stoneA)" transform="rotate(-2 675 141)"/>
-      <ellipse class="hero-stone" cx="792"  cy="146" rx="54" ry="30" fill="url(#stoneB)" transform="rotate(3 792 146)"/>
-      <ellipse class="hero-stone" cx="910"  cy="155" rx="50" ry="32" fill="url(#stoneA)" transform="rotate(-1 910 155)"/>
-      <ellipse class="hero-stone" cx="1030" cy="166" rx="52" ry="30" fill="url(#stoneB)" transform="rotate(2 1030 166)"/>
-      <ellipse class="hero-stone" cx="1145" cy="178" rx="48" ry="28" fill="url(#stoneA)" transform="rotate(-3 1145 178)"/>
+      <ellipse class="hero-stone" cx="110"  cy="170" rx="62" ry="36" fill="url(#stoneA)" transform="rotate(-3 110 170)"/>
+      <ellipse class="hero-stone" cx="345"  cy="148" rx="66" ry="40" fill="url(#stoneB)" transform="rotate(2 345 148)"/>
+      <ellipse class="hero-stone" cx="580"  cy="128" rx="70" ry="42" fill="url(#stoneA)" transform="rotate(-2 580 128)"/>
+      <ellipse class="hero-stone" cx="800"  cy="118" rx="74" ry="44" fill="url(#stoneB)" transform="rotate(1 800 118)"/>
+      <ellipse class="hero-stone" cx="1020" cy="128" rx="70" ry="42" fill="url(#stoneA)" transform="rotate(-1 1020 128)"/>
+      <ellipse class="hero-stone" cx="1255" cy="148" rx="66" ry="40" fill="url(#stoneB)" transform="rotate(3 1255 148)"/>
+      <ellipse class="hero-stone" cx="1490" cy="170" rx="62" ry="36" fill="url(#stoneA)" transform="rotate(-2 1490 170)"/>
     </g>
   </svg>
 </div>

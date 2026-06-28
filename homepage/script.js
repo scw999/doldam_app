@@ -40,30 +40,44 @@
       delay: 800,
     });
 
-    // 캠프파이어 불꽃 — 따뜻한 빛이 부드럽게 호흡
+    // 캠프파이어 불꽃 — 따뜻한 빛이 천천히 호흡
     anime({
       targets: '.hero-fire',
-      scale: [1, 1.08],
-      opacity: [0.85, 1, 0.85],
-      duration: 3200,
+      scale: [0.96, 1.06],
+      opacity: [0.8, 1, 0.8],
+      duration: 5000,
       easing: 'easeInOutSine',
       direction: 'alternate',
       loop: true,
     });
 
-    // 11개 돌 — 각자 다른 속도·위상으로 부드럽게 호흡 (안아주는 느낌)
+    // 돌담 — 페이지 로드 시 부드러운 fade-in (양 끝 → 가운데 순서)
     const stones = document.querySelectorAll('.hero-stone');
-    stones.forEach((stone, i) => {
-      anime({
-        targets: stone,
-        translateY: [0, -3 - (i % 3)],  // 1~5px 미세 움직임
-        duration: 2400 + (i % 4) * 400,  // 2.4~3.6s 다양
-        delay: i * 180,                  // 순차 시작 (파도처럼)
-        easing: 'easeInOutSine',
-        direction: 'alternate',
-        loop: true,
-      });
+    stones.forEach((s) => { s.style.opacity = '0'; });
+
+    anime({
+      targets: '.hero-stone',
+      opacity: [0, 1],
+      translateY: [12, 0],
+      duration: 1200,
+      easing: 'easeOutCubic',
+      delay: anime.stagger(120, { from: 'center', direction: 'reverse' }),
     });
+
+    // Fade-in 끝난 후 천천히 호흡 (각자 다른 속도)
+    setTimeout(() => {
+      stones.forEach((stone, i) => {
+        anime({
+          targets: stone,
+          translateY: [0, -3],
+          duration: 4500 + (i % 4) * 600,  // 4.5~6.3s 매우 느림
+          delay: i * 250,
+          easing: 'easeInOutSine',
+          direction: 'alternate',
+          loop: true,
+        });
+      });
+    }, 2000);
 
     // Hero 콘텐츠 순차 등장
     anime.timeline({ easing: 'easeOutCubic' })
