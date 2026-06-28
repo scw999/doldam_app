@@ -40,6 +40,31 @@
       delay: 800,
     });
 
+    // 캠프파이어 불꽃 — 따뜻한 빛이 부드럽게 호흡
+    anime({
+      targets: '.hero-fire',
+      scale: [1, 1.08],
+      opacity: [0.85, 1, 0.85],
+      duration: 3200,
+      easing: 'easeInOutSine',
+      direction: 'alternate',
+      loop: true,
+    });
+
+    // 11개 돌 — 각자 다른 속도·위상으로 부드럽게 호흡 (안아주는 느낌)
+    const stones = document.querySelectorAll('.hero-stone');
+    stones.forEach((stone, i) => {
+      anime({
+        targets: stone,
+        translateY: [0, -3 - (i % 3)],  // 1~5px 미세 움직임
+        duration: 2400 + (i % 4) * 400,  // 2.4~3.6s 다양
+        delay: i * 180,                  // 순차 시작 (파도처럼)
+        easing: 'easeInOutSine',
+        direction: 'alternate',
+        loop: true,
+      });
+    });
+
     // Hero 콘텐츠 순차 등장
     anime.timeline({ easing: 'easeOutCubic' })
       .add({

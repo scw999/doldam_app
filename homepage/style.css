@@ -157,19 +157,50 @@ a:focus-visible, button:focus-visible, summary:focus-visible, input:focus-visibl
   background: radial-gradient(circle, rgba(184, 120, 76, 0.45) 0%, transparent 70%);
 }
 .hero-glow-2 {
-  bottom: -18%;
+  /* 하단 글로우 — 돌담 캠프파이어와 합쳐서 따뜻함 강화 */
+  bottom: -25%;
   right: -12%;
   width: 55%;
   aspect-ratio: 1;
-  background: radial-gradient(circle, rgba(232, 213, 192, 0.7) 0%, transparent 65%);
+  background: radial-gradient(circle, rgba(232, 213, 192, 0.55) 0%, transparent 70%);
 }
 .hero-glow-3 {
   top: 30%;
   right: 15%;
   width: 25%;
   aspect-ratio: 1;
-  background: radial-gradient(circle, rgba(196, 149, 106, 0.3) 0%, transparent 70%);
+  background: radial-gradient(circle, rgba(196, 149, 106, 0.28) 0%, transparent 70%);
 }
+
+/* ─── 돌담 캠프파이어 ─── */
+.hero-stones {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 220px;
+  pointer-events: none;
+  z-index: 0;
+  overflow: hidden;
+}
+.hero-stones-svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.hero-stone {
+  transform-origin: center;
+  transform-box: fill-box;
+  will-change: transform;
+}
+.hero-fire {
+  will-change: transform, opacity;
+}
+/* hero-section 하단 padding 살짝 늘려서 돌담 위 공간 확보 */
+.hero { padding-bottom: var(--s-9); }
+
+/* hero 콘텐츠는 돌담 위에 보이도록 */
+.hero > * { position: relative; z-index: 1; }
 
 /* Hero entrance — JS가 채워줌, reduced-motion이면 즉시 표시 */
 @media (prefers-reduced-motion: no-preference) {
@@ -1033,9 +1064,13 @@ footer {
   .footer-brand { grid-column: 1 / -1; }
 }
 
+@media (max-width: 768px) {
+  .hero-stones { height: 140px; }
+}
 @media (max-width: 480px) {
   .store-link { height: 48px; }
   .store-google img { height: 72px; margin: -12px 0; }
   .footer-inner { grid-template-columns: 1fr; }
   .mood-grid { grid-template-columns: repeat(3, 1fr); }
+  .hero-stones { height: 110px; }
 }
