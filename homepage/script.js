@@ -3,42 +3,9 @@
 (function () {
   const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-  // ─── 1. Hero 글로우 펄스 + 등장 애니메이션 (anime.js) ───
+  // ─── 1. Hero 콘텐츠 등장 애니메이션 (anime.js) ───
   function initHeroAnimations() {
     if (reduce || typeof anime === 'undefined') return;
-
-    // 글로우 펄스 — 3개 블롭이 다른 속도로 부드럽게 호흡
-    anime({
-      targets: '.hero-glow-1',
-      scale: [1, 1.18],
-      translateX: [0, 30],
-      translateY: [0, 20],
-      duration: 8000,
-      easing: 'easeInOutSine',
-      direction: 'alternate',
-      loop: true,
-    });
-    anime({
-      targets: '.hero-glow-2',
-      scale: [1, 1.25],
-      translateX: [0, -40],
-      translateY: [0, -30],
-      duration: 10000,
-      easing: 'easeInOutSine',
-      direction: 'alternate',
-      loop: true,
-      delay: 1500,
-    });
-    anime({
-      targets: '.hero-glow-3',
-      scale: [0.9, 1.3],
-      opacity: [0.7, 1, 0.7],
-      duration: 6000,
-      easing: 'easeInOutSine',
-      direction: 'alternate',
-      loop: true,
-      delay: 800,
-    });
 
     // Hero 콘텐츠 순차 등장
     anime.timeline({ easing: 'easeOutCubic' })

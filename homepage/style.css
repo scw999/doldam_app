@@ -139,43 +139,31 @@ a:focus-visible, button:focus-visible, summary:focus-visible, input:focus-visibl
 }
 .nav-links a:hover { color: var(--ink); text-decoration: none; }
 
-/* ──────────────── Hero (masthead 스타일, 가운데 정렬) ──────────────── */
+/* ──────────────── Hero (masthead 스타일, 캠프파이어 사진 배경) ──────────────── */
 .hero-section {
   position: relative;
   overflow: hidden;
   isolation: isolate;
-  background: var(--bg);
+  background-color: #0E0805;
 }
-/* 따뜻한 글로우 — anime.js로 펄스 애니메이션 (3개 블롭) */
-.hero-glow {
+/* 배경 사진 — 살짝 흐리고 약간 어둡게 (가독성) */
+.hero-section::before {
+  content: '';
   position: absolute;
-  border-radius: 50%;
-  pointer-events: none;
+  inset: -12px;  /* blur 가장자리 잘림 방지 */
+  background: url('/img/hero-bg.png') center/cover no-repeat;
+  filter: blur(3px) brightness(0.78) saturate(0.95);
+  z-index: -2;
+}
+/* 어두운 오버레이 — vignette + 상하단 진하게 (텍스트 가독성 확보) */
+.hero-section::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 70% 60% at center, rgba(10,6,2,0.18) 0%, rgba(10,6,2,0.55) 70%, rgba(10,6,2,0.78) 100%),
+    linear-gradient(180deg, rgba(10,6,2,0.45) 0%, transparent 25%, transparent 70%, rgba(10,6,2,0.55) 100%);
   z-index: -1;
-  filter: blur(60px);
-  will-change: transform, opacity;
-}
-.hero-glow-1 {
-  top: -12%;
-  left: -10%;
-  width: 50%;
-  aspect-ratio: 1;
-  background: radial-gradient(circle, rgba(184, 120, 76, 0.45) 0%, transparent 70%);
-}
-.hero-glow-2 {
-  /* 하단 글로우 — 돌담 캠프파이어와 합쳐서 따뜻함 강화 */
-  bottom: -25%;
-  right: -12%;
-  width: 55%;
-  aspect-ratio: 1;
-  background: radial-gradient(circle, rgba(232, 213, 192, 0.55) 0%, transparent 70%);
-}
-.hero-glow-3 {
-  top: 30%;
-  right: 15%;
-  width: 25%;
-  aspect-ratio: 1;
-  background: radial-gradient(circle, rgba(196, 149, 106, 0.28) 0%, transparent 70%);
 }
 
 
@@ -188,22 +176,22 @@ a:focus-visible, button:focus-visible, summary:focus-visible, input:focus-visibl
 .hero {
   max-width: 1080px;
   margin: 0 auto;
-  padding: var(--s-9) var(--s-5) var(--s-8);
-  border-bottom: 1px solid var(--rule);
+  padding: clamp(120px, 16vw, 200px) var(--s-5) clamp(100px, 14vw, 180px);
   text-align: center;
   position: relative;
 }
 .hero-meta {
   display: inline-flex; gap: var(--s-3);
   font-size: 11px;
-  color: var(--ink-muted);
+  color: rgba(250, 246, 241, 0.78);
   text-transform: uppercase;
   letter-spacing: 0.12em;
   margin-bottom: var(--s-6);
   padding: 0 var(--s-4) var(--s-3);
-  border-bottom: 1px solid var(--rule-soft);
+  border-bottom: 1px solid rgba(250, 246, 241, 0.22);
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.55);
 }
-.hero-meta .dot { color: var(--primary); }
+.hero-meta .dot { color: #F2B97D; }
 .hero h1 {
   font-size: clamp(40px, 7vw, 72px);
   line-height: 1.05;
@@ -211,36 +199,41 @@ a:focus-visible, button:focus-visible, summary:focus-visible, input:focus-visibl
   margin: 0 auto var(--s-5);
   max-width: min(18ch, 100%);
   word-break: keep-all;
+  color: #FAF6F1;
+  text-shadow: 0 2px 16px rgba(0, 0, 0, 0.6), 0 1px 3px rgba(0, 0, 0, 0.5);
 }
 .hero h1 .accent {
-  color: var(--primary);
+  color: #F2B97D;  /* 모닥불 불꽃 톤 */
   display: inline-block;
   font-weight: 700;
+  text-shadow: 0 2px 20px rgba(216, 120, 48, 0.45), 0 1px 4px rgba(0, 0, 0, 0.6);
 }
 /* 정체성 한 줄 — h1과 sub 사이 핵심 메시지 */
 .hero-tag {
   font-family: 'Noto Serif KR', serif;
   font-size: clamp(18px, 2.6vw, 22px);
   font-weight: 500;
-  color: var(--ink);
+  color: #FAF6F1;
   line-height: 1.55;
   max-width: 38ch;
   margin: 0 auto var(--s-5);
   word-break: keep-all;
   letter-spacing: -0.015em;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.7), 0 1px 3px rgba(0, 0, 0, 0.5);
 }
 .hero-tag strong {
-  color: var(--primary-deep);
+  color: #F2B97D;
   font-weight: 700;
 }
 
 .hero-sub {
   font-size: clamp(15px, 2.2vw, 17px);
-  color: var(--ink-soft);
+  color: rgba(250, 246, 241, 0.88);
   line-height: 1.65;
   max-width: 52ch;
   margin: 0 auto var(--s-7);
   word-break: keep-all;
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.7), 0 1px 2px rgba(0, 0, 0, 0.5);
 }
 
 /* Store row — Apple/Google 공식 가이드라인 준수
