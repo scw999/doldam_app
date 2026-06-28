@@ -145,11 +145,10 @@ a:focus-visible, button:focus-visible, summary:focus-visible, input:focus-visibl
   overflow: hidden;
   isolation: isolate;
   background: var(--bg);
-  /* SVG ring(2:1)에 맞춰 min-height — 너무 납작하지 않게 */
-  min-height: clamp(560px, 50vw, 820px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  /* SVG ring(2:1)에 맞춰 hero-section을 같은 비율로 — 측면 돌 안 잘림 */
+  min-height: clamp(500px, 50vw, 760px);
+  display: grid;
+  place-items: center;
   border-bottom: 1px solid var(--rule);
 }
 /* 따뜻한 글로우 — anime.js로 펄스 애니메이션 (3개 블롭) */
@@ -212,12 +211,13 @@ a:focus-visible, button:focus-visible, summary:focus-visible, input:focus-visibl
   }
 }
 .hero {
-  flex: 0 0 auto;
+  /* grid place-items로 hero-section 중앙에 자동 정렬 — 측면 padding은 ring 측면 돌과 콘텐츠 거리 확보 */
   max-width: 1080px;
-  /* ring 안쪽에 콘텐츠 — 좌우는 ring 측면 돌과 거리 두기, 위아래는 flex로 가운데 정렬됨 */
-  padding: var(--s-5) clamp(60px, 8vw, 140px);
+  width: 100%;
+  padding: var(--s-5) clamp(40px, 8vw, 140px);
   text-align: center;
   position: relative;
+  z-index: 1;
 }
 .hero-meta {
   display: inline-flex; gap: var(--s-3);
@@ -1036,7 +1036,7 @@ footer {
 @media (max-width: 768px) {
   .nav-links { gap: var(--s-3); }
   .nav-links a { font-size: 12px; }
-  .hero { padding: var(--s-4) clamp(40px, 10vw, 80px); }
+  .hero { padding: var(--s-4) clamp(30px, 8vw, 60px); }
   .promise-flow {
     grid-template-columns: repeat(2, 1fr);
     gap: var(--s-5) 0;

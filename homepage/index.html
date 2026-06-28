@@ -67,20 +67,22 @@
           <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
         </filter>
       </defs>
-      <!-- 타원 perimeter 12개 돌 (중심 800,400 / 가로반지름 720 / 세로반지름 350) -->
+      <!-- 타원 perimeter 12개 돌 (중심 800,400 / 가로반지름 720 / 세로반지름 350)
+           호 길이 균등 분배 — 각도 0°, 36.7°, 63°, 90°, 117°, 143.3°, 180°, 216.7°, 243°, 270°, 297°, 323.3°
+           ellipse 둘레는 위치마다 ds/dθ가 다르므로, 균등 시각감 위해 단순 30°가 아닌 호 길이 균등 분배 -->
       <g filter="url(#ringStoneShadow)">
         <ellipse class="hero-stone" cx="1520" cy="400" rx="68" ry="42" fill="url(#ringStoneA)" transform="rotate(-2 1520 400)"/>
-        <ellipse class="hero-stone" cx="1424" cy="575" rx="62" ry="38" fill="url(#ringStoneB)" transform="rotate(3 1424 575)"/>
-        <ellipse class="hero-stone" cx="1160" cy="703" rx="62" ry="38" fill="url(#ringStoneA)" transform="rotate(-1 1160 703)"/>
+        <ellipse class="hero-stone" cx="1377" cy="609" rx="62" ry="38" fill="url(#ringStoneB)" transform="rotate(3 1377 609)"/>
+        <ellipse class="hero-stone" cx="1127" cy="712" rx="62" ry="38" fill="url(#ringStoneA)" transform="rotate(-1 1127 712)"/>
         <ellipse class="hero-stone" cx="800"  cy="750" rx="68" ry="42" fill="url(#ringStoneB)" transform="rotate(2 800 750)"/>
-        <ellipse class="hero-stone" cx="440"  cy="703" rx="62" ry="38" fill="url(#ringStoneA)" transform="rotate(-3 440 703)"/>
-        <ellipse class="hero-stone" cx="176"  cy="575" rx="62" ry="38" fill="url(#ringStoneB)" transform="rotate(1 176 575)"/>
+        <ellipse class="hero-stone" cx="473"  cy="712" rx="62" ry="38" fill="url(#ringStoneA)" transform="rotate(-3 473 712)"/>
+        <ellipse class="hero-stone" cx="223"  cy="609" rx="62" ry="38" fill="url(#ringStoneB)" transform="rotate(1 223 609)"/>
         <ellipse class="hero-stone" cx="80"   cy="400" rx="68" ry="42" fill="url(#ringStoneA)" transform="rotate(-2 80 400)"/>
-        <ellipse class="hero-stone" cx="176"  cy="225" rx="62" ry="38" fill="url(#ringStoneB)" transform="rotate(2 176 225)"/>
-        <ellipse class="hero-stone" cx="440"  cy="97"  rx="62" ry="38" fill="url(#ringStoneA)" transform="rotate(-1 440 97)"/>
+        <ellipse class="hero-stone" cx="223"  cy="191" rx="62" ry="38" fill="url(#ringStoneB)" transform="rotate(2 223 191)"/>
+        <ellipse class="hero-stone" cx="473"  cy="88"  rx="62" ry="38" fill="url(#ringStoneA)" transform="rotate(-1 473 88)"/>
         <ellipse class="hero-stone" cx="800"  cy="50"  rx="68" ry="42" fill="url(#ringStoneB)" transform="rotate(3 800 50)"/>
-        <ellipse class="hero-stone" cx="1160" cy="97"  rx="62" ry="38" fill="url(#ringStoneA)" transform="rotate(-2 1160 97)"/>
-        <ellipse class="hero-stone" cx="1424" cy="225" rx="62" ry="38" fill="url(#ringStoneB)" transform="rotate(2 1424 225)"/>
+        <ellipse class="hero-stone" cx="1127" cy="88"  rx="62" ry="38" fill="url(#ringStoneA)" transform="rotate(-2 1127 88)"/>
+        <ellipse class="hero-stone" cx="1377" cy="191" rx="62" ry="38" fill="url(#ringStoneB)" transform="rotate(2 1377 191)"/>
       </g>
     </svg>
   </div>
