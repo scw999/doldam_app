@@ -53,6 +53,9 @@ body {
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
   font-feature-settings: "ss01", "kern";
+  /* 한국어 어절(공백 단위) 보존 — 단어 중간 끊김 방지 */
+  word-break: keep-all;
+  overflow-wrap: break-word;
 }
 
 h1, h2, h3, h4, h5 {
@@ -1069,4 +1072,13 @@ footer {
   .store-google img { height: 72px; margin: -12px 0; }
   .footer-inner { grid-template-columns: 1fr; }
   .mood-grid { grid-template-columns: repeat(3, 1fr); }
+
+  /* 좁은 모바일에서 텍스트 max-width 완화 — 내용물이 컨테이너 안에 자연스럽게 wrap */
+  .hero-tag, .hero-sub, .feature-text p,
+  .chapter-lede, .empathy-claim, .verify-body, .story-snippet,
+  .feature-text h3, .mood-pull h3, .rebuild-text h3, .chapter h2 {
+    max-width: 100%;
+  }
+  /* 모바일 hero 폰트 크기 살짝 줄임 */
+  .hero { padding: var(--s-7) var(--s-4) var(--s-8); }
 }
