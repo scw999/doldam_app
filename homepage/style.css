@@ -395,10 +395,10 @@ a:focus-visible, button:focus-visible, summary:focus-visible, input:focus-visibl
   font-weight: 600;
 }
 
-/* Variant A: 풀 폰 + 텍스트 (asymmetric grid) */
+/* Variant A: 풀 폰 + 텍스트 (균형 그리드) */
 .variant-phone {
   display: grid;
-  grid-template-columns: 1.1fr 1fr;
+  grid-template-columns: 1fr 1fr;
   gap: var(--s-8);
   align-items: center;
 }
@@ -408,8 +408,9 @@ a:focus-visible, button:focus-visible, summary:focus-visible, input:focus-visibl
   display: flex; justify-content: center;
 }
 .variant-phone .phone-wrap img {
-  max-width: 320px;
-  border-radius: 28px;
+  max-width: 420px;
+  width: 100%;
+  border-radius: 32px;
   box-shadow: var(--shadow-raised);
 }
 
@@ -554,72 +555,6 @@ a:focus-visible, button:focus-visible, summary:focus-visible, input:focus-visibl
 }
 .chat-poll-q { font-weight: 600; color: var(--ink); margin-bottom: 4px; }
 .chat-poll-cta { font-size: 11px; color: var(--primary-deep); font-weight: 600; }
-
-/* Variant D: 투표 — 가로 카드 발췌 + 텍스트 */
-.variant-vote {
-  display: grid;
-  grid-template-columns: 1fr 1.1fr;
-  gap: var(--s-7);
-  align-items: center;
-}
-.vote-stack {
-  display: flex; flex-direction: column; gap: var(--s-3);
-}
-.vote-card {
-  background: var(--surface);
-  border: 1px solid var(--rule);
-  padding: var(--s-4);
-  border-radius: var(--r-lg);
-}
-.vote-meta {
-  display: flex; align-items: center; gap: var(--s-2);
-  font-size: 11px; margin-bottom: var(--s-2);
-  letter-spacing: 0.06em;
-}
-.vote-hot {
-  background: var(--primary);
-  color: #fff;
-  font-size: 10px; font-weight: 700;
-  padding: 2px 8px; border-radius: var(--r-full);
-  letter-spacing: 0.08em;
-}
-.vote-count { color: var(--ink-muted); }
-.vote-q {
-  font-size: 16px; font-weight: 600;
-  color: var(--ink);
-  margin-bottom: var(--s-3);
-  line-height: 1.4;
-  font-family: 'Noto Serif KR', serif;
-  letter-spacing: -0.015em;
-}
-.vote-bar {
-  display: flex; height: 28px;
-  border-radius: var(--r-sm);
-  overflow: hidden;
-  margin-bottom: 6px;
-  background: var(--bg-2);
-}
-.vote-pro {
-  background: var(--ink);
-  color: var(--bg);
-  font-size: 11px; font-weight: 700;
-  display: flex; align-items: center;
-  padding: 0 10px;
-  letter-spacing: 0.04em;
-}
-.vote-con {
-  background: var(--primary);
-  color: #fff;
-  font-size: 11px; font-weight: 700;
-  display: flex; align-items: center; justify-content: flex-end;
-  padding: 0 10px;
-  letter-spacing: 0.04em;
-}
-.vote-labels {
-  display: flex; justify-content: space-between;
-  font-size: 11px; color: var(--ink-muted);
-  letter-spacing: 0.04em;
-}
 
 /* Variant E: 기분 — 큰 폰 + 이모지 인덱스 */
 .variant-mood {
@@ -1028,7 +963,7 @@ footer {
   .promise-step + .promise-step { border-left: none; }
   .promise-step:nth-child(3) { border-top: 1px solid var(--rule-soft); padding-top: var(--s-5); }
   .promise-step:nth-child(4) { border-top: 1px solid var(--rule-soft); padding-top: var(--s-5); }
-  .variant-phone, .variant-vote, .variant-rebuild, .variant-mood, .variant-chat {
+  .variant-phone, .variant-rebuild, .variant-mood, .variant-chat {
     grid-template-columns: 1fr;
     gap: var(--s-5);
   }
@@ -1047,7 +982,7 @@ footer {
   }
   .variant-phone.right .text { order: 1; }
   .variant-phone.right .phone-wrap { order: 2; }
-  .variant-phone .phone-wrap img { max-width: 280px; }
+  .variant-phone .phone-wrap img { max-width: 320px; }
   .verify-phone-main { max-width: 300px; }
   .mood-grid { grid-template-columns: repeat(5, 1fr); max-width: 100%; }
   .footer-inner { grid-template-columns: 1fr 1fr; gap: var(--s-5); }
