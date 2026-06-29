@@ -178,7 +178,7 @@
       <div class="card" style="margin-top:16px">
         <p class="section-title">🔥 인기글 게시판 기준</p>
         <div class="tip">
-          최근 N일 글 중에서 <b>댓글 수 ≥ 최소 댓글</b> 또는 <b>(공감 + 웃겨요) 합산 ≥ 최소 반응</b> 조건을 만족하면 인기글에 노출됩니다. 성별 전용 게시판(남성방·여성방)은 자동 제외됩니다.
+          최근 N일 글 중에서 <b>댓글 수 ≥ 최소 댓글</b> 또는 <b>전체 반응 수(공감·안아줄게요·힘내요·웃겨요 합산) ≥ 최소 반응</b> 조건을 만족하면 인기글에 노출됩니다. 성별 전용 게시판(남성방·여성방)은 자동 제외됩니다.
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px">
           <label style="display:block">
@@ -186,7 +186,7 @@
             <input id="popularMinComments" type="number" min="1" max="10000" value="10" style="margin-bottom:0" />
           </label>
           <label style="display:block">
-            <span style="font-size:12px;color:#8C7B6B;display:block;margin-bottom:4px">최소 반응 수 (공감+웃겨요)</span>
+            <span style="font-size:12px;color:#8C7B6B;display:block;margin-bottom:4px">최소 반응 수 (4종 합산)</span>
             <input id="popularMinReactions" type="number" min="1" max="10000" value="20" style="margin-bottom:0" />
           </label>
           <label style="display:block">

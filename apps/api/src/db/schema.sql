@@ -42,9 +42,7 @@ CREATE TABLE IF NOT EXISTS posts (
   content        TEXT NOT NULL,
   category       TEXT NOT NULL,              -- free/dating/kids/money/legal/men_only/women_only
   view_count     INTEGER NOT NULL DEFAULT 0,
-  like_count     INTEGER NOT NULL DEFAULT 0,
-  empathy_count  INTEGER NOT NULL DEFAULT 0, -- reaction=0(공감돼요) 비정규화
-  funny_count    INTEGER NOT NULL DEFAULT 0, -- reaction=3(웃겨요) 비정규화
+  like_count     INTEGER NOT NULL DEFAULT 0, -- 4종 반응(공감/안아줄게요/힘내요/웃겨요) 전체 합
   comment_count  INTEGER NOT NULL DEFAULT 0,
   created_at     INTEGER NOT NULL,
   deleted_at     INTEGER

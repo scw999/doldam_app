@@ -1,0 +1,26 @@
+name: Deploy doldam-admin
+
+# apps/admin/ 변경이 main에 푸시되면 Cloudflare Pages(doldam-admin)에 자동 배포.
+# 수동 트리거(workflow_dispatch)도 가능 — 긴급 재배포가 필요할 때 사용.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/admin/**'
+      - '.github/workflows/deploy-admin.yml'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      deployments: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy apps/admin --project-name=doldam-admin --branch=main

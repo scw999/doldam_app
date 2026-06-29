@@ -62,7 +62,7 @@ posts.get('/', async (c) => {
 
   if (popular) {
     // 인기글: app_settings 임계값 기반, 최근 N일 글만, 성별 전용 카테고리는 보안상 제외
-    // 정렬은 (반응+댓글) 가중치 합 내림차순 — 추후 가중치는 임계값과 별도로 튜닝 가능
+    // 반응 합계는 like_count(4종 반응 전체 합)를 사용 — 별도 비정규화 불필요
     const { minComments, minReactions, windowDays } = await getPopularSettings(c.env);
     const since = Date.now() - windowDays * 24 * 60 * 60 * 1000;
     const sql =
@@ -71,9 +71,9 @@ posts.get('/', async (c) => {
          AND p.created_at >= ?
          AND p.report_count < ?
          AND p.category NOT IN ('men_only','women_only')
-         AND (p.comment_count >= ? OR (p.empathy_count + p.funny_count) >= ?)
+         AND (p.comment_count >= ? OR p.like_count >= ?)
          ${blockClause}
-       ORDER BY (p.empathy_count + p.funny_count + p.comment_count) DESC, p.created_at DESC
+       ORDER BY (p.like_count + p.comment_count) DESC, p.created_at DESC
        LIMIT ?`;
     const { results } = await c.env.DOLDAM_DB
       .prepare(sql)
@@ -258,7 +258,6 @@ posts.delete('/:id', requireAuth, async (c) => {
 });
 
 // ---- 좋아요 토글 ----
-// reaction=0(공감돼요)과 3(웃겨요)은 인기글 집계용 비정규화 카운터(empathy_count/funny_count)도 같이 갱신
 posts.post('/:id/like', requireAuth, async (c) => {
   const user = c.get('user');
   const id = c.req.param('id');
@@ -267,18 +266,15 @@ posts.post('/:id/like', requireAuth, async (c) => {
   if (![0, 1, 2, 3].includes(reaction)) return c.json({ error: 'invalid_reaction' }, 400);
 
   const existing = await c.env.DOLDAM_DB
-    .prepare('SELECT reaction FROM post_likes WHERE post_id = ? AND user_id = ?')
-    .bind(id, user.id).first<{ reaction: number }>();
+    .prepare('SELECT 1 FROM post_likes WHERE post_id = ? AND user_id = ?')
+    .bind(id, user.id).first();
 
   if (existing) {
-    const prev = existing.reaction;
     await c.env.DOLDAM_DB
       .prepare('DELETE FROM post_likes WHERE post_id = ? AND user_id = ?')
       .bind(id, user.id).run();
-    const decEmpathy = prev === 0 ? ', empathy_count = MAX(0, empathy_count - 1)' : '';
-    const decFunny   = prev === 3 ? ', funny_count = MAX(0, funny_count - 1)'     : '';
     await c.env.DOLDAM_DB
-      .prepare(`UPDATE posts SET like_count = MAX(0, like_count - 1)${decEmpathy}${decFunny} WHERE id = ?`)
+      .prepare('UPDATE posts SET like_count = MAX(0, like_count - 1) WHERE id = ?')
       .bind(id).run();
     return c.json({ liked: false });
   }
@@ -286,10 +282,8 @@ posts.post('/:id/like', requireAuth, async (c) => {
   await c.env.DOLDAM_DB
     .prepare('INSERT INTO post_likes (post_id, user_id, reaction, created_at) VALUES (?, ?, ?, ?)')
     .bind(id, user.id, reaction, Date.now()).run();
-  const incEmpathy = reaction === 0 ? ', empathy_count = empathy_count + 1' : '';
-  const incFunny   = reaction === 3 ? ', funny_count = funny_count + 1'     : '';
   await c.env.DOLDAM_DB
-    .prepare(`UPDATE posts SET like_count = like_count + 1${incEmpathy}${incFunny} WHERE id = ?`)
+    .prepare('UPDATE posts SET like_count = like_count + 1 WHERE id = ?')
     .bind(id).run();
   return c.json({ liked: true });
 });
