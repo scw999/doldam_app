@@ -356,41 +356,78 @@ admin.post('/poll-eas', requireAdmin, async (c) => {
   return c.json({ ok: true });
 });
 
-// ---- 인기글 임계값 조회/수정 (스태프 포탈에서 사용) ----
+// ---- 인기글/활발한 토픽 임계값 조회/수정 (스태프 포탈에서 사용) ----
 // app_settings 테이블 기반. 키별 정수값 — 코드 배포 없이 운영 중 조정 가능.
-const POPULAR_KEYS = ['popular_min_comments', 'popular_min_reactions', 'popular_window_days'] as const;
-type PopularKey = typeof POPULAR_KEYS[number];
+//   인기글 (popular_*)     : 누적 — 기준 만족하면 영구 노출
+//   활발한 토픽 (active_topic_*) : 단기 — windowDays 이내 + 기준 만족, 홈 hot 섹션 노출
+const POPULAR_KEYS = ['popular_min_comments', 'popular_min_reactions'] as const;
+const ACTIVE_TOPIC_KEYS = ['active_topic_min_comments', 'active_topic_min_reactions', 'active_topic_window_days'] as const;
 
-admin.get('/settings/popular', requireAdmin, async (c) => {
-  const { results } = await c.env.DOLDAM_DB
-    .prepare(`SELECT key, value FROM app_settings WHERE key IN ('popular_min_comments','popular_min_reactions','popular_window_days')`)
-    .all<{ key: string; value: string }>();
-  const map = Object.fromEntries(results.map((r) => [r.key, Number(r.value)]));
-  return c.json({
-    popular_min_comments:  map.popular_min_comments  ?? 10,
-    popular_min_reactions: map.popular_min_reactions ?? 20,
-    popular_window_days:   map.popular_window_days   ?? 7,
-  });
-});
+async function readSettings<K extends readonly string[]>(
+  env: Env, keys: K, defaults: Record<K[number], number>,
+): Promise<Record<K[number], number>> {
+  const placeholders = keys.map(() => '?').join(',');
+  const { results } = await env.DOLDAM_DB
+    .prepare(`SELECT key, value FROM app_settings WHERE key IN (${placeholders})`)
+    .bind(...keys).all<{ key: string; value: string }>();
+  const map = Object.fromEntries(results.map((r) => [r.key, Number(r.value)])) as Record<string, number>;
+  const out = { ...defaults };
+  for (const k of keys) if (Number.isFinite(map[k])) (out as Record<string, number>)[k] = map[k];
+  return out;
+}
 
-admin.patch('/settings/popular', requireAdmin, async (c) => {
-  const body = await c.req.json<Partial<Record<PopularKey, number>>>();
-  const updates: Array<[PopularKey, number]> = [];
-  for (const key of POPULAR_KEYS) {
+async function writeSettings(env: Env, allowedKeys: readonly string[], body: Record<string, unknown>): Promise<number> {
+  const updates: Array<[string, number]> = [];
+  for (const key of allowedKeys) {
     const v = body[key];
     if (v === undefined) continue;
-    if (!Number.isFinite(v) || v < 1 || v > 10000) return c.json({ error: 'invalid_value', key }, 400);
-    updates.push([key, Math.floor(v)]);
+    const n = Number(v);
+    if (!Number.isFinite(n) || n < 1 || n > 10000) throw new Error(`invalid_value:${key}`);
+    updates.push([key, Math.floor(n)]);
   }
-  if (updates.length === 0) return c.json({ error: 'no_changes' }, 400);
+  if (updates.length === 0) return 0;
   const now = Date.now();
   for (const [key, value] of updates) {
-    await c.env.DOLDAM_DB
+    await env.DOLDAM_DB
       .prepare(`INSERT INTO app_settings (key, value, updated_at) VALUES (?, ?, ?)
                 ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`)
       .bind(key, String(value), now).run();
   }
-  return c.json({ ok: true, updated: updates.length });
+  return updates.length;
+}
+
+admin.get('/settings/popular', requireAdmin, async (c) => {
+  const s = await readSettings(c.env, POPULAR_KEYS, { popular_min_comments: 10, popular_min_reactions: 20 });
+  return c.json(s);
+});
+
+admin.patch('/settings/popular', requireAdmin, async (c) => {
+  const body = await c.req.json<Record<string, unknown>>();
+  try {
+    const updated = await writeSettings(c.env, POPULAR_KEYS, body);
+    if (updated === 0) return c.json({ error: 'no_changes' }, 400);
+    return c.json({ ok: true, updated });
+  } catch (e) {
+    return c.json({ error: (e as Error).message }, 400);
+  }
+});
+
+admin.get('/settings/active-topic', requireAdmin, async (c) => {
+  const s = await readSettings(c.env, ACTIVE_TOPIC_KEYS, {
+    active_topic_min_comments: 3, active_topic_min_reactions: 5, active_topic_window_days: 3,
+  });
+  return c.json(s);
+});
+
+admin.patch('/settings/active-topic', requireAdmin, async (c) => {
+  const body = await c.req.json<Record<string, unknown>>();
+  try {
+    const updated = await writeSettings(c.env, ACTIVE_TOPIC_KEYS, body);
+    if (updated === 0) return c.json({ error: 'no_changes' }, 400);
+    return c.json({ ok: true, updated });
+  } catch (e) {
+    return c.json({ error: (e as Error).message }, 400);
+  }
 });
 
 // ---- 테스트 푸시 알림 전송 ----

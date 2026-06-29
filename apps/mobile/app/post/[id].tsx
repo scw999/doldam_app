@@ -415,13 +415,13 @@ export default function PostDetail() {
             for (const c of comments) {
               if (c.parent_id) (byParent[c.parent_id] ??= []).push(c);
             }
-            const PREVIEW = 2;
+            const PREVIEW = 3;
 
             return topLevel.map(parent => {
               const replies = byParent[parent.id] ?? [];
               const isExpanded = expandedParents.has(parent.id);
-              // 최신 2개를 보여주고 나머지는 "이전 답글 더 보기"로 접기
-              const visible = replies.length > PREVIEW && !isExpanded ? replies.slice(-PREVIEW) : replies;
+              // 처음 3개(오래된 순)를 보여주고 나머지는 아래쪽 "다음 답글 더 보기"로 접기
+              const visible = replies.length > PREVIEW && !isExpanded ? replies.slice(0, PREVIEW) : replies;
               const hiddenCount = replies.length - visible.length;
               const pMine = parent.user_id === myUserId;
               const isOP = parent.user_id === post!.user_id;
@@ -538,12 +538,6 @@ export default function PostDetail() {
                             ) : (
                               <Text style={{ fontSize: 13, color: colors.text, lineHeight: 20 }}>{reply.content}</Text>
                             )}
-                            {!rEditing && (
-                              <Pressable onPress={() => setReplyTo({ id: parent.id, nickname: parent.nickname?.split(' ')[0] ?? '익명' })}
-                                style={{ marginTop: 6, alignSelf: 'flex-start' }}>
-                                <Text style={{ fontSize: 11, color: colors.textSub }}>↩ 답글</Text>
-                              </Pressable>
-                            )}
                           </View>
                         );
                       })}
@@ -552,7 +546,7 @@ export default function PostDetail() {
                           onPress={() => setExpandedParents(prev => new Set([...prev, parent.id]))}
                           style={{ padding: 10, alignItems: 'center', backgroundColor: colors.tag, borderRadius: 10 }}>
                           <Text style={{ fontSize: 12, color: colors.primary, fontWeight: '600' }}>
-                            ↑ 이전 답글 {hiddenCount}개 더 보기
+                            ↓ 다음 답글 {hiddenCount}개 더 보기
                           </Text>
                         </Pressable>
                       )}

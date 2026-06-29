@@ -69,6 +69,8 @@ export function patchBoardPost(postId: string, patch: { like_count?: number }) {
   }
 }
 
+type ListResp = { items: Post[]; nextCursor: number | null };
+
 export default function BoardScreen() {
   const hasUnread = useUnreadCount();
   const [cat, setCat] = useState('free');
@@ -76,6 +78,8 @@ export default function BoardScreen() {
   const [items, setItems] = useState<Post[]>([]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [nextCursor, setNextCursor] = useState<number | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   const load = useCallback(async (c: string) => {
     const cached = postCache[c];
@@ -85,18 +89,34 @@ export default function BoardScreen() {
     } else {
       setLoading(true);
     }
-    // 항상 최신 데이터로 갱신
     try {
       const [posts, pts] = await Promise.all([
-        api.get<{ items: Post[] }>(`/posts?category=${c}`, { cacheTtl: 0 }),
+        api.get<ListResp>(`/posts?category=${c}&limit=20`, { cacheTtl: 0 }),
         api.get<{ balance: number }>('/points/balance', { cacheTtl: 0 }),
       ]);
       postCache[c] = { items: posts.items, ts: Date.now() };
       setItems(posts.items);
+      setNextCursor(posts.nextCursor);
       setBalance(pts.balance);
     } catch (e) { console.warn('board load', e); }
     finally { setLoading(false); }
   }, []);
+
+  // 무한 스크롤: 추가 페이지 로드 (cursor 기반 — popular은 offset, 그 외는 created_at)
+  const loadMore = useCallback(async () => {
+    if (loadingMore || nextCursor === null) return;
+    setLoadingMore(true);
+    try {
+      const resp = await api.get<ListResp>(`/posts?category=${cat}&limit=20&cursor=${nextCursor}`, { cacheTtl: 0 });
+      // 중복 방지 + 동시성 보호: 카테고리 바뀌었으면 결과 무시
+      setItems((prev) => {
+        const ids = new Set(prev.map((p) => p.id));
+        return [...prev, ...resp.items.filter((p) => !ids.has(p.id))];
+      });
+      setNextCursor(resp.nextCursor);
+    } catch (e) { console.warn('board loadMore', e); }
+    finally { setLoadingMore(false); }
+  }, [cat, nextCursor, loadingMore]);
 
   useFocusEffect(useCallback(() => {
     load(cat);
@@ -147,27 +167,32 @@ export default function BoardScreen() {
                 {cat === 'popular' ? '아직 인기 글이 없어요. 다른 글에 반응을 남겨주세요!' : '아직 글이 없어요. 첫 글을 남겨보세요.'}
               </Text>
         }
+        onEndReached={loadMore}
+        onEndReachedThreshold={0.5}
         ListFooterComponent={
-          <View style={styles.matchBanner}>
-            <Text style={{ fontSize: 24 }}>🫂</Text>
-            <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text, letterSpacing: -0.2 }}>
-                이 주제로 대화하고 싶다면?
-              </Text>
-              <Text style={{ fontSize: 11, color: colors.textSub, marginTop: 2 }}>
-                4명 소그룹 · 3일 후 자동 종료
-              </Text>
+          <View>
+            {loadingMore && <ActivityIndicator style={{ marginVertical: spacing.lg }} />}
+            <View style={styles.matchBanner}>
+              <Text style={{ fontSize: 24 }}>🫂</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text, letterSpacing: -0.2 }}>
+                  이 주제로 대화하고 싶다면?
+                </Text>
+                <Text style={{ fontSize: 11, color: colors.textSub, marginTop: 2 }}>
+                  4명 소그룹 · 3일 후 자동 종료
+                </Text>
+              </View>
+              <Pressable
+                onPress={() => router.push('/(tabs)/chat')}
+                style={{
+                  backgroundColor: colors.primary,
+                  paddingHorizontal: 14, paddingVertical: 8,
+                  borderRadius: radius.full,
+                }}
+              >
+                <Text style={{ color: '#fff', fontSize: 12, fontWeight: '600' }}>참여</Text>
+              </Pressable>
             </View>
-            <Pressable
-              onPress={() => router.push('/(tabs)/chat')}
-              style={{
-                backgroundColor: colors.primary,
-                paddingHorizontal: 14, paddingVertical: 8,
-                borderRadius: radius.full,
-              }}
-            >
-              <Text style={{ color: '#fff', fontSize: 12, fontWeight: '600' }}>참여</Text>
-            </Pressable>
           </View>
         }
         renderItem={({ item: p }) => {

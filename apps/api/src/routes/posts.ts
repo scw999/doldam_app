@@ -29,15 +29,28 @@ async function getReqGender(req: Request, env: Env): Promise<'M' | 'F' | null> {
 }
 
 // 인기글 임계값 — app_settings에서 읽어오되 누락 시 안전 기본값으로 폴백
-async function getPopularSettings(env: Env): Promise<{ minComments: number; minReactions: number; windowDays: number }> {
+// 인기글은 기간 제한 없이 누적: 기준 만족하면 영구 노출
+async function getPopularSettings(env: Env): Promise<{ minComments: number; minReactions: number }> {
   const rows = await env.DOLDAM_DB
-    .prepare("SELECT key, value FROM app_settings WHERE key IN ('popular_min_comments','popular_min_reactions','popular_window_days')")
+    .prepare("SELECT key, value FROM app_settings WHERE key IN ('popular_min_comments','popular_min_reactions')")
     .all<{ key: string; value: string }>();
   const map = new Map(rows.results.map((r) => [r.key, Number(r.value)] as const));
   return {
     minComments:  Number.isFinite(map.get('popular_min_comments'))  ? map.get('popular_min_comments')!  : 10,
     minReactions: Number.isFinite(map.get('popular_min_reactions')) ? map.get('popular_min_reactions')! : 20,
-    windowDays:   Number.isFinite(map.get('popular_window_days'))   ? map.get('popular_window_days')!   : 7,
+  };
+}
+
+// "지금 가장 많이 나누는 이야기" 임계값 + 유효 기간 — 홈 화면 hot 정렬에 사용
+async function getActiveTopicSettings(env: Env): Promise<{ minComments: number; minReactions: number; windowDays: number }> {
+  const rows = await env.DOLDAM_DB
+    .prepare("SELECT key, value FROM app_settings WHERE key IN ('active_topic_min_comments','active_topic_min_reactions','active_topic_window_days')")
+    .all<{ key: string; value: string }>();
+  const map = new Map(rows.results.map((r) => [r.key, Number(r.value)] as const));
+  return {
+    minComments:  Number.isFinite(map.get('active_topic_min_comments'))  ? map.get('active_topic_min_comments')!  : 3,
+    minReactions: Number.isFinite(map.get('active_topic_min_reactions')) ? map.get('active_topic_min_reactions')! : 5,
+    windowDays:   Number.isFinite(map.get('active_topic_window_days'))   ? map.get('active_topic_window_days')!   : 3,
   };
 }
 
@@ -61,41 +74,49 @@ posts.get('/', async (c) => {
                FROM posts p JOIN users u ON u.id = p.user_id`;
 
   if (popular) {
-    // 인기글: app_settings 임계값 기반, 최근 N일 글만, 성별 전용 카테고리는 보안상 제외
-    // 반응 합계는 like_count(4종 반응 전체 합)를 사용 — 별도 비정규화 불필요
-    const { minComments, minReactions, windowDays } = await getPopularSettings(c.env);
-    const since = Date.now() - windowDays * 24 * 60 * 60 * 1000;
+    // 인기글: app_settings 임계값 기반, 기간 제한 없이 누적, 성별 전용 카테고리는 보안상 제외
+    // 반응 합계는 like_count(4종 반응 전체 합)를 사용. 점수 정렬이라 offset 기반 페이지네이션.
+    const { minComments, minReactions } = await getPopularSettings(c.env);
+    const offset = Number(c.req.query('cursor') ?? 0);
     const sql =
       `${SEL}
        WHERE p.deleted_at IS NULL
-         AND p.created_at >= ?
          AND p.report_count < ?
          AND p.category NOT IN ('men_only','women_only')
          AND (p.comment_count >= ? OR p.like_count >= ?)
          ${blockClause}
        ORDER BY (p.like_count + p.comment_count) DESC, p.created_at DESC
-       LIMIT ?`;
+       LIMIT ? OFFSET ?`;
     const { results } = await c.env.DOLDAM_DB
       .prepare(sql)
-      .bind(since, REPORT_HIDE_THRESHOLD, minComments, minReactions, ...blockBinds, limit)
+      .bind(REPORT_HIDE_THRESHOLD, minComments, minReactions, ...blockBinds, limit, offset)
       .all<{ created_at: number }>();
-    // 인기글은 점수 기반 정렬이라 커서 페이지네이션이 의미 없어 nextCursor=null
+    const nextCursor = results.length === limit ? offset + limit : null;
+    return c.json({ items: results, nextCursor });
+  }
+
+  if (hot) {
+    // "지금 가장 많이 나누는 이야기" — app_settings 임계값 + 유효 기간 적용
+    const { minComments, minReactions, windowDays } = await getActiveTopicSettings(c.env);
+    const since = Date.now() - windowDays * 24 * 60 * 60 * 1000;
+    const sql =
+      `${SEL}
+       WHERE ${all ? '' : 'p.category = ? AND '}p.deleted_at IS NULL
+         AND p.created_at >= ?
+         AND p.report_count < ?
+         AND (p.comment_count >= ? OR p.like_count >= ?)
+         ${blockClause}
+       ORDER BY (p.like_count + p.comment_count) DESC, p.created_at DESC
+       LIMIT ?`;
+    const binds = all
+      ? [since, REPORT_HIDE_THRESHOLD, minComments, minReactions, ...blockBinds, limit]
+      : [categoryParam, since, REPORT_HIDE_THRESHOLD, minComments, minReactions, ...blockBinds, limit];
+    const { results } = await c.env.DOLDAM_DB.prepare(sql).bind(...binds).all<{ created_at: number }>();
     return c.json({ items: results, nextCursor: null });
   }
 
-  const ORDER = hot
-    ? 'ORDER BY (p.like_count + p.comment_count) DESC, p.created_at DESC'
-    : 'ORDER BY p.created_at DESC';
-
-  const { results } = hot
-    ? await c.env.DOLDAM_DB
-        .prepare(
-          `${SEL} WHERE ${all ? '' : 'p.category = ? AND '}p.deleted_at IS NULL AND p.report_count < ?${blockClause}
-           ${ORDER} LIMIT ?`
-        )
-        .bind(...(all ? [REPORT_HIDE_THRESHOLD, ...blockBinds, limit] : [categoryParam, REPORT_HIDE_THRESHOLD, ...blockBinds, limit]))
-        .all<{ created_at: number }>()
-    : all
+  const ORDER = 'ORDER BY p.created_at DESC';
+  const { results } = all
     ? await c.env.DOLDAM_DB
         .prepare(`${SEL} WHERE p.deleted_at IS NULL AND p.created_at < ? AND p.report_count < ?${blockClause} ${ORDER} LIMIT ?`)
         .bind(cursor, REPORT_HIDE_THRESHOLD, ...blockBinds, limit)
@@ -105,7 +126,7 @@ posts.get('/', async (c) => {
         .bind(categoryParam, cursor, REPORT_HIDE_THRESHOLD, ...blockBinds, limit)
         .all<{ created_at: number }>();
 
-  const nextCursor = (!hot && results.length === limit) ? results[results.length - 1].created_at : null;
+  const nextCursor = results.length === limit ? results[results.length - 1].created_at : null;
   return c.json({ items: results, nextCursor });
 });
 
@@ -356,6 +377,15 @@ posts.post('/:id/comments', requireAuth, moderate, async (c) => {
     .bind(user.id).first<{ muted_until: number | null }>();
   if (muteRow2?.muted_until && muteRow2.muted_until > Date.now()) {
     return c.json({ error: 'muted', mutedUntil: muteRow2.muted_until }, 403);
+  }
+
+  // 평면 댓글 정책: 대댓글에는 다시 답글을 달 수 없음 (parent_id가 또 parent를 가진 경우 거부)
+  if (parentId) {
+    const parentRow = await c.env.DOLDAM_DB
+      .prepare('SELECT parent_id FROM comments WHERE id = ? AND post_id = ? AND deleted_at IS NULL')
+      .bind(parentId, postId).first<{ parent_id: string | null }>();
+    if (!parentRow) return c.json({ error: 'parent_not_found' }, 404);
+    if (parentRow.parent_id) return c.json({ error: 'reply_to_reply_forbidden' }, 400);
   }
 
   const id = crypto.randomUUID();
