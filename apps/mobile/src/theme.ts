@@ -82,22 +82,22 @@ export const shadow = {
   },
 } as const;
 
-// 폰트 — Noto Serif KR은 @expo-google-fonts/noto-serif-kr로 런타임 로드
-// 기본값은 fallback (로드 실패/진행 중에도 레이아웃 안 깨짐)
+// 폰트 — Noto Sans KR (OFL 라이선스, 돋움 계열 고딕)
+// @expo-google-fonts/noto-sans-kr로 런타임 로드. 기본값은 fallback.
 export const fonts = {
-  title: 'NotoSerifKR_600SemiBold',
-  titleFallback: 'serif',
-  body: 'Pretendard-Regular',
+  title: 'NotoSansKR_700Bold',
+  titleFallback: 'sans-serif',
+  body: 'NotoSansKR_400Regular',
   bodyFallback: 'System',
 } as const;
 
 export const typography = {
   // h1: 홈 인사말, 상세 제목
-  h1: { fontSize: 22, fontFamily: fonts.title, fontWeight: '600' as const, letterSpacing: -0.6 },
+  h1: { fontSize: 22, fontFamily: fonts.title, fontWeight: '700' as const, letterSpacing: -0.6 },
   // h2: 섹션 헤더
-  h2: { fontSize: 17, fontFamily: fonts.title, fontWeight: '600' as const, letterSpacing: -0.4 },
+  h2: { fontSize: 17, fontFamily: 'NotoSansKR_700Bold', fontWeight: '700' as const, letterSpacing: -0.4 },
   // h3: 카드 제목
-  h3: { fontSize: 15, fontFamily: fonts.title, fontWeight: '600' as const, letterSpacing: -0.3 },
+  h3: { fontSize: 15, fontFamily: 'NotoSansKR_700Bold', fontWeight: '700' as const, letterSpacing: -0.3 },
   // 본문
   body: { fontSize: 14, fontFamily: fonts.body, letterSpacing: -0.2, lineHeight: 22 },
   bodyLg: { fontSize: 15, fontFamily: fonts.body, letterSpacing: -0.2, lineHeight: 24 },
@@ -105,7 +105,7 @@ export const typography = {
   caption: { fontSize: 12, fontFamily: fonts.body, letterSpacing: -0.15, color: colors.textSub },
   meta: { fontSize: 11, fontFamily: fonts.body, letterSpacing: -0.1, color: colors.textLight },
   // 숫자/강조
-  number: { fontSize: 20, fontFamily: fonts.body, fontWeight: '700' as const, letterSpacing: -0.5 },
+  number: { fontSize: 20, fontFamily: 'NotoSansKR_700Bold', fontWeight: '700' as const, letterSpacing: -0.5 },
 } as const;
 
 // 공용 theme object (디자인 폴더 규약에 맞춤)

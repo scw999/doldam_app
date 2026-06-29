@@ -356,6 +356,43 @@ admin.post('/poll-eas', requireAdmin, async (c) => {
   return c.json({ ok: true });
 });
 
+// ---- 인기글 임계값 조회/수정 (스태프 포탈에서 사용) ----
+// app_settings 테이블 기반. 키별 정수값 — 코드 배포 없이 운영 중 조정 가능.
+const POPULAR_KEYS = ['popular_min_comments', 'popular_min_reactions', 'popular_window_days'] as const;
+type PopularKey = typeof POPULAR_KEYS[number];
+
+admin.get('/settings/popular', requireAdmin, async (c) => {
+  const { results } = await c.env.DOLDAM_DB
+    .prepare(`SELECT key, value FROM app_settings WHERE key IN ('popular_min_comments','popular_min_reactions','popular_window_days')`)
+    .all<{ key: string; value: string }>();
+  const map = Object.fromEntries(results.map((r) => [r.key, Number(r.value)]));
+  return c.json({
+    popular_min_comments:  map.popular_min_comments  ?? 10,
+    popular_min_reactions: map.popular_min_reactions ?? 20,
+    popular_window_days:   map.popular_window_days   ?? 7,
+  });
+});
+
+admin.patch('/settings/popular', requireAdmin, async (c) => {
+  const body = await c.req.json<Partial<Record<PopularKey, number>>>();
+  const updates: Array<[PopularKey, number]> = [];
+  for (const key of POPULAR_KEYS) {
+    const v = body[key];
+    if (v === undefined) continue;
+    if (!Number.isFinite(v) || v < 1 || v > 10000) return c.json({ error: 'invalid_value', key }, 400);
+    updates.push([key, Math.floor(v)]);
+  }
+  if (updates.length === 0) return c.json({ error: 'no_changes' }, 400);
+  const now = Date.now();
+  for (const [key, value] of updates) {
+    await c.env.DOLDAM_DB
+      .prepare(`INSERT INTO app_settings (key, value, updated_at) VALUES (?, ?, ?)
+                ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`)
+      .bind(key, String(value), now).run();
+  }
+  return c.json({ ok: true, updated: updates.length });
+});
+
 // ---- 테스트 푸시 알림 전송 ----
 admin.post('/push-test', requireAdmin, async (c) => {
   const { userId, title = '테스트 알림', body = '돌담 푸시 알림이 작동하고 있어요!' } =

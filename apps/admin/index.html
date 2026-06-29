@@ -175,6 +175,28 @@
         <input id="pushTestBody" placeholder="알림 내용" value="돌담 푸시 알림 테스트입니다!" />
         <button id="pushTestBtn" class="ghost" style="margin-top:6px">🔔 테스트 발송</button>
       </div>
+      <div class="card" style="margin-top:16px">
+        <p class="section-title">🔥 인기글 게시판 기준</p>
+        <div class="tip">
+          최근 N일 글 중에서 <b>댓글 수 ≥ 최소 댓글</b> 또는 <b>(공감 + 웃겨요) 합산 ≥ 최소 반응</b> 조건을 만족하면 인기글에 노출됩니다. 성별 전용 게시판(남성방·여성방)은 자동 제외됩니다.
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px">
+          <label style="display:block">
+            <span style="font-size:12px;color:#8C7B6B;display:block;margin-bottom:4px">최소 댓글 수</span>
+            <input id="popularMinComments" type="number" min="1" max="10000" value="10" style="margin-bottom:0" />
+          </label>
+          <label style="display:block">
+            <span style="font-size:12px;color:#8C7B6B;display:block;margin-bottom:4px">최소 반응 수 (공감+웃겨요)</span>
+            <input id="popularMinReactions" type="number" min="1" max="10000" value="20" style="margin-bottom:0" />
+          </label>
+          <label style="display:block">
+            <span style="font-size:12px;color:#8C7B6B;display:block;margin-bottom:4px">인기 유효 기간 (일)</span>
+            <input id="popularWindowDays" type="number" min="1" max="365" value="7" style="margin-bottom:0" />
+          </label>
+        </div>
+        <button id="popularSaveBtn">저장</button>
+        <div id="popularResult" style="font-size:12px;color:#5BAF7B;margin-top:8px"></div>
+      </div>
     </div>
 
     <!-- 유저 -->
@@ -270,6 +292,7 @@ document.querySelectorAll('.tab').forEach(function(tab){
     if(name==='overview') loadOverview();
     if(name==='users') loadUsers(0,true);
     if(name==='rooms') loadRooms();
+    if(name==='tools') loadPopularSettings();
   });
 });
 
@@ -282,6 +305,7 @@ document.getElementById('refreshRooms').addEventListener('click',loadRooms);
 document.getElementById('roomStatus').addEventListener('change',loadRooms);
 document.getElementById('broadcastBtn').addEventListener('click',sendBroadcast);
 document.getElementById('pushTestBtn').addEventListener('click',sendPushTest);
+document.getElementById('popularSaveBtn').addEventListener('click',savePopularSettings);
 
 // ---- 이미지 모달 ----
 document.getElementById('imgModalClose').addEventListener('click',function(){
@@ -816,6 +840,38 @@ async function sendBroadcast(){
   }catch(e){
     resultEl.textContent='실패: '+e.message;
     resultEl.style.color='#E07B6B';
+    toast('실패: '+e.message);
+  }
+}
+
+// ---- 인기글 임계값 ----
+async function loadPopularSettings(){
+  try{
+    const s=await apiFetch('/admin/settings/popular');
+    document.getElementById('popularMinComments').value=s.popular_min_comments;
+    document.getElementById('popularMinReactions').value=s.popular_min_reactions;
+    document.getElementById('popularWindowDays').value=s.popular_window_days;
+  }catch(e){ /* 기본값 그대로 두고 무시 */ }
+}
+async function savePopularSettings(){
+  const minComments=Number(document.getElementById('popularMinComments').value);
+  const minReactions=Number(document.getElementById('popularMinReactions').value);
+  const windowDays=Number(document.getElementById('popularWindowDays').value);
+  const resultEl=document.getElementById('popularResult');
+  if(![minComments,minReactions,windowDays].every(v=>Number.isFinite(v)&&v>=1)){
+    resultEl.textContent='모든 값은 1 이상 정수여야 합니다.'; resultEl.style.color='#E07B6B'; return;
+  }
+  resultEl.textContent='저장 중…'; resultEl.style.color='#C4956A';
+  try{
+    await apiFetch('/admin/settings/popular',{method:'PATCH',body:JSON.stringify({
+      popular_min_comments:minComments,
+      popular_min_reactions:minReactions,
+      popular_window_days:windowDays,
+    })});
+    resultEl.textContent='✓ 저장 완료'; resultEl.style.color='#5BAF7B';
+    toast('인기글 기준 저장 완료');
+  }catch(e){
+    resultEl.textContent='실패: '+e.message; resultEl.style.color='#E07B6B';
     toast('실패: '+e.message);
   }
 }

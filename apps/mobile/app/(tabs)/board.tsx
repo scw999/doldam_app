@@ -34,6 +34,7 @@ async function getMyGender(): Promise<'M' | 'F' | null> {
 
 const CATEGORIES = [
   { id: 'all',        label: '전체',     color: '#8C7B6B', genderOnly: null },
+  { id: 'popular',    label: '🔥 인기글', color: '#E07B6B', genderOnly: null },
   { id: 'free',       label: '자유톡',   color: '#6BAF7B', genderOnly: null },
   { id: 'heart',      label: '속마음',   color: '#D4728C', genderOnly: null },
   { id: 'kids',       label: '양육일기', color: '#5B8FC9', genderOnly: null },
@@ -142,7 +143,9 @@ export default function BoardScreen() {
         ListEmptyComponent={
           loading
             ? <ActivityIndicator style={{ marginTop: spacing.xxl }} />
-            : <Text style={styles.empty}>아직 글이 없어요. 첫 글을 남겨보세요.</Text>
+            : <Text style={styles.empty}>
+                {cat === 'popular' ? '아직 인기 글이 없어요. 다른 글에 반응을 남겨주세요!' : '아직 글이 없어요. 첫 글을 남겨보세요.'}
+              </Text>
         }
         ListFooterComponent={
           <View style={styles.matchBanner}>
@@ -176,7 +179,7 @@ export default function BoardScreen() {
                 <View style={{ flex: 1 }} />
                 <Text style={{ fontSize: 11, color: colors.textLight }}>{timeAgo(p.created_at)}</Text>
               </View>
-              <Text style={[typography.h2, { color: colors.text, marginBottom: 6, lineHeight: 23 }]} numberOfLines={2}>
+              <Text style={[typography.h2, { fontSize: 15, color: colors.text, marginBottom: 6, lineHeight: 21 }]} numberOfLines={2}>
                 {p.title}
               </Text>
               <Text style={{ fontSize: 13, color: colors.textSub, lineHeight: 21, marginBottom: 12 }} numberOfLines={2}>
@@ -196,13 +199,15 @@ export default function BoardScreen() {
         }}
       />
 
-      <Pressable
-        onPress={() => router.push({ pathname: '/post/new', params: { category: cat === 'all' ? 'free' : cat } })}
-        style={styles.fab}
-      >
-        <Text style={{ color: '#fff', fontSize: 22, lineHeight: 26 }}>✏️</Text>
-        <Text style={{ color: '#fff', fontSize: 11, fontWeight: '700', letterSpacing: -0.3 }}>글쓰기</Text>
-      </Pressable>
+      {cat !== 'popular' && (
+        <Pressable
+          onPress={() => router.push({ pathname: '/post/new', params: { category: cat === 'all' ? 'free' : cat } })}
+          style={styles.fab}
+        >
+          <Text style={{ color: '#fff', fontSize: 22, lineHeight: 26 }}>✏️</Text>
+          <Text style={{ color: '#fff', fontSize: 11, fontWeight: '700', letterSpacing: -0.3 }}>글쓰기</Text>
+        </Pressable>
+      )}
     </View>
   );
 }

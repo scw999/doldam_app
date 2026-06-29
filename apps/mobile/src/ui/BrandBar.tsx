@@ -34,7 +34,7 @@ export function BrandBar({ points, hasNewNotification = false }: Props) {
           </LinearGradient>
           <Text style={{
             fontSize: 18, fontWeight: '700', color: colors.text,
-            letterSpacing: -0.5, fontFamily: 'NotoSerifKR_700Bold',
+            letterSpacing: -0.5, fontFamily: 'NotoSansKR_700Bold',
           }}>돌담</Text>
         </View>
 

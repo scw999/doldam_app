@@ -36,19 +36,29 @@ CREATE INDEX IF NOT EXISTS idx_av_user ON auth_verifications(user_id);
 
 -- ===== 게시판 =====
 CREATE TABLE IF NOT EXISTS posts (
-  id            TEXT PRIMARY KEY,
-  user_id       TEXT NOT NULL,
-  title         TEXT NOT NULL,
-  content       TEXT NOT NULL,
-  category      TEXT NOT NULL,               -- free/dating/kids/money/legal/men_only/women_only
-  view_count    INTEGER NOT NULL DEFAULT 0,
-  like_count    INTEGER NOT NULL DEFAULT 0,
-  comment_count INTEGER NOT NULL DEFAULT 0,
-  created_at    INTEGER NOT NULL,
-  deleted_at    INTEGER
+  id             TEXT PRIMARY KEY,
+  user_id        TEXT NOT NULL,
+  title          TEXT NOT NULL,
+  content        TEXT NOT NULL,
+  category       TEXT NOT NULL,              -- free/dating/kids/money/legal/men_only/women_only
+  view_count     INTEGER NOT NULL DEFAULT 0,
+  like_count     INTEGER NOT NULL DEFAULT 0,
+  empathy_count  INTEGER NOT NULL DEFAULT 0, -- reaction=0(공감돼요) 비정규화
+  funny_count    INTEGER NOT NULL DEFAULT 0, -- reaction=3(웃겨요) 비정규화
+  comment_count  INTEGER NOT NULL DEFAULT 0,
+  created_at     INTEGER NOT NULL,
+  deleted_at     INTEGER
 );
 CREATE INDEX IF NOT EXISTS idx_posts_cat_created ON posts(category, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_posts_created ON posts(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_posts_popular ON posts(created_at DESC) WHERE deleted_at IS NULL;
+
+-- 스태프 포탈에서 조절 가능한 동적 설정값 (인기글 임계값 등)
+CREATE TABLE IF NOT EXISTS app_settings (
+  key         TEXT PRIMARY KEY,
+  value       TEXT NOT NULL,
+  updated_at  INTEGER NOT NULL
+);
 
 CREATE TABLE IF NOT EXISTS comments (
   id            TEXT PRIMARY KEY,

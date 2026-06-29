@@ -3,7 +3,12 @@ import { Platform } from 'react-native';
 import { Stack, router, useSegments, useRootNavigationState } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { useFonts, NotoSerifKR_600SemiBold, NotoSerifKR_700Bold } from '@expo-google-fonts/noto-serif-kr';
+import {
+  useFonts,
+  NotoSansKR_400Regular,
+  NotoSansKR_500Medium,
+  NotoSansKR_700Bold,
+} from '@expo-google-fonts/noto-sans-kr';
 import * as Notifications from 'expo-notifications';
 import { useAuth } from '@/store/auth';
 import { api } from '@/api';
@@ -37,12 +42,9 @@ export default function RootLayout() {
   const hydrate = useAuth((s) => s.hydrate);
   const token = useAuth((s) => s.token);
   const [fontsLoaded] = useFonts({
-    NotoSerifKR_600SemiBold,
-    NotoSerifKR_700Bold,
-    'Pretendard-Regular': require('../assets/fonts/Pretendard-Regular.otf'),
-    'Pretendard-Medium': require('../assets/fonts/Pretendard-Medium.otf'),
-    'Pretendard-SemiBold': require('../assets/fonts/Pretendard-SemiBold.otf'),
-    'Pretendard-Bold': require('../assets/fonts/Pretendard-Bold.otf'),
+    NotoSansKR_400Regular,
+    NotoSansKR_500Medium,
+    NotoSansKR_700Bold,
   });
 
   useEffect(() => { hydrate(); }, [hydrate]);
@@ -110,7 +112,7 @@ export default function RootLayout() {
         screenOptions={{
           headerStyle: { backgroundColor: colors.bg },
           headerTintColor: colors.text,
-          headerTitleStyle: { fontFamily: 'NotoSerifKR_600SemiBold' },
+          headerTitleStyle: { fontFamily: 'NotoSansKR_700Bold' },
           contentStyle: { backgroundColor: colors.bg },
         }}
       >

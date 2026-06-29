@@ -420,7 +420,8 @@ export default function PostDetail() {
             return topLevel.map(parent => {
               const replies = byParent[parent.id] ?? [];
               const isExpanded = expandedParents.has(parent.id);
-              const visible = replies.length > PREVIEW && !isExpanded ? replies.slice(0, PREVIEW) : replies;
+              // 최신 2개를 보여주고 나머지는 "이전 답글 더 보기"로 접기
+              const visible = replies.length > PREVIEW && !isExpanded ? replies.slice(-PREVIEW) : replies;
               const hiddenCount = replies.length - visible.length;
               const pMine = parent.user_id === myUserId;
               const isOP = parent.user_id === post!.user_id;
@@ -499,7 +500,6 @@ export default function PostDetail() {
                             borderLeftWidth: 3, borderLeftColor: colors.primary + '50',
                             borderRadius: 12,
                           }}>
-                            <Text style={{ fontSize: 9, color: colors.textLight, marginBottom: 4 }}>↳ 답글</Text>
                             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 5 }}>
                               <Avatar gender={reply.gender} size={20} />
                               <Text style={{ fontSize: 11, fontWeight: '600', color: colors.text }}>
@@ -552,7 +552,7 @@ export default function PostDetail() {
                           onPress={() => setExpandedParents(prev => new Set([...prev, parent.id]))}
                           style={{ padding: 10, alignItems: 'center', backgroundColor: colors.tag, borderRadius: 10 }}>
                           <Text style={{ fontSize: 12, color: colors.primary, fontWeight: '600' }}>
-                            ↓ 대댓글 {hiddenCount}개 더 보기
+                            ↑ 이전 답글 {hiddenCount}개 더 보기
                           </Text>
                         </Pressable>
                       )}
