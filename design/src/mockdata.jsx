@@ -33,7 +33,7 @@ const CATEGORIES = [
   { id: 'all', label: '전체', color: '#8C7B6B' },
   { id: 'free', label: '자유톡', color: '#6BAF7B' },
   { id: 'heart', label: '속마음', color: '#D4728C' },
-  { id: 'kids', label: '양육일기', color: '#5B8FC9' },
+  { id: 'kids', label: '자녀이야기', color: '#5B8FC9' },
   { id: 'love', label: '연애/관계', color: '#C4956A' },
   { id: 'law', label: '법률/돈', color: '#8C7B6B' },
   { id: 'men', label: '남성방', color: '#5B8FC9' },
@@ -64,7 +64,7 @@ const BOARD_POSTS = [
     comments: 18, scrap: true,
   },
   {
-    id: 3, cat: 'kids', catLabel: '양육일기', catColor: '#5B8FC9',
+    id: 3, cat: 'kids', catLabel: '자녀이야기', catColor: '#5B8FC9',
     nick: '별빛 나무 #3156', gender: 'F', age: '30대 초반', time: '2시간 전',
     title: "아이가 '아빠는 왜 안 와?' 라고 물을 때",
     body: '매번 면접교섭일 끝나고 이 질문 들으면 가슴이 무너져요. 일곱 살 딸인데 이제 눈치도 보는 것 같고... 어떻게 대답하시나요? 상담받아봤지만 막상 집에 오면 또 답답해져요.',

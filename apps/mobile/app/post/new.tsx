@@ -7,7 +7,7 @@ import { api } from '@/api';
 const CATEGORIES = [
   { id: 'free',       label: '자유톡',   color: '#6BAF7B' },
   { id: 'heart',      label: '속마음',   color: '#D4728C' },
-  { id: 'kids',       label: '양육일기', color: '#5B8FC9' },
+  { id: 'kids',       label: '자녀이야기', color: '#5B8FC9' },
   { id: 'dating',     label: '연애/관계', color: '#C4956A' },
   { id: 'legal',      label: '법률/돈',  color: '#8C7B6B' },
   { id: 'remarriage', label: '재혼',     color: '#B8739E' },

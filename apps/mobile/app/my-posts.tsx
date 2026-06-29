@@ -13,7 +13,7 @@ interface Post {
 const CAT: Record<string, { label: string; color: string }> = {
   free:       { label: '자유톡',   color: '#6BAF7B' },
   heart:      { label: '속마음',   color: '#D4728C' },
-  kids:       { label: '양육일기', color: '#5B8FC9' },
+  kids:       { label: '자녀이야기', color: '#5B8FC9' },
   dating:     { label: '연애/관계', color: '#C4956A' },
   legal:      { label: '법률/돈',  color: '#8C7B6B' },
   men_only:   { label: '남성방',   color: '#5B8FC9' },
